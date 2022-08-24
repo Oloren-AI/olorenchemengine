@@ -1,8 +1,9 @@
 =============================
-Oloren ChemEngine |oceLogo|
+|oceLogo| Oloren ChemEngine
 =============================
 
 .. |oceLogo| image:: assets/oce_logo.png
+  :height: 30
 
 Oloren ChemEngine (oce) is a software package developed and maintained by Oloren AI containing a
 unified API for the development and use of molecular property predictors enabling
