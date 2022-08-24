@@ -7,14 +7,13 @@ Made by `Oloren AI <oloren.ai>`_, the Python library **Oloren ChemEngine** enabl
 Installation
 ***********
 
-After cloning the repository, you can install the package with the following command:
+In a Python 3.8 environment, you can install the package with the following command:
 
 .. code-block:: bash
 
-    bash install.sh
-    pip install . # add -e for development
+    bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)
 
-This will work fine in both a conda environment and a pip environment.
+Feel free to inspect the install script to see what is going on under the hood. This will work fine in both a conda environment and a pip environment.
 
 Quick Start
 ***********
