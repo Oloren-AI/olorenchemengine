@@ -19,17 +19,17 @@ molecular vector representations.
 
     import olorenchemengine as oce
 
-    df = oce.ExampleDataset
-
+    df = oce.ExampleDataFrame()
+    
     model = oce.BaseBoosting([
                 oce.RandomForestModel(oce.DescriptastorusDescriptor("rdkit2dnormalized"), n_estimators=1000),
                 oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000)])
     model.fit(df["Smiles"], df["pChEMBL Value"])
-
+    
     oce.save(model, "model.oce")
-
+    
     model2 = oce.load("model.oce")
-
+    
     y_pred = model2.predict(["CC(=O)OC1=CC=CC=C1C(=O)O"])
 
 It's that simple! And it's just as simple to train a graph neural network, generate
