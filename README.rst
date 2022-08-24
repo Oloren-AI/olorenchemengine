@@ -67,7 +67,6 @@ In a Python 3.8 environment, you can install the package with the following comm
 .. code-block:: bash
 
     bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)
-    curl -s -L https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh | bash
 
 Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment.
 
