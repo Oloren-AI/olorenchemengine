@@ -1,0 +1,84 @@
+# Temporary and binary files
+
+gcloud-auth.json
+
+experiments
+
+*.csv
+*.pth
+*.oce
+
+!ModelDatabase_*
+
+*~
+*.py[cod]
+*.so
+*.cfg
+!.isort.cfg
+!setup.cfg
+*.orig
+*.log
+*.pot
+__pycache__/*
+.cache/*
+.*.swp
+*/.ipynb_checkpoints/*
+.ipynb_checkpoints
+.DS_Store
+lightning_logs/
+e/
+
+# Project files
+.ropeproject
+.project
+.pydevproject
+.settings
+.idea
+.vscode
+tags
+
+# Package files
+*.egg
+*.eggs/
+.installed.cfg
+*.egg-info
+
+# Unittest and coverage
+htmlcov/*
+.coverage
+.coverage.*
+.tox
+junit*.xml
+coverage.xml
+.pytest_cache/
+tmp.oce
+*/tmp.oce
+
+# Build and docs folder/files
+build/*
+dist/*
+sdist/*
+docs/api/*
+docs/_rst/*
+docs/_build/*
+cover/*
+MANIFEST
+
+# Per-project virtualenvs
+.venv*/
+.conda*/
+
+# profiling info
+*_profile.py
+*_profile.oce
+
+# data files
+src/olorenchemengine/data/dataset/*.csv
+src/olorenchemengine/CONFIG.json
+src/olorenchemengine/CREDENTIALS.json
+src/olorenchemengine/*.json
+
+# tutorials
+/examples/**/*.*
+!/examples/**/*.ipynb
+!/examples/bbb_data.xlsx
