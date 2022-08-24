@@ -82,3 +82,6 @@ src/olorenchemengine/*.json
 /examples/**/*.*
 !/examples/**/*.ipynb
 !/examples/bbb_data.xlsx
+
+# test images
+tests/*.png

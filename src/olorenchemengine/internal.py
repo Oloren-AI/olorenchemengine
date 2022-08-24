@@ -68,7 +68,7 @@ class OASConnector:
         PATH_TO_REFRESH_TOKEN = f"{home}/.oce/firebase_refresh_token.json"
 
         if not os.path.exists(PATH_TO_REFRESH_TOKEN):
-            print("Navigate to https://beta.oloren.ai/auth to get auth token.")
+            print("Navigate to https://oas.oloren.ai/auth to get auth token.")
             response = log_in_first_time(input("Paste token here: "))
             if not os.path.exists(f"{home}/.oce"):
                 os.makedirs(f"{home}/.oce")
@@ -120,7 +120,7 @@ class OASConnector:
             }
         )
 
-        print(f"Uploaded visualization to https://beta.oloren.ai/vis?vid={out[1].id}")
+        print(f"Uploaded visualization to https://oas.oloren.ai/vis?vid={out[1].id}")
 
         return out
 
