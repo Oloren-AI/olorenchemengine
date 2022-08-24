@@ -40,7 +40,7 @@ capabilities is available in our documentation at `docs.oloren.ai <https://docs.
 oce at a high level
 -------------------------------
 
-Everything in oce is built around Oloren's proprietary ``BaseClass`` system, which all classes stem from.
+Everything in oce is built around Oloren's ``BaseClass`` system, which all classes stem from.
 Any ``BaseClass`` derived objects has its parameters and complete state saved
 via ``parmeterize`` and ``saves`` respectively. A blank object (no internal state)
 can be recreated via ``create_BC`` and a complete object (with internal state) can
