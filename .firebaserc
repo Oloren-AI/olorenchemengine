@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "oloren-ai"
+  },
+  "targets": {
+    "oloren-ai": {
+      "hosting": {
+        "docs": [
+          "oloren-docs"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

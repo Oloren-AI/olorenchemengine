@@ -62,3 +62,5 @@ if ! python -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader(sys.argv[
 else
     echo "Pyg installation found, skipping installation..."
 fi
+
+pip install olorenchemengine
