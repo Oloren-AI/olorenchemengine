@@ -77,6 +77,11 @@ _______________________________
 We have an examples folder, which we'd highly reccomend you checkout--1A and 1B
 in particular--the rest of the examples can be purused when the topics come up.
 
+_______________________________
+Notice
+_______________________________
+NOTICE: IN CHEMENGINE, WE LOG MODEL PERFORMANCE AND MODEL HYPERPARAMETERS—NO THERAPEUTIC DATA—AND WE REQUIRE CONTRIBUTOR AGREEMENTS
+
 -------------------------------
 Our Thanks
 -------------------------------
