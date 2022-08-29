@@ -61,9 +61,14 @@ else
     echo "Pyg installation found, skipping installation..."
 fi
 
-if [[ $* == *--dev* ]]; then
-    SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-    pip install -e $SCRIPT_DIR # install editable copy of the package for dev
+
+if [[ $* == *--docker* ]]; then
+    echo "Docker argument passed, skipping installing chemengine package."
 else
-    pip install olorenchemengine
+    if [[ $* == *--dev* ]]; then
+        SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+        pip install -e $SCRIPT_DIR # install editable copy of the package for dev
+    else
+        pip install olorenchemengine
+    fi
 fi

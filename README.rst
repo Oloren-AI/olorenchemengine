@@ -71,10 +71,36 @@ In a Python 3.8 environment, you can install the package with the following comm
 Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment.
 
 _______________________________
+Docker
+_______________________________
+
+Alternatively, you can also run OCE from one of our docker images. After cloning the repo, just run:
+
+.. code-block:: bash
+
+    docker build -t oce:latest -f docker/Dockerfile.gpu . # build the docker image
+    docker run -it -v ~/.oce:/root/.oce oce:latest python # run the docker image
+
+Replace ".gpu" with ".cpu" in the docker path if you want to run the project in a dockerized environment.
+
+_______________________________
 Basic Usage
 _______________________________
 We have an examples folder, which we'd highly reccomend you checkout--1A and 1B
 in particular--the rest of the examples can be purused when the topics come up.
+
+_______________________________
+Contributing
+_______________________________
+First, thank you for contributing to OCE! To install OCE in editable/development mode, simply clone the repository and run:
+
+.. code-block:: bash
+
+    bash install.sh --dev
+
+This will install the repo in an editable way, so your changes will reflect immediately in your python environment. All tests for OCE are in the `tests` directory and can be run by running `pytest` in this directory. Please contact support@oloren.ai if you need any assistance in your development process!
+
+PRs from external collaborators will require a Contributor License Agreement (CLA) to be signed before the code is merged into the repository.
 
 _______________________________
 Notice
