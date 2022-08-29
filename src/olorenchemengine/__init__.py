@@ -41,7 +41,8 @@ import pandas as pd
 import json
 import torch
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "CONFIG.json")
+
+CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".oce/CONFIG.json")
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH) as f:
         CONFIG_ = json.load(f)

@@ -1,0 +1,6 @@
+FROM continuumio/miniconda3
+MAINTAINER Raunak Chowdhuri <raunak@oloren.ai>
+
+RUN conda install python=3.8
+COPY . .
+RUN bash install.sh --dev
