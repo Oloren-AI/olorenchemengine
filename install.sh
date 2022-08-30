@@ -1,8 +1,6 @@
 #!/bin/bash
 
-# Check if currently in a conda environment automatically
-CONDA=0
-if [ "$CONDA_PREFIX" ]; then
+if [[ $(python -c "import sys, os; print(os.path.exists(os.path.join(sys.prefix, 'conda-meta')))") = *True* ]]; then
     echo "Detected conda environment, using conda commands going forward..."
     CONDA=1
 else
@@ -44,7 +42,7 @@ if ! python -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader(sys.argv[
         echo "Found CUDA=11.3 enabled PyTorch, installing torch geometric with GPU support..."
         if [ $CONDA == 1 ]; then
             echo ">> conda install pyg -c pyg"
-            conda install pyg -c pyg
+            conda install -y pyg -c pyg
         else
             echo ">> python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu113.html"
             python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
@@ -52,7 +50,7 @@ if ! python -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader(sys.argv[
     else
         if [ $CONDA == 1 ]; then
             echo ">> conda install pyg -c pyg"
-            conda install pyg -c pyg
+            conda install -y pyg -c pyg
         else
             echo "Found PyTorch without CUDA=11.3, installing torch geometric without GPU support..."
             echo ">> python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cpu.html"
@@ -63,4 +61,14 @@ else
     echo "Pyg installation found, skipping installation..."
 fi
 
-pip install olorenchemengine
+
+if [[ $* == *--docker* ]]; then
+    echo "Docker argument passed, skipping installing chemengine package."
+else
+    if [[ $* == *--dev* ]]; then
+        SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+        pip install -e $SCRIPT_DIR # install editable copy of the package for dev
+    else
+        pip install olorenchemengine
+    fi
+fi
