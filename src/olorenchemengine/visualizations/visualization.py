@@ -347,12 +347,14 @@ class VisualizeDatasetCompounds(BaseVisualization):
         compound_height = 250 (int): Height of each compound image in the table
         annotations = None (str): Name of columns in dataset to be used to annotated
             the table. Will only be considered if dataset is a BaseDataset.
+        kekulize = True (bool): Whether or not to kekulize molecules for rendering.
+            Default is True.
         box = True (bool):
         shuffle = True (bool): Whether or not to shuffle the compounds."""
 
     @log_arguments
     def __init__(self, dataset: Union[BaseDataset, list, pd.Series], table_width: int = 2, table_height: int = 5,
-        compound_width: int = 250, compound_height: int = 250, annotations = None,
+        compound_width: int = 250, compound_height: int = 250, annotations = None, kekulize = True,
         box=True, shuffle=True,log=True, **kwargs):
         self.dataset = dataset
         if issubclass(type(dataset), BaseDataset):
@@ -377,11 +379,14 @@ class VisualizeDatasetCompounds(BaseVisualization):
         self.compound_width = compound_width
         self.compound_height = compound_height
         self.annotations = annotations
+        self.kekulize = kekulize
         self.box = box
         super().__init__(**kwargs)
         self.packages = ["smilesdrawer", "plotly"]
 
     def get_data(self):
+        if self.kekulize:
+            self.compounds = [Chem.MolToSmiles(Chem.MolFromSmiles(s), kekuleSmiles = True) for s in self.compounds]
         d =  {"smiles": self.compounds,
             "table_width": self.table_width,
             "table_height": self.table_height,
