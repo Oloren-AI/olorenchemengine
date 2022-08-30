@@ -432,6 +432,8 @@ class CompoundScatterPlot(BaseVisualization):
             y-axis value. Default is None.
         smiles_col (str, optional): If specified, uses value as the column name for the
             molecule smiles. Default is None.
+        kekulize (bool, optional): Whether or not to kekulize molecules for display.
+            Default is True.
         color_col (str, optional): If specified, uses value as the column name for the
             color of the markers. Default is None.
         xaxis_type (str, optional): Type of x-axis. Default is 'linear', other
@@ -470,6 +472,7 @@ class CompoundScatterPlot(BaseVisualization):
         x_col: str =    None,
         y_col: str =    None,
         smiles_col: str = None,
+        kekulize: bool = True,
         color_col: str = None,
         xaxis_type: str = "linear",
         yaxis_type: str = "linear",
@@ -519,6 +522,7 @@ class CompoundScatterPlot(BaseVisualization):
             self.yaxis_title = yaxis_title
 
         # Saves aesthetic variables
+        self.kekulize = kekulize
         self.xaxis_type = xaxis_type
         self.yaxis_type = yaxis_type
         self.axesratio = axesratio
@@ -559,6 +563,8 @@ class CompoundScatterPlot(BaseVisualization):
             dict: Data for visualization."""
 
         if include_data:
+            if self.kekulize:
+                self.df["SMILES"] = self.df["SMILES"].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), kekuleSmiles=True))
             d = self.df.to_dict("l")
         else:
             d = dict()
@@ -686,7 +692,7 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         return pd.DataFrame(pca_arr, columns=["Component 1", "Component 2"])
 
     def get_data(self, color: str = None, size: str = None, SMILES: str = None) -> dict:
-        d = super().get_data(include_data=False)
+        d = super().get_data(include_data=True)
 
         if not self.color is None:
             assert self.color in self.dataset.data.columns, f"specified color column, {color}, not in columns"
@@ -695,10 +701,6 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         if not size is None:
             assert size in self.df.columns, f"specified size column, {size}, not in columns"
             d["size"] = self.df[size].tolist()
-
-        d["X"] = self.dataset.data["X"].tolist()
-        d["Y"] = self.dataset.data["Y"].tolist()
-        d["SMILES"] = self.dataset.data[self.dataset.structure_col].tolist()
 
         d["colorscale"] = self.colorscale
 
