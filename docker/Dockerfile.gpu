@@ -1,0 +1,37 @@
+FROM nvidia/cuda:11.3.1-devel
+MAINTAINER Raunak Chowdhuri <raunak@oloren.ai>
+
+# NVIDIA Key Swaps
+RUN rm /etc/apt/sources.list.d/cuda.list
+RUN rm /etc/apt/sources.list.d/nvidia-ml.list
+RUN apt-key del 7fa2af80
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
+RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64/7fa2af80.pub
+
+## Basic dependencies
+RUN apt-get clean && apt-get update -y -qq
+RUN apt-get install -y curl git build-essential
+RUN echo "deb http://us.archive.ubuntu.com/ubuntu/ xenial main universe" >> /etc/apt/sources.list
+RUN echo "deb-src http://us.archive.ubuntu.com/ubuntu/ xenial main universe" >> /etc/apt/sources.list
+RUN apt-get update
+RUN ["apt-get", "install", "-y", "libsm6", "libxext6", "libxrender-dev"]
+
+# Install Anaconda3
+ENV PATH="/root/miniconda3/bin:${PATH}"
+ARG PATH="/root/miniconda3/bin:${PATH}"
+RUN apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+RUN wget \
+    https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+    && mkdir /root/.conda \
+    && bash Miniconda3-latest-Linux-x86_64.sh -b \
+    && rm -f Miniconda3-latest-Linux-x86_64.sh
+
+# Set the conda version!
+RUN conda --version
+RUN conda install python=3.8
+
+# Copy the library over
+COPY install.sh install.sh
+RUN bash install.sh --docker
+COPY . .
+RUN pip install .
