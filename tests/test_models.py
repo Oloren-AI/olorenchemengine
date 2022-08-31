@@ -8,6 +8,7 @@ from olorenchemengine.ensemble import *
 from olorenchemengine.automl import *
 from olorenchemengine.benchmarks import *
 import pandas as pd
+from olorenchemengine.internal import download_public_file
 from sklearn.model_selection import train_test_split
 
 __author__ = "Oloren AI"
@@ -16,19 +17,22 @@ __copyright__ = "Oloren AI"
 
 @pytest.fixture
 def example_data():
-    df = pd.read_csv("tests/sample_data1.csv")[:10]
+    file_path = download_public_file("sample-csvs/sample_data1.csv")
+    df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
 
 @pytest.fixture
 def example_data2():
-    df = pd.read_csv("tests/sample_data2.csv")[:10]
+    file_path = download_public_file("sample-csvs/sample_data2.csv")
+    df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
 
 @pytest.fixture
 def example_data3():
-    df = pd.read_csv("tests/sample_data3.csv")[:10]
+    file_path = download_public_file("sample-csvs/sample_data3.csv")
+    df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
 def bf_model(model):
@@ -264,6 +268,11 @@ def test_mol2vec(example_data):
     from olorenchemengine.external import Mol2Vec
 
     model = oce.RandomForestModel(Mol2Vec(), n_estimators=10,)
+    train_predict_slf(model, example_data)
+
+def test_smiles_transformer(example_data):
+    from olorenchemengine.external import HondaSTRep
+    model = RandomForestModel(HondaSTRep(), n_estimators=10,)
     train_predict_slf(model, example_data)
 
 
