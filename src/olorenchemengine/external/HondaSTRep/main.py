@@ -4,8 +4,8 @@ import pandas as pd
 from typing import List, Union, Any
 
 import olorenchemengine as oce
-from olorenchemengine.base_class import log_arguments
-from olorenchemengine.representations import BaseVecRepresentation
+from olorenchemengine.base_class import log_arguments, BaseModel
+from olorenchemengine.representations import BaseVecRepresentation, SMILESRepresentation
 from olorenchemengine.internal import download_public_file
 from .operations import WordVocab, TrfmSeq2seq, Seq2seqDataset
 
@@ -14,6 +14,9 @@ from torch.utils.data import DataLoader
 import torch
     
 class HondaSTRep(BaseVecRepresentation):
+    """ HondaSTRep is an implementation of the molecular representation provided
+    by Honda et al. in `SMILES Transformer: Pre-trained Molecular Fingerprint for Low Data Drug Discovery
+    <https://arxiv.org/abs/1911.04738>`."""
 
     @log_arguments
     def __init__(self):
