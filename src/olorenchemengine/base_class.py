@@ -730,7 +730,7 @@ class BaseModel(BaseClass):
         except:
             pass
         # LOGGING END
-
+        print(response)
         if values:
             d.update({"values": y_pred})
 
