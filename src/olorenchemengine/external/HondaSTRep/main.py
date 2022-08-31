@@ -35,6 +35,8 @@ class HondaSTRep(BaseVecRepresentation):
         return output
 
     def _convert_list(self, smiles_list: List[str], ys: List[Union[int, float, np.number]] = None) -> List[np.ndarray]:
+        if isinstance(smiles_list, pd.Series):
+            smiles_list = smiles_list.tolist()
         seq2seqdataset = Seq2seqDataset(smiles_list, self.vocab)
         loader = DataLoader(seq2seqdataset, batch_size=32, shuffle=False, num_workers=oce.CONFIG["NUM_WORKERS"])
         output = None
