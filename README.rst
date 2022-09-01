@@ -107,11 +107,9 @@ Notice
 _______________________________
 Maintaining and developing Oloren ChemEngine requires a lot of resources. As such, we would like to log for each evaluated model the model hyperparameters, the model performance metrics and a unique, non-identifying hash of the dataset. These logs are used to improve our AutoML model. Below is a representative example of such a log:
 
-.. code-block:: json
-
-    {
+.. code-block:: javascript
     
-    dataset_hash: "149eae5c763afcc14f6355007df298b05f4a51c6a334ea933fbe7fc496adb271",
+    {dataset_hash: "149eae5c763afcc14f6355007df298b05f4a51c6a334ea933fbe7fc496adb271",
 
     metric_direction: null,
 
@@ -119,9 +117,7 @@ Maintaining and developing Oloren ChemEngine requires a lot of resources. As suc
 
     name: "BaseBoosting 1zpI0dIb",
 
-    params: "{"BC_class_name": "BaseBoosting", "args": [[{"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morgan3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morganchiral3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morganfeature3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["rdkit2dnormalized"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "OlorenCheckpoint", "args": ["default"], "kwargs": {"log": true, "num_tasks": 2048}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}]], "kwargs": {"log": true, "n": 1, "oof": false, "nfolds": 5}}"
-    
-    }
+    params: "{"BC_class_name": "BaseBoosting", "args": [[{"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morgan3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morganchiral3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morganfeature3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["rdkit2dnormalized"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "OlorenCheckpoint", "args": ["default"], "kwargs": {"log": true, "num_tasks": 2048}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}]], "kwargs": {"log": true, "n": 1, "oof": false, "nfolds": 5}}"}
 
 The dataset hash is created with the following code:
 
