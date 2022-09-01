@@ -72,9 +72,9 @@ extensions = [
     "sphinx.ext.ifconfig",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    "sphinxcontrib.googleanalytics",
+    # "sphinxcontrib.googleanalytics",
 ]
-googleanalytics_id = 'G-R5E6ME01BB'
+# googleanalytics_id = 'G-R5E6ME01BB'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -186,6 +186,9 @@ html_theme = "furo"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
+
+# adding JS code to each page (for google analytics)
+# html_js_files = ['js/analytics.js',]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
