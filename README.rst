@@ -129,7 +129,7 @@ The dataset hash is created with the following code:
 
 This means that **we log no therapeutics-related data whatsoever.** We just log hashes of model performance. 
 
-If you would still prefer a logging-free version, please fill out the following form to obtain a version with all logging code excised: [https://y09gl0qf49q.typeform.com/to/brGMidJ0](https://y09gl0qf49q.typeform.com/to/brGMidJ0). 
+If you would still prefer a logging-free version, please fill out the following form to obtain a version with all logging code excised: https://y09gl0qf49q.typeform.com/to/brGMidJ0. 
 
 We also require contributor agreements for all versions of Oloren ChemEngine.
 
