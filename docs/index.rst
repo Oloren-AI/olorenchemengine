@@ -26,7 +26,7 @@ Quick Start
     # df is a Pandas Dataframe with the following columns:
     # "Smiles" (structure)
     # "pChEMBL Value" (property to be predicted)
-    df = oce.ExampleDataset
+    df = oce.ExampleDataFrame()
 
     ## Defining a model
 
