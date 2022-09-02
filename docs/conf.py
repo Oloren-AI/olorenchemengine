@@ -72,9 +72,12 @@ extensions = [
     "sphinx.ext.ifconfig",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
-    # "sphinxcontrib.googleanalytics",
+    "sphinxcontrib.gtagjs",
 ]
-# googleanalytics_id = 'G-R5E6ME01BB'
+
+gtagjs_ids = [
+    'G-R5E6ME01BB',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
