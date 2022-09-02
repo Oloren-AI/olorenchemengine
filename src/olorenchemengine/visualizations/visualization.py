@@ -633,11 +633,14 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         """
 
     @log_arguments
-    def __init__(self, dataset: BaseDataset, rep: BaseCompoundVecRepresentation, dim_reduction="tsne", *args,
+    def __init__(self, dataset: Union[BaseDataset, list, pd.Series], rep: BaseCompoundVecRepresentation, dim_reduction="tsne", *args,
             color = None, colorscale = "Portland", title ="Chemical Space Plot", log=True, **kwargs):
 
         # Sets visualization instance variables
-        self.dataset = dataset
+        if issubclass(type(dataset), BaseDataset):
+            self.structures = self.dataset.data[self.dataset.structure_col]
+        else:
+            self.structures = dataset
         self.colorscale = colorscale
         self.rep = rep
         self.dim_reduction = dim_reduction
@@ -647,7 +650,7 @@ class ChemicalSpacePlot(CompoundScatterPlot):
             self.color = color
 
         # Converts the molecules in the dataset to the desired representation
-        chem_rep_list = self.rep.convert(self.dataset.data[self.dataset.structure_col])
+        chem_rep_list = self.rep.convert(self.structures)
 
         # Does dimensionality reduction on the given representation to get the
         # 2D coordinates of the chemical space plot
@@ -657,13 +660,17 @@ class ChemicalSpacePlot(CompoundScatterPlot):
             df = self.pca_df(chem_rep_list)
 
         # Sets the dataframe up to be used by the parent class CompoundScatterPlot
-        self.dataset.data["X"] = df["Component 1"]
-        self.dataset.data["Y"] = df["Component 2"]
-        self.dataset.data["SMILES"] = self.dataset.data[self.dataset.structure_col]
+        if issubclass(type(dataset), BaseDataset):
+            self.df = self.dataset.data
+        else:
+            self.df = pd.DataFrame()
+        self.df["X"] = df["Component 1"]
+        self.df["Y"] = df["Component 2"]
+        self.df["SMILES"] = self.structures
 
         self.title = title
 
-        super().__init__(self.dataset.data, *args, title=self.title,
+        super().__init__(self.df, *args, title=self.title,
             xaxis_title="Component 1", yaxis_title="Component 2", log=False, **kwargs)
 
     def tsne_df(self, chem_rep_list):
@@ -700,8 +707,8 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         d = super().get_data(include_data=True)
 
         if not self.color is None:
-            assert self.color in self.dataset.data.columns, f"specified color column, {color}, not in columns"
-            d["color"] = self.dataset.data[self.color].tolist()
+            assert self.color in self.df.columns, f"specified color column, {color}, not in columns"
+            d["color"] = self.df[self.color].tolist()
 
         if not size is None:
             assert size in self.df.columns, f"specified size column, {size}, not in columns"

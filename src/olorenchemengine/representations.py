@@ -510,6 +510,18 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
         rep1 (BaseVecRepresentation): first representation to concatenate
         rep2 (BaseVecRepresentation): second representation to concatenate
         log (bool): whether to log the representations or not
+        
+    Can be created by adding two representations together using + operator.
+    
+    Example
+    ------------------------------
+    import olorenautoml as oam
+    combo_rep = oam.MorganVecRepresentation(radius=2, nbits=2048) + oam.Mol2Vec()
+    model = oam.RandomForestModel(representation = combo_rep, n_estimators = 1000)
+    
+    model.fit(train['Drug'], train['Y'])
+    model.predict(test['Drug'])
+    ------------------------------  
     """
 
     @log_arguments
@@ -543,8 +555,19 @@ class NoisyVec(BaseVecRepresentation):
     Parameters:
         rep (BaseVecRepresentation): BaseVecRepresentation to add noise to
         a_std (float): standard deviation of the additive noise. Defaults to 0.1.
-        m_std (float): standard deviation of the multiplicative noise. Defaults to 0.1."""
-
+        m_std (float): standard deviation of the multiplicative noise. Defaults to 0.1.
+        names (List[str]): list of the names of the features in the vector representation, optional.
+        
+    Example
+    ------------------------------
+    import olorenautoml as oam
+    model = oam.RandomForestModel(representation = oam.'''BaseCompoundVecRepresentation(Params)''', n_estimators=1000)
+    
+    model.fit(train['Drug'], train['Y'])
+    model.predict(test['Drug'])
+    ------------------------------      
+    """
+    
     @log_arguments
     def __init__(self, rep: BaseVecRepresentation, *args, a_std=0.1, m_std=0.1, **kwargs):
         self.a_std = a_std

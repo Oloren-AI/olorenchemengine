@@ -243,10 +243,11 @@ class SwapMutations(PerturbationEngine):
                 for remove in removal:
                     m.RemoveAtom(remove.GetIdx())
                 try:
-                    s1 = Chem.MolToSmiles(m)
                     m = self.stitch(m)
+                    s = Chem.MolToSmiles(m)
+                    m = Chem.MolFromSmiles(s)
                     if not m is None:
-                        outs.append(Chem.MolToSmiles(m))
+                        outs.append(s)
                 except Exception as e:
                     pass
         return outs
