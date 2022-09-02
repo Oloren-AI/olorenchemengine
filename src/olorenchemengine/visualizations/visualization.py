@@ -576,9 +576,8 @@ class CompoundScatterPlot(BaseVisualization):
             dict: Data for visualization."""
 
         if include_data:
-            if self.kekulize:
-                self.df["SMILES"] = self.df["SMILES"].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), kekuleSmiles=True))
             d = self.df.to_dict("l")
+            d["SMILES"] = self.df["SMILES"].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), kekuleSmiles=self.kekulize)).tolist()
         else:
             d = dict()
         d["title"] = self.title
@@ -747,7 +746,9 @@ class VisualizeMoleculePerturbations(ChemicalSpacePlot):
     @log_arguments
     def __init__(self, smiles: str, 
             perturbation_engine: PerturbationEngine = None,
-            rep: BaseVecRepresentation = None):
+            rep: BaseVecRepresentation = None,
+            idx: int = None,
+            n: int = None):
         self.smiles = smiles
         if perturbation_engine is None:
             self.perturbation_engine = SwapMutations(radius = 0)
@@ -757,18 +758,26 @@ class VisualizeMoleculePerturbations(ChemicalSpacePlot):
             self.rep = DescriptastorusDescriptor("morgan3counts")
         else:
             self.rep = rep
-        
+            
+        if n is None:
+            self.n = 100
+        else:
+            self.n = n
+            
         from rdkit import Chem
-        from rdkit.Chem.Fingerprints import FingerprintMols
+        from rdkit.Chem import AllChem
         
         df = pd.DataFrame()
-        df["SMILES"] = self.perturbation_engine.get_compound_list(smiles) + [smiles]
+        if idx is None:
+            df["SMILES"] = self.perturbation_engine.get_compound_list(smiles) + [smiles]
+        else:
+            df["SMILES"] = self.perturbation_engine.get_compound_list(smiles, idx = idx)+ [smiles]
         df["mols"] = [Chem.MolFromSmiles(s) for s in df["SMILES"]]
         df = df.dropna(subset = ["mols"])
         
-        fps = [FingerprintMols.FingerprintMol(m) for m in df["mols"]]
+        fps = [AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048, useChirality=False) for m in df["mols"]]
         
-        df["sim"] = DataStructs.BulkTanimotoSimilarity(FingerprintMols.FingerprintMol(Chem.MolFromSmiles(self.smiles)), fps)
+        df["sim"] = DataStructs.BulkTanimotoSimilarity(AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(self.smiles), 2, nBits=2048, useChirality=False) , fps)
         
         super().__init__(df,
                 self.rep,
