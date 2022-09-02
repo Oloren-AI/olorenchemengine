@@ -28,7 +28,8 @@ class PerturbationEngine(BaseClass):
         get_compound: returns a compound with a randomly chosen modification
         get_compound_list: returns a list of compounds with modifications, the list
             is meant to be comprehensive of the result of the application of an
-            entire class of modifications"""
+            entire class of modifications."""
+            
     @abstractmethod
     def get_compound_at_idx(self, smiles, idx):
         pass
@@ -250,7 +251,7 @@ class SwapMutations(PerturbationEngine):
                         outs.append(s)
                 except Exception as e:
                     pass
-        return outs
+        return list(set(outs))
 
     def _save(self) -> dict:
         return super()._save()
@@ -297,7 +298,7 @@ class STONEDMutations(PerturbationEngine):
         selfies_ls = [sf.encoder(x) for x in randomized_smile_orderings]
         selfies_mut = get_mutated_SELFIES(selfies_ls.copy(), num_mutations = self.mutations)
         smiles_back = [sf.decoder(x) for x in selfies_mut]
-        return smiles_back
+        return list(set(smiles_back))
 
     def _save(self) -> dict:
         return super()._save()
