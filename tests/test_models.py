@@ -5,7 +5,6 @@ from olorenchemengine.base_class import *
 from olorenchemengine.basics import *
 from olorenchemengine.representations import *
 from olorenchemengine.ensemble import *
-from olorenchemengine.automl import *
 from olorenchemengine.benchmarks import *
 import pandas as pd
 from olorenchemengine.internal import download_public_file
@@ -174,43 +173,8 @@ def test_rfstacker(example_data):
     train_predict_slf(model, example_data)
 
 
-def test_queued_automl(example_data):
-    mp = oce.automl.QueuedAutoML().get_model()
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
-
 
 import warnings
-
-
-def test_random_walk(example_data):
-    if "GOOGLE_CREDENTIALS_FILENAME" not in oce.CONFIG and "GOOGLE_SERVICE_ACC_FILENAME" not in oce.CONFIG:
-        warnings.warn(UserWarning("Skipping random walk test due to lack of credentials."))
-        return
-
-    mp = oce.automl.RandomWalk().get_model()
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
-
-
-@pytest.mark.timeout(30)
-def test_ns_automl(example_data2):
-    mp = oce.automl.NaiveSelection().get_model()
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
-
-
-@pytest.mark.timeout(30)
-def test_ns_automl_2(example_data2):
-    mp = oce.automl.NaiveSelection().get_model(
-        structure_column="Smiles", input_columns=["feat1"], value_columns=["feat2"]
-    )
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
 
 
 def test_ns_spgnn_1(example_data3):
