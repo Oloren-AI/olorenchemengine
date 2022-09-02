@@ -62,7 +62,7 @@ The following are the guiding principles for the development of **Oloren ChemEng
 * | **Flexibility**: differing molecular representations, experimental datapoints, model architectures, ensembling strategies, and other innovative methodologies can be implemented in a consistent framework
 * | **Accuracy**: the capabilities of the library match or supercede top-of-the-leaderboard molecular property predictors, with a concerted focus on improving the utility of molecular property predictors in real-world settings, leveraging available experimental data.
 
-Defined as subclasses of ``BaseModel``, models including graph neural networks, descriptor- and fingerprint-based machine learning models, and Oloren AI proprietary models are all supported. Defined as subclasses of ``BaseAutoML``, algorithms to automatically select and find the best model architectures are provided as well.
+Defined as subclasses of ``BaseModel``, models including graph neural networks, descriptor- and fingerprint-based machine learning models, and Oloren AI proprietary models are all supported. 
 
 Contents
 ========

@@ -94,7 +94,6 @@ update_config()
 def ExampleDataFrame():
     return pd.read_csv("gs://oloren-public-data/sample-csvs/sample_data3.csv")
 
-from .automl import *
 from .base_class import *
 from .basics import *
 from .ensemble import *

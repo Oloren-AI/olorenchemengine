@@ -2,6 +2,8 @@ from random import random
 import pytest
 import olorenchemengine as oce
 import pandas as pd
+from olorenchemengine.internal import download_public_file
+
 
 __author__ = "Oloren AI"
 __copyright__ = "Oloren AI"
@@ -11,17 +13,20 @@ __copyright__ = "Oloren AI"
 
 @pytest.fixture
 def example_data1():
-    df = pd.read_csv("tests/sample_data1.csv")
+    file_path = download_public_file("sample-csvs/sample_data1.csv")
+    df = pd.read_csv(file_path)
     return df
 
 @pytest.fixture
 def example_data2():
-    df = pd.read_csv("tests/sample_data2.csv")
+    file_path = download_public_file("sample-csvs/sample_data2.csv")
+    df = pd.read_csv(file_path)
     return df
 
 @pytest.fixture
 def example_data3():
-    df = pd.read_csv("tests/sample_data3.csv")
+    file_path = download_public_file("sample-csvs/sample_data3.csv")
+    df = pd.read_csv(file_path)
     return df
 
 def test_run_random(example_data3):
