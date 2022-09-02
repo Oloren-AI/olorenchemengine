@@ -1,4 +1,5 @@
 from cmath import e
+from lib2to3.pgen2.literals import simple_escapes
 import os
 from re import escape
 import urllib.parse
@@ -479,6 +480,7 @@ class CompoundScatterPlot(BaseVisualization):
         smiles_col: str = None,
         kekulize: bool = True,
         color_col: str = None,
+        colorscale: str = None,
         xaxis_type: str = "linear",
         yaxis_type: str = "linear",
         axesratio: float = None,
@@ -511,11 +513,17 @@ class CompoundScatterPlot(BaseVisualization):
             self.df["SMILES"] = self.df[smiles_col]
             if smiles_col != "SMILES":
                 self.df = self.df.drop(smiles_col, axis=1)
+                
+        if color_col == "property_col":
+            self.color_col = self.dataset.property_col
+        else:
+            self.color_col = color_col
         if color_col is not None:
             self.df["color"] = self.df[color_col]
             if color_col != "color":
                 self.df = self.df.drop(color_col, axis=1)
-
+        self.colorscale = colorscale
+        
         # Sets up axes titling using column names as defaults if available
         if xaxis_title is None and x_col is not None:
             self.xaxis_title = x_col
@@ -568,9 +576,8 @@ class CompoundScatterPlot(BaseVisualization):
             dict: Data for visualization."""
 
         if include_data:
-            if self.kekulize:
-                self.df["SMILES"] = self.df["SMILES"].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), kekuleSmiles=True))
             d = self.df.to_dict("l")
+            d["SMILES"] = self.df["SMILES"].apply(lambda x: Chem.MolToSmiles(Chem.MolFromSmiles(x), kekuleSmiles=self.kekulize)).tolist()
         else:
             d = dict()
         d["title"] = self.title
@@ -582,6 +589,8 @@ class CompoundScatterPlot(BaseVisualization):
         d["width"] = self.width
         d["height"] = self.height
         d["opacity"] = self.opacity
+        if not self.colorscale is None:
+            d["colorscale"] = self.colorscale
 
         if self.axesratio is not None:
             d["axesratio"] = self.axesratio
@@ -620,7 +629,9 @@ class ChemicalSpacePlot(CompoundScatterPlot):
     performing dimensionality reduction to 2 dimensions.
 
     Parameters:
-        dataset (BaseDataset): Dataset to be used in visualization.
+        dataset (BaseDataset, pd.Seriess, list): BaseDataset to be used in visualization. Alternatively
+            can be a list or pd.Series where then this object will be treated as a list 
+            of structures.
         rep (BaseCompoundVecRepresentation): Representation to use for dimensionality reduction.
         dim_reduction (str, optional): Dimensionality reduction method to use. Default is
             'tsne' other options are 'pca'.
@@ -633,21 +644,23 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         """
 
     @log_arguments
-    def __init__(self, dataset: BaseDataset, rep: BaseCompoundVecRepresentation, dim_reduction="tsne", *args,
-            color = None, colorscale = "Portland", title ="Chemical Space Plot", log=True, **kwargs):
+    def __init__(self, dataset: Union[BaseDataset, list, pd.Series, pd.DataFrame], rep: BaseCompoundVecRepresentation, 
+            *args, dim_reduction="tsne",
+            smiles_col=None, title ="Chemical Space Plot", log=True, **kwargs):
 
         # Sets visualization instance variables
-        self.dataset = dataset
-        self.colorscale = colorscale
+        if issubclass(type(dataset), BaseDataset):
+            self.structures = dataset.data[dataset.structure_col]
+        elif isinstance(dataset, pd.DataFrame):
+            assert smiles_col is not None, "smiles_col must be defined if `dataset` parameter is pd.DataFrame"
+            self.structures = dataset[smiles_col]
+        else:
+            self.structures = dataset
         self.rep = rep
         self.dim_reduction = dim_reduction
-        if color == "property_col":
-            self.color = self.dataset.property_col
-        else:
-            self.color = color
 
         # Converts the molecules in the dataset to the desired representation
-        chem_rep_list = self.rep.convert(self.dataset.data[self.dataset.structure_col])
+        chem_rep_list = self.rep.convert(self.structures)
 
         # Does dimensionality reduction on the given representation to get the
         # 2D coordinates of the chemical space plot
@@ -657,14 +670,22 @@ class ChemicalSpacePlot(CompoundScatterPlot):
             df = self.pca_df(chem_rep_list)
 
         # Sets the dataframe up to be used by the parent class CompoundScatterPlot
-        self.dataset.data["X"] = df["Component 1"]
-        self.dataset.data["Y"] = df["Component 2"]
-        self.dataset.data["SMILES"] = self.dataset.data[self.dataset.structure_col]
+        if issubclass(type(dataset), BaseDataset):
+            self.df = dataset.data
+        elif issubclass(type(dataset), pd.DataFrame):
+            self.df = dataset
+        else:
+            self.df = pd.DataFrame()
+            
+        self.df["X"] = df["Component 1"]
+        self.df["Y"] = df["Component 2"]
+        self.df["SMILES"] = self.structures
 
         self.title = title
 
-        super().__init__(self.dataset.data, *args, title=self.title,
-            xaxis_title="Component 1", yaxis_title="Component 2", log=False, **kwargs)
+        super().__init__(self.df, *args, title=self.title,
+            xaxis_title="Component 1", yaxis_title="Component 2", smiles_col = smiles_col,
+            log=False, **kwargs)
 
     def tsne_df(self, chem_rep_list):
         """
@@ -696,20 +717,74 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         pca_arr = pca.fit_transform(chem_rep_list)
         return pd.DataFrame(pca_arr, columns=["Component 1", "Component 2"])
 
-    def get_data(self, color: str = None, size: str = None, SMILES: str = None) -> dict:
+    def get_data(self, color_col: str = None, size_col: str = None, SMILES: str = None) -> dict:
         d = super().get_data(include_data=True)
 
-        if not self.color is None:
-            assert self.color in self.dataset.data.columns, f"specified color column, {color}, not in columns"
-            d["color"] = self.dataset.data[self.color].tolist()
+        self.color_col = color_col
+        if not self.color_col is None:
+            assert self.color_col in self.df.columns, f"specified color column, {self.color_col}, not in columns"
+            d["color"] = self.df[self.color_col].tolist()
 
-        if not size is None:
-            assert size in self.df.columns, f"specified size column, {size}, not in columns"
-            d["size"] = self.df[size].tolist()
-
-        d["colorscale"] = self.colorscale
+        self.size_col = size_col
+        if not self.size_col is None:
+            assert self.size_col in self.df.columns, f"specified size column, {self.size_col}, not in columns"
+            d["size"] = self.df[self.size_col].tolist()
 
         return d
+    
+class VisualizeMoleculePerturbations(ChemicalSpacePlot):
+    """ Visualize perturbations of a single molecule given from a PerturbationEngine
+    in a ChemicalSpacePlot.
+    
+    Parameters:
+        smiles (str): SMILES of molecule to perturb.
+        perturbation_engine (PerturbationEngine): Perturbation engine, which has 
+            the underlying algorithm for perturbing molecules. Default is `SwapMutations(radius = 0)`
+        rep (BaseVecRepresentation): Molecular vector representation to use for
+            dimensionality reduction"""
+        
+    @log_arguments
+    def __init__(self, smiles: str, 
+            perturbation_engine: PerturbationEngine = None,
+            rep: BaseVecRepresentation = None,
+            idx: int = None,
+            n: int = None):
+        self.smiles = smiles
+        if perturbation_engine is None:
+            self.perturbation_engine = SwapMutations(radius = 0)
+        else:
+            self.perturbation_engine = perturbation_engine
+        if rep is None:
+            self.rep = DescriptastorusDescriptor("morgan3counts")
+        else:
+            self.rep = rep
+            
+        if n is None:
+            self.n = 100
+        else:
+            self.n = n
+            
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+        
+        df = pd.DataFrame()
+        if idx is None:
+            df["SMILES"] = self.perturbation_engine.get_compound_list(smiles) + [smiles]
+        else:
+            df["SMILES"] = self.perturbation_engine.get_compound_list(smiles, idx = idx)+ [smiles]
+        df["mols"] = [Chem.MolFromSmiles(s) for s in df["SMILES"]]
+        df = df.dropna(subset = ["mols"])
+        
+        fps = [AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048, useChirality=False) for m in df["mols"]]
+        
+        df["sim"] = DataStructs.BulkTanimotoSimilarity(AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(self.smiles), 2, nBits=2048, useChirality=False) , fps)
+        
+        super().__init__(df,
+                self.rep,
+                title = "Chemical Space Plot of Molecular Perturbations<br><sub>Points colored by tanimoto similarity to the reference compund</sub>",
+                color_col = "sim",
+                smiles_col = "SMILES",
+                colorscale = "YlOrRd")
 
 class VisualizeDatasetSplit(ChemicalSpacePlot):
     """Visualize a dataset by seeing where train/test compounds are in a dimensionality
