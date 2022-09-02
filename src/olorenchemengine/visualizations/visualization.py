@@ -480,7 +480,7 @@ class CompoundScatterPlot(BaseVisualization):
         smiles_col: str = None,
         kekulize: bool = True,
         color_col: str = None,
-        colorscale: str = "Portland",
+        colorscale: str = None,
         xaxis_type: str = "linear",
         yaxis_type: str = "linear",
         axesratio: float = None,
@@ -590,7 +590,8 @@ class CompoundScatterPlot(BaseVisualization):
         d["width"] = self.width
         d["height"] = self.height
         d["opacity"] = self.opacity
-        d["colorscale"] = self.colorscale
+        if not self.colorscale is None:
+            d["colorscale"] = self.colorscale
 
         if self.axesratio is not None:
             d["axesratio"] = self.axesratio
