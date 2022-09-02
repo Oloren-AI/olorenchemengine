@@ -5,6 +5,7 @@ from olorenchemengine.interpret import *
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from olorenchemengine.internal import download_public_file
 
 from rdkit import Chem
 
@@ -16,7 +17,7 @@ __copyright__ = "Oloren AI"
 
 def test_datasetfromcsv():
     dataset = oce.DatasetFromCSV(
-        file_path=os.path.join(os.path.dirname(__file__), "sample_data1.csv"),
+        file_path=download_public_file("sample-csvs/sample_data1.csv"),
         structure_col="Smiles",
         property_col="pChEMBL Value",
     ) + oce.RandomSplit(split_proportions=[0.8,0.0,2])
@@ -30,7 +31,7 @@ def test_datasetfromcsv():
 
 def test_manage():
     dataset = oce.DatasetFromCSV(
-        file_path=os.path.join(os.path.dirname(__file__), "sample_data1.csv"),
+        file_path=download_public_file("sample-csvs/sample_data1.csv"),
         structure_col="Smiles",
         property_col="pChEMBL Value",
     ) + oce.RandomSplit(split_proportions=[0.8,0.1,0.1])

@@ -2,13 +2,15 @@ import pytest
 import olorenchemengine as oce
 import pandas as pd
 import numpy as np
+from olorenchemengine.internal import download_public_file
 
 __author__ = "Oloren AI"
 __copyright__ = "Oloren AI"
 
 @pytest.fixture
 def example_data1():
-    df = pd.read_csv("tests/sample_data1.csv")
+    file_path = download_public_file("sample-csvs/sample_data1.csv")
+    df = pd.read_csv(file_path)
     return df
 
 #RuntimeError: Not compiled with CUDA support
