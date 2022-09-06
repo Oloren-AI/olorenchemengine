@@ -1528,6 +1528,74 @@ class ModelROC(BaseVisualization):
         d["score"] = np.around(self.score, decimals=2)
         return d
 
+class ModelROCThreshold(BaseVisualization):
+    """ Visualize the ROC curve for a model.
+
+    Parameters:
+        dataset (Dataset): Dataset to evaluate model on
+        model (BaseModel): Model to evaluate on
+        model_name (str, optional): name of model. Default is None.
+        eval_set (str, optional): Subset of dataset to visualize, either 'train', 'test',
+            or 'valid'. Default is 'test'."""
+
+    @log_arguments
+    def __init__(self, dataset: BaseDataset, model: BaseModel, *args, eval_set="test",
+        log=True, model_name=None, **kwargs):
+
+        if not type(dataset) is BaseDataset:
+            raise TypeError(
+                "dataset must be a BaseDataset. If you're using a Pandas Dataframe consider using df.to_csv() in the"
+                + " oce.BaseDataset class to convert a pandas.DataFrame of data to a BaseDataset."
+            )
+        self.dataset = dataset
+        self.model = model
+
+        if eval_set == "test":
+            self.eval_set = self.dataset.test_dataset
+        elif eval_set == "train":
+            self.eval_set = self.dataset.train_dataset
+        elif eval_set == "valid":
+            self.eval_set = self.dataset.valid_dataset
+        else:
+            self.eval_set = self.dataset.entire_dataset
+
+        preds = self.model.predict(self.eval_set[0])
+
+        from sklearn import metrics
+
+        y_true = self.eval_set[1]
+        if isinstance(y_true, pd.Series):
+            y_true = y_true.tolist()
+
+        fpr, tpr, thresholds = metrics.roc_curve(y_true, preds)
+        ix = np.sort(np.random.choice(np.arange(len(fpr)), size=1000, replace=True))
+        self.df = pd.DataFrame({"X": fpr[ix], "Y": tpr[ix],
+            "thresholds": thresholds[ix]},)
+
+        self.score = metrics.roc_auc_score(y_true, preds)
+
+        if model_name is None:
+            self.model_name = model_name_from_params(oce.parameterize(model))
+        else:
+            self.model_name = model_name
+
+        self.packages = ["plotly"]
+
+    @staticmethod
+    def get_attributes():
+        return [{"Select a Model/Dataset": [["model", "modelSelector"], ["dataset", "datasetSelector"],]}]
+
+    @property
+    def JS_NAME(self) -> str:
+            return "ModelROCThreshold"
+
+    def get_data(self) -> dict:
+        d = self.df.to_dict("l")
+        d["model_name"] = self.model_name
+        d["score"] = np.around(self.score, decimals=2)
+        d["P"] = (sum(self.dataset.test_dataset[1]))/len(self.dataset.test_dataset[1])
+        d["N"] = (len(self.dataset.test_dataset[1]) - sum(self.dataset.test_dataset[1]))/len(self.dataset.test_dataset[1])
+        return d
 
 class ModelPR(BaseVisualization):
     """ Visualize the Precision-Recall curve for a model.
