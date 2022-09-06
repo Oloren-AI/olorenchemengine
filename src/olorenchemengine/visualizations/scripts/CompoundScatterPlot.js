@@ -173,6 +173,10 @@ plot
       ctx.fillStyle = "white";
       ctx.fillRect(0, 0, hoverBackground.width, hoverBackground.height);
 
+      var x = (d.x - xaxis.range[0]) / (xaxis.range[1] - xaxis.range[0]);
+      var y = (d.y - yaxis.range[0]) / (yaxis.range[1] - yaxis.range[0]);
+      var xdir = ((x > 0.5) ? 'right' : 'left');
+      var ydir = ((y > 0.5) ? 'top' : 'bottom');
       Plotly.update(
         "basevis-entry",
         {},
@@ -193,27 +197,27 @@ plot
           ],
           images: [
             {
-              x: (d.x - xaxis.range[0]) / (xaxis.range[1] - xaxis.range[0]),
-              y: (d.y - yaxis.range[0]) / (yaxis.range[1] - yaxis.range[0]),
+              x: x,
+              y: y,
               sizex: hoverSize,
               sizey: hoverSize,
               xref: "paper",
               yref: "paper",
               source: document.getElementById("hoverBackground").toDataURL(),
-              xanchor: "left",
-              yanchor: "top",
+              xanchor: xdir,
+              yanchor: ydir,
               layer: "above",
             },
             {
-              x: (d.x - xaxis.range[0]) / (xaxis.range[1] - xaxis.range[0]),
-              y: (d.y - yaxis.range[0]) / (yaxis.range[1] - yaxis.range[0]),
+              x: x,
+              y: y,
               sizex: hoverSize,
               sizey: hoverSize,
               xref: "paper",
               yref: "paper",
               source: document.getElementById("hoverCanvas").toDataURL(),
-              xanchor: "left",
-              yanchor: "top",
+              xanchor: xdir,
+              yanchor: ydir,
               layer: "above",
             },
           ],

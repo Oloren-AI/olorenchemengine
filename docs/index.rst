@@ -1,11 +1,11 @@
-============
+=================
 Oloren ChemEngine
-============
+=================
 
-Made by `Oloren AI <oloren.ai>`_, the Python library **Oloren ChemEngine** enables the creation of state-of-the-art, complex molecular property predictors in just a few lines of code. Models defined and trained with olorenchemengine achieve super-leaderboard performance in less than 10 lines of code.
+Made by `Oloren AI <oloren.ai>`_, the Python library **Oloren ChemEngine** enables the creation of state-of-the-art, complex molecular property predictors in just a few lines of code. Models defined and trained with olorenchemengine achieve super-leaderboard performance in less than 10 lines.
 
 Installation
-***********
+************
 
 In a Python 3.8 environment, you can install the package with the following command:
 
@@ -26,7 +26,7 @@ Quick Start
     # df is a Pandas Dataframe with the following columns:
     # "Smiles" (structure)
     # "pChEMBL Value" (property to be predicted)
-    df = oce.ExampleDataset
+    df = oce.ExampleDataFrame()
 
     ## Defining a model
 
@@ -35,23 +35,22 @@ Quick Start
     # 2. GIN model pretrained using contrastive learning on PubChem
     # 3. a Random Forest model trained using a representation
     #    learned using contrastive learning on PubChem
-    model = oce.BaseBoosting([
-                oce.RandomForestModel(oce.DescriptastorusDescriptor("rdkit2dnormalized"),n_estimators=1000),
-                oce.BaseTorchGeometricModel(oce.TLFromCheckpoint("default"), preinitialized=True),
-                oce.RandomForestModel(oce.OlorenCheckpoint("default"),n_estimators=1000)])
-
+   model = oce.BaseBoosting([
+            oce.RandomForestModel(oce.DescriptastorusDescriptor("rdkit2dnormalized"), n_estimators=1000),
+            oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000)])
 
     ## Training the model
     model.fit(df["Smiles"], df["pChEMBL Value"])
-
-    ## Predicting property of new compounds
-    y_pred = model.predict(["CC(=O)OC1=CC=CC=C1C(=O)O"])
-
+   
     ## Saving the model
     oce.save(model, "model.oce")
 
     ## Loading the model
     model2 = oce.load("model.oce")
+
+    ## Predicting property of new compounds
+    y_pred = model2.predict(["CC(=O)OC1=CC=CC=C1C(=O)O"])
+
 
 Philosophy
 **********
@@ -63,7 +62,7 @@ The following are the guiding principles for the development of **Oloren ChemEng
 * | **Flexibility**: differing molecular representations, experimental datapoints, model architectures, ensembling strategies, and other innovative methodologies can be implemented in a consistent framework
 * | **Accuracy**: the capabilities of the library match or supercede top-of-the-leaderboard molecular property predictors, with a concerted focus on improving the utility of molecular property predictors in real-world settings, leveraging available experimental data.
 
-Defined as subclasses of ``BaseModel``, models including graph neural networks, descriptor- and fingerprint-based machine learning models, and Oloren AI proprietary models are all supported. Defined as subclasses of ``BaseAutoML``, algorithms to automatically select and find the best model architectures are provided as well.
+Defined as subclasses of ``BaseModel``, models including graph neural networks, descriptor- and fingerprint-based machine learning models, and Oloren AI proprietary models are all supported. 
 
 Contents
 ========

@@ -36,6 +36,37 @@ It's that simple! And it's just as simple to train a graph neural network, gener
 visualizations, and create error models. More information on features and
 capabilities is available in our documentation at `docs.oloren.ai <https://docs.oloren.ai>`_.
 
+_______________________________
+Notice
+_______________________________
+Maintaining and developing Oloren ChemEngine requires a lot of resources. As such, we would like to log for each evaluated model the model hyperparameters, the model performance metrics and a unique, non-identifying hash of the dataset. These logs are used to improve our models. Below is a representative example of such a log:
+
+.. code-block:: javascript
+    
+    {dataset_hash: "149eae5c763afcc14f6355007df298b05f4a51c6a334ea933fbe7fc496adb271",
+
+    metric_direction: null,
+
+    metrics: "{"Average Precision": 0.9479992350277128, "ROC-AUC": 0.7450549450549451}",
+
+    name: "BaseBoosting 1zpI0dIb",
+
+    params: "{"BC_class_name": "BaseBoosting", "args": [[{"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morgan3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morganchiral3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["morganfeature3counts"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "DescriptastorusDescriptor", "args": ["rdkit2dnormalized"], "kwargs": {"log": true, "scale": null}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}, {"BC_class_name": "RandomForestModel", "args": [{"BC_class_name": "OlorenCheckpoint", "args": ["default"], "kwargs": {"log": true, "num_tasks": 2048}}], "kwargs": {"bootstrap": true, "criterion": "entropy", "max_features": "log2", "n_estimators": 2000, "max_depth": null, "class_weight": null}}]], "kwargs": {"log": true, "n": 1, "oof": false, "nfolds": 5}}"}
+
+The dataset hash is created with the following code:
+
+.. code-block:: python
+
+    import joblib
+
+    dataset_hash = joblib.hash(X) + joblib.hash(y)
+
+This means that **we log no therapeutics-related data whatsoever.** We just log hashes of model performance. 
+
+If you would still prefer a logging-free version, please fill out the following form to obtain a version with all logging code excised: https://y09gl0qf49q.typeform.com/to/brGMidJ0. 
+
+We also require contributor agreements for all versions of Oloren ChemEngine.
+
 -------------------------------
 oce at a high level
 -------------------------------
@@ -71,15 +102,36 @@ In a Python 3.8 environment, you can install the package with the following comm
 Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment.
 
 _______________________________
+Docker
+_______________________________
+
+Alternatively, you can also run OCE from one of our docker images. After cloning the repo, just run:
+
+.. code-block:: bash
+
+    docker build -t oce:latest -f docker/Dockerfile.gpu . # build the docker image
+    docker run -it -v ~/.oce:/root/.oce oce:latest python # run the docker image
+
+Replace ".gpu" with ".cpu" in the docker path if you want to run the project in a dockerized environment.
+
+_______________________________
 Basic Usage
 _______________________________
 We have an examples folder, which we'd highly reccomend you checkout--1A and 1B
 in particular--the rest of the examples can be purused when the topics come up.
 
 _______________________________
-Notice
+Contributing
 _______________________________
-NOTICE: IN CHEMENGINE, WE LOG MODEL PERFORMANCE AND MODEL HYPERPARAMETERS—NO THERAPEUTIC DATA—AND WE REQUIRE CONTRIBUTOR AGREEMENTS
+First, thank you for contributing to OCE! To install OCE in editable/development mode, simply clone the repository and run:
+
+.. code-block:: bash
+
+    bash install.sh --dev
+
+This will install the repo in an editable way, so your changes will reflect immediately in your python environment. All tests for OCE are in the `tests` directory and can be run by running `pytest` in this directory. Please contact support@oloren.ai if you need any assistance in your development process!
+
+PRs from external collaborators will require a Contributor License Agreement (CLA) to be signed before the code is merged into the repository.
 
 -------------------------------
 Our Thanks

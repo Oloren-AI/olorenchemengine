@@ -28,7 +28,8 @@ class PerturbationEngine(BaseClass):
         get_compound: returns a compound with a randomly chosen modification
         get_compound_list: returns a list of compounds with modifications, the list
             is meant to be comprehensive of the result of the application of an
-            entire class of modifications"""
+            entire class of modifications."""
+            
     @abstractmethod
     def get_compound_at_idx(self, smiles, idx):
         pass
@@ -60,10 +61,12 @@ class SwapMutations(PerturbationEngine):
         if not radius in (0, 1, 2):
             raise ValueError("radius must be 0, 1, or 2")
 
-        transformation_path = download_public_file(f"swap-mutations/trans_{radius}.json")
-
-        with open(transformation_path, "r") as f:
-            self.trans = json.load(f)
+        
+        self.trans = dict()
+        for radius in range(radius+1):
+            transformation_path = download_public_file(f"swap-mutations/trans_{radius}.json")
+            with open(transformation_path, "r") as f:
+                self.trans.update(json.load(f))
 
     def get_substitution(self, m, idx, r = 1):
 
@@ -161,15 +164,14 @@ class SwapMutations(PerturbationEngine):
             m.RemoveAtom(remove.GetIdx())
         return m
 
-    def get_compound_at_idx(self, smiles, idx, **kwargs):
+    def get_compound_at_idx(self, smiles, idx, n: int = 1, **kwargs):
         ref_m = Chem.MolFromSmiles(smiles)
 
         l, a, sub_a = self.get_substitution(ref_m, idx, r = self.radius)
 
-        # if the current substructure to replace has not replacements in the database
-        # retry getting compound on failure
+        # if the current substructure to replace has no replacements in the database
         if str(l) not in self.trans:
-            return self.get_compound(ref_m, **kwargs)
+            return None
 
         for x in sub_a:
             ref_m.GetAtomWithIdx(x).SetAtomMapNum(10000)
@@ -177,13 +179,11 @@ class SwapMutations(PerturbationEngine):
         for k, j in enumerate(a):
             ref_m.GetAtomWithIdx(j).SetAtomMapNum(k+1)
 
-        surface_atoms = [ref_m.GetAtomWithIdx(j) for j in a]
-
         sub = np.random.choice(self.trans[str(l)])
         m = Chem.CombineMols(ref_m, Chem.MolFromSmiles(sub, sanitize=False))
 
         m = Chem.RWMol(m)
-
+        
         removal = []
         for i in range(len(m.GetAtoms())):
             if m.GetAtomWithIdx(i).GetAtomMapNum() == 10000:
@@ -199,10 +199,7 @@ class SwapMutations(PerturbationEngine):
             if not m is None:
                 return Chem.MolToSmiles(m)
         except Exception as e:
-            pass
-
-        # retry getting compound on failure
-        return self.get_compound(smiles, **kwargs)
+            return None
 
     def get_compound(self, smiles, **kwargs):
         if isinstance(smiles, Chem.Mol):
@@ -213,10 +210,14 @@ class SwapMutations(PerturbationEngine):
         idx = np.random.choice(mol.GetNumAtoms(), replace = False)
         return self.get_compound_at_idx(smiles, idx, **kwargs)
 
-    def get_compound_list(self, smiles, **kwargs) -> list:
+    def get_compound_list(self, smiles, idx: int = None, **kwargs) -> list:
         outs = []
         ref_m = Chem.MolFromSmiles(smiles)
-        for i in tqdm(range(len(ref_m.GetAtoms()))):
+        if idx is None:
+            space = range(len(ref_m.GetAtoms()))
+        else:
+            space = [idx]
+        for i in tqdm(space):
             ref_m = Chem.MolFromSmiles(smiles)
             l, a, sub_a = self.get_substitution(ref_m, i, r= self.radius)
 
@@ -243,13 +244,14 @@ class SwapMutations(PerturbationEngine):
                 for remove in removal:
                     m.RemoveAtom(remove.GetIdx())
                 try:
-                    s1 = Chem.MolToSmiles(m)
                     m = self.stitch(m)
+                    s = Chem.MolToSmiles(m)
+                    m = Chem.MolFromSmiles(s)
                     if not m is None:
-                        outs.append(Chem.MolToSmiles(m))
+                        outs.append(s)
                 except Exception as e:
                     pass
-        return outs
+        return list(set(outs))
 
     def _save(self) -> dict:
         return super()._save()
@@ -296,7 +298,7 @@ class STONEDMutations(PerturbationEngine):
         selfies_ls = [sf.encoder(x) for x in randomized_smile_orderings]
         selfies_mut = get_mutated_SELFIES(selfies_ls.copy(), num_mutations = self.mutations)
         smiles_back = [sf.decoder(x) for x in selfies_mut]
-        return smiles_back
+        return list(set(smiles_back))
 
     def _save(self) -> dict:
         return super()._save()

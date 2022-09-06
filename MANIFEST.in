@@ -1,0 +1,4 @@
+include README.rst
+include LICENSE.txt
+include funniest/data.json
+include src/olorenchemengine/visualizations/scripts/*

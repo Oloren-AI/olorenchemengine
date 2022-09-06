@@ -801,9 +801,11 @@ class BaseModel(BaseClass):
             raise Exception("Model for upload must be trained.")
 
         if not fname:
-            fname = self.model_name
+            fname = self.name
 
-        return oas_connector.upload_model(self, fname)
+        out = oas_connector.upload_model(self, fname)
+        print(f"Access your model at: https://oas.oloren.ai/endpoint/?mid={out[1].id}")
+
 
 
 class MakeMultiClassModel(BaseModel):

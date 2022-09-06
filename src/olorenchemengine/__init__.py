@@ -41,7 +41,8 @@ import pandas as pd
 import json
 import torch
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "CONFIG.json")
+
+CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".oce/CONFIG.json")
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH) as f:
         CONFIG_ = json.load(f)
@@ -93,7 +94,6 @@ update_config()
 def ExampleDataFrame():
     return pd.read_csv("gs://oloren-public-data/sample-csvs/sample_data3.csv")
 
-from .automl import *
 from .base_class import *
 from .basics import *
 from .ensemble import *

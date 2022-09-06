@@ -5,9 +5,9 @@ from olorenchemengine.base_class import *
 from olorenchemengine.basics import *
 from olorenchemengine.representations import *
 from olorenchemengine.ensemble import *
-from olorenchemengine.automl import *
 from olorenchemengine.benchmarks import *
 import pandas as pd
+from olorenchemengine.internal import download_public_file
 from sklearn.model_selection import train_test_split
 
 __author__ = "Oloren AI"
@@ -16,19 +16,22 @@ __copyright__ = "Oloren AI"
 
 @pytest.fixture
 def example_data():
-    df = pd.read_csv("tests/sample_data1.csv")[:10]
+    file_path = download_public_file("sample-csvs/sample_data1.csv")
+    df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
 
 @pytest.fixture
 def example_data2():
-    df = pd.read_csv("tests/sample_data2.csv")[:10]
+    file_path = download_public_file("sample-csvs/sample_data2.csv")
+    df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
 
 @pytest.fixture
 def example_data3():
-    df = pd.read_csv("tests/sample_data3.csv")[:10]
+    file_path = download_public_file("sample-csvs/sample_data3.csv")
+    df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
 def bf_model(model):
@@ -170,43 +173,8 @@ def test_rfstacker(example_data):
     train_predict_slf(model, example_data)
 
 
-def test_queued_automl(example_data):
-    mp = oce.automl.QueuedAutoML().get_model()
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
-
 
 import warnings
-
-
-def test_random_walk(example_data):
-    if "GOOGLE_CREDENTIALS_FILENAME" not in oce.CONFIG and "GOOGLE_SERVICE_ACC_FILENAME" not in oce.CONFIG:
-        warnings.warn(UserWarning("Skipping random walk test due to lack of credentials."))
-        return
-
-    mp = oce.automl.RandomWalk().get_model()
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
-
-
-@pytest.mark.timeout(30)
-def test_ns_automl(example_data2):
-    mp = oce.automl.NaiveSelection().get_model()
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
-
-
-@pytest.mark.timeout(30)
-def test_ns_automl_2(example_data2):
-    mp = oce.automl.NaiveSelection().get_model(
-        structure_column="Smiles", input_columns=["feat1"], value_columns=["feat2"]
-    )
-    model = create_BC(mp)
-    assert issubclass(type(model), BaseModel)
-    bf_model(model)
 
 
 def test_ns_spgnn_1(example_data3):
@@ -264,6 +232,11 @@ def test_mol2vec(example_data):
     from olorenchemengine.external import Mol2Vec
 
     model = oce.RandomForestModel(Mol2Vec(), n_estimators=10,)
+    train_predict_slf(model, example_data)
+
+def test_smiles_transformer(example_data):
+    from olorenchemengine.external import HondaSTRep
+    model = RandomForestModel(HondaSTRep(), n_estimators=10,)
     train_predict_slf(model, example_data)
 
 
