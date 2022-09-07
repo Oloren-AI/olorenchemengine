@@ -287,7 +287,7 @@ class CleanStructures(BaseDatasetTransform):
         dataset (BaseDataset): The dataset to clean.
     """
 
-    def transform(self, dataset: BaseDataset, **kwargs):
+    def transform(self, dataset: BaseDataset, dropna_property: bool = True, **kwargs):
         cols = dataset.data.columns.tolist()
         def try_clean(s):
             try:
