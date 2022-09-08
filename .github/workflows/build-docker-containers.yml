@@ -1,4 +1,4 @@
-name: build-upload-docs
+name: build-docker-containers
 on:
   push:
     branches:
