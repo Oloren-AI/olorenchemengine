@@ -210,7 +210,14 @@ class BenchmarkMolNet(BenchmarkDatasets):
 
     Parameters:
         datasets List[str] (optional): List of MoleculeNet dataset names to benchmark. If None, all datasets are benchmarked. Dataset names are
-        listed in self.datasets_loaded of the init function.
+            listed in self.datasets_loaded of the init function.
+        filepath (str): filepath to save the benchmark results
+        mode (str): "default" is those given by MoleculeNet direectly, "geognn"
+            is those used by GeoGNN (https://www.nature.com/articles/s42256-021-00438-4) and
+            append the string "-small" to use a subset of 5 tasks for benchmarks with more
+            than five tasks.
+        eval (str): whether to output model performance against the validation set ("valid")
+            or the test set ("test").
 
     Methods:
         run(models: Union[BaseModel, List[BaseModel]]): Benchmark the given model or list of models against the specified dataset(s).
@@ -232,7 +239,7 @@ class BenchmarkMolNet(BenchmarkDatasets):
     """
 
     @log_arguments
-    def __init__(self, datasets: List[str] = ['all'], file_path = None, mode = "default", small = True,
+    def __init__(self, datasets: List[str] = ['all'], file_path = None, mode = "default", 
             eval="valid", log = True):
         self.mode = mode
         self.eval = eval
@@ -367,21 +374,31 @@ class BenchmarkMolNet(BenchmarkDatasets):
                         from random import sample
                         random.seed(42)
                         property_cols = sample(property_cols, 1)
+
+                if "smiles" in df.columns:
+                    structure_col = "smiles"
+                elif "mol" in df.columns:
+                    structure_col = "mol"
+                dataset = oce.BaseDataset(data = df.to_csv(), structure_col = structure_col) + oce.CleanStructures()
+
+                if "geognn" in self.mode:
+                    dataset = dataset + oce.gg_ScaffoldSplit(split_proportions = [0.8, 0.1, 0.1])
+                else:
+                    dataset = dataset + oce.dc_ScaffoldSplit(split_proportions = [0.8, 0.1, 0.1])
+
                 for property_col in tqdm(property_cols):
                     print(f"Running property {property_col}")
-                    if "smiles" in df.columns:
-                        structure_col = "smiles"
-                    elif "mol" in df.columns:
-                        structure_col = "mol"
-                    dataset = oce.BaseDataset(data = df.to_csv(), structure_col = structure_col, property_col = property_col) + oce.CleanStructures()
-                    if self.mode == "geognn":
-                        dataset = dataset + oce.gg_ScaffoldSplit(split_proportions = [0.8, 0.1, 0.1])
-                    model.fit(*dataset.train_dataset)
+                    
+                    dataset2 = dataset.copy()
+                    dataset2.property_col = property_col
+                    dataset2 = dataset2 + oce.CleanStructures()
+
+                    model.fit(*dataset2.train_dataset)
                     print(f"Running {model.setting} metrics")
                     if self.eval == "test":
-                        results = model.test(*dataset.test_dataset)
+                        results = model.test(*dataset2.test_dataset)
                     else:
-                        results = model.test(*dataset.valid_dataset)
+                        results = model.test(*dataset2.valid_dataset)
 
                     l.append(results[self.metrics[name]])
 
