@@ -1,8 +1,7 @@
 name: build-upload-docs
 on:
-  push:
-    branches:
-    - master
+  release:
+    types: [published]
 
 jobs:
   release:
