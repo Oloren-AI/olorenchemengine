@@ -4,4 +4,5 @@
 sphinx>=3.2.1
 sphinxcontrib-gtagjs
 furo
+sphinxcontrib-gtagjs
 # sphinx_rtd_theme

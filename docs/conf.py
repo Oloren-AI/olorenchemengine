@@ -75,6 +75,24 @@ extensions = [
     "sphinxcontrib.gtagjs",
 ]
 
+
+from sphinx.ext.autodoc.mock import _MockObject
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+
+autodoc_mock_imports = ["hyperopt", "ogb"]
+
+for _ in range(50):
+    try:
+        import olorenchemengine
+    except ModuleNotFoundError as e:
+        mod_name = str(e).split("'")[1]
+        print("Mocking {}".format(mod_name))
+        autodoc_mock_imports.append(mod_name)
+        sys.modules[mod_name] = _MockObject()
+
+print(autodoc_mock_imports)
+
 gtagjs_ids = [
     'G-R5E6ME01BB',
 ]

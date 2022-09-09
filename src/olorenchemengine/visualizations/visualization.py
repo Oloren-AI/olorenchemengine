@@ -513,7 +513,7 @@ class CompoundScatterPlot(BaseVisualization):
             self.df["SMILES"] = self.df[smiles_col]
             if smiles_col != "SMILES":
                 self.df = self.df.drop(smiles_col, axis=1)
-                
+
         if color_col == "property_col":
             self.color_col = self.dataset.property_col
         else:
@@ -523,7 +523,7 @@ class CompoundScatterPlot(BaseVisualization):
             if color_col != "color":
                 self.df = self.df.drop(color_col, axis=1)
         self.colorscale = colorscale
-        
+
         # Sets up axes titling using column names as defaults if available
         if xaxis_title is None and x_col is not None:
             self.xaxis_title = x_col
@@ -630,7 +630,7 @@ class ChemicalSpacePlot(CompoundScatterPlot):
 
     Parameters:
         dataset (BaseDataset, pd.Seriess, list): BaseDataset to be used in visualization. Alternatively
-            can be a list or pd.Series where then this object will be treated as a list 
+            can be a list or pd.Series where then this object will be treated as a list
             of structures.
         rep (BaseCompoundVecRepresentation): Representation to use for dimensionality reduction.
         dim_reduction (str, optional): Dimensionality reduction method to use. Default is
@@ -644,7 +644,7 @@ class ChemicalSpacePlot(CompoundScatterPlot):
         """
 
     @log_arguments
-    def __init__(self, dataset: Union[BaseDataset, list, pd.Series, pd.DataFrame], rep: BaseCompoundVecRepresentation, 
+    def __init__(self, dataset: Union[BaseDataset, list, pd.Series, pd.DataFrame], rep: BaseCompoundVecRepresentation,
             *args, dim_reduction="tsne",
             smiles_col=None, title ="Chemical Space Plot", log=True, **kwargs):
 
@@ -676,7 +676,7 @@ class ChemicalSpacePlot(CompoundScatterPlot):
             self.df = dataset
         else:
             self.df = pd.DataFrame()
-            
+
         self.df["X"] = df["Component 1"]
         self.df["Y"] = df["Component 2"]
         self.df["SMILES"] = self.structures
@@ -731,20 +731,20 @@ class ChemicalSpacePlot(CompoundScatterPlot):
             d["size"] = self.df[self.size_col].tolist()
 
         return d
-    
+
 class VisualizeMoleculePerturbations(ChemicalSpacePlot):
     """ Visualize perturbations of a single molecule given from a PerturbationEngine
     in a ChemicalSpacePlot.
-    
+
     Parameters:
         smiles (str): SMILES of molecule to perturb.
-        perturbation_engine (PerturbationEngine): Perturbation engine, which has 
+        perturbation_engine (PerturbationEngine): Perturbation engine, which has
             the underlying algorithm for perturbing molecules. Default is `SwapMutations(radius = 0)`
         rep (BaseVecRepresentation): Molecular vector representation to use for
             dimensionality reduction"""
-        
+
     @log_arguments
-    def __init__(self, smiles: str, 
+    def __init__(self, smiles: str,
             perturbation_engine: PerturbationEngine = None,
             rep: BaseVecRepresentation = None,
             idx: int = None,
@@ -758,15 +758,15 @@ class VisualizeMoleculePerturbations(ChemicalSpacePlot):
             self.rep = DescriptastorusDescriptor("morgan3counts")
         else:
             self.rep = rep
-            
+
         if n is None:
             self.n = 100
         else:
             self.n = n
-            
+
         from rdkit import Chem
         from rdkit.Chem import AllChem
-        
+
         df = pd.DataFrame()
         if idx is None:
             df["SMILES"] = self.perturbation_engine.get_compound_list(smiles) + [smiles]
@@ -774,11 +774,11 @@ class VisualizeMoleculePerturbations(ChemicalSpacePlot):
             df["SMILES"] = self.perturbation_engine.get_compound_list(smiles, idx = idx)+ [smiles]
         df["mols"] = [Chem.MolFromSmiles(s) for s in df["SMILES"]]
         df = df.dropna(subset = ["mols"])
-        
+
         fps = [AllChem.GetMorganFingerprintAsBitVect(m, 2, nBits=2048, useChirality=False) for m in df["mols"]]
-        
+
         df["sim"] = DataStructs.BulkTanimotoSimilarity(AllChem.GetMorganFingerprintAsBitVect(Chem.MolFromSmiles(self.smiles), 2, nBits=2048, useChirality=False) , fps)
-        
+
         super().__init__(df,
                 self.rep,
                 title = "Chemical Space Plot of Molecular Perturbations<br><sub>Points colored by tanimoto similarity to the reference compund</sub>",
@@ -1366,12 +1366,14 @@ class VisualizeCounterfactual(CompoundScatterPlot):
         self,
         smiles: str,
         model: BaseModel,
-        perturbation_engine: PerturbationEngine = SwapMutations(radius=1),
+        perturbation_engine: PerturbationEngine = None,
         delta: Union[int, float, Tuple] = (-1, 1),
         n: int = 40,
         pca: bool = False,
         **kwargs,
     ):
+        if perturbation_engine is None:
+            perturbation_engine = SwapMutations(radius=1)
 
         self.smiles = smiles
         self.model = model
