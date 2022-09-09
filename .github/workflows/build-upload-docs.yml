@@ -23,3 +23,9 @@ jobs:
       working-directory: ./docs
       run: |
         make html
+    - uses: FirebaseExtended/action-hosting-deploy@v0
+      with:
+        firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT_OLOREN_AI }}"
+        channelId: live
+        projectId: oloren-ai
+        target: docs
