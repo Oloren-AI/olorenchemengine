@@ -1,8 +1,7 @@
 name: build-docker-containers
 on:
-  push:
-    branches:
-    - master
+  release:
+    types: [published]
 
 jobs:
   release:
