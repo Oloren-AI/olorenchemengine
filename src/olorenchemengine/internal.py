@@ -7,7 +7,7 @@ import pickle
 from abc import ABC, abstractmethod
 from typing import Callable, Union
 import gcsfs
-
+import subprocess
 import pyrebase  # Default pyrebase is pyrebase3 which won't work. Need to install pyrebase4 (pip install pyrebase4)
 from google.cloud.firestore import Client
 from google.oauth2.credentials import Credentials
@@ -500,3 +500,23 @@ def json_params_str(base: Union[BaseClass, dict]) -> str:
         .replace("False", "false")
         .replace("None", "null")
     )
+
+def install_with_permission(package_name: str):
+    inp = input(f"The required package {package_name} is not installed. Do you want to install it? [y/N]? ")
+    if inp.lower() == "y":
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+    else:
+        print(f"Stopping program. You can install the package manually with: \n >> pip install {package_name}")
+        os._exit(1)
+
+def import_or_install(package_name: str, statement: str = None, scope: dict = None):
+    if scope is None:
+        scope = globals()
+    if statement is None:
+        statement = f"import {package_name}"
+    try:
+        exec(statement, scope)
+    except ImportError:
+        install_with_permission(package_name)
+    finally:
+        exec(statement, scope)
