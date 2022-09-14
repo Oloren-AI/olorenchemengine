@@ -406,40 +406,9 @@ class MLPStacker(SKLearnStacker):
     @log_arguments
     def __init__(self, models, layer_dims = [2048,512,128], activation = "tanh", epochs = 100, batch_size = 16, verbose = 0, n=1,log = True):
 
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import Dense
-        from tensorflow.keras.regularizers import L2
-        from tensorflow.keras.optimizers import Adam
-        from tensorflow.keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
-
-        def create_reg_model():
-            reg_model = Sequential()
-            for layer_dim in layer_dims:
-                reg_model.add(Dense(layer_dim,activation=activation, kernel_regularizer=L2(1e-5)))
-            reg_model.add(Dense(1))
-
-            reg_opt = Adam(learning_rate=0.0005)
-
-            reg_model.compile(reg_opt, loss='mean_squared_error')
-
-            return reg_model
-
-        def create_class_model():
-            class_model = Sequential()
-
-            for layer_dim in layer_dims:
-                class_model.add(Dense(layer_dim,activation=activation, kernel_regularizer=L2(1e-5)))
-            class_model.add(Dense(1, activation = "sigmoid"))
-
-            class_opt = Adam(learning_rate=0.0005)
-
-            class_model.compile(class_opt, loss='binary_crossentropy')
-
-            return class_model
-
         super().__init__(models,
-            KerasRegressor(build_fn = create_reg_model, epochs=epochs, batch_size=batch_size, verbose = 0),
-            KerasClassifier(build_fn = create_class_model, epochs=epochs, batch_size=batch_size, verbose = 0),
+            TorchMLP(None, layer_dims= layer_dims, activation = activation, epochs=epochs, batch_size=batch_size, verbose = 0),
+            TorchMLP(None, layer_dims= layer_dims, activation = activation, epochs=epochs, batch_size=batch_size, verbose = 0),
             n=n,
             log = False)
 

@@ -111,99 +111,6 @@ class LogisticRegression(BaseEstimator):
 
         self.obj = LogisticRegression(*args, **kwargs)
 
-class BaseKerasMLP(BaseEstimator):
-    """MLP BaseEstimator implemented in Keras with sklearn wrapper
-
-    Parameters:
-        activation (str): Activation function to use in the hidden layers
-        dropout (float): Dropout rate to use in the hidden layers
-        layer_dims (np.array): List of integers representing the number of neurons in each layer
-        epochs (int): Number of epochs to train the model for
-        batch_size (int): Number of samples to use in each batch
-        task (str): The task to train the model for. Either "classification" or "regression"
-        lr (float): Learning rate to use for the optimizer
-        kernel_regularizer (float): Regularization parameter for the kernel
-        loss (str): Loss function to use for the model
-     """
-
-    @log_arguments
-    def __init__(
-        self,
-        layer_dims=[2048, 512, 128],
-        activation="leakyrelu",
-        dropout=0.0,
-        epochs=100,
-        batch_size=16,
-        task="regression",
-        lr=0.0001,
-        kernel_regularizer=1e-5,
-        loss="mean_squared_error",
-    ):
-        self.task =task
-        def create_model():
-            from tensorflow.keras.optimizers import Adam
-            from tensorflow.keras.regularizers import L2
-            from tensorflow.keras.layers import Dense, Dropout, LeakyReLU
-            from tensorflow.keras.models import Sequential, load_model
-
-            model = Sequential()
-            for layer_dim in layer_dims:
-                if activation == "leakyrelu":
-                    model.add(
-                        Dense(layer_dim, kernel_regularizer=L2(kernel_regularizer))
-                    )
-                    model.add(LeakyReLU())
-                else:
-                    model.add(
-                        Dense(
-                            layer_dim,
-                            activation=activation,
-                            kernel_regularizer=L2(kernel_regularizer),
-                        )
-                    )
-                model.add(Dropout(dropout))
-            if task == "classification":
-                model.add(Dense(1, activation="sigmoid"))
-            else:
-                model.add(Dense(1))
-
-            opt = Adam(learning_rate=lr)
-
-            model.compile(opt, loss=loss)
-
-            return model
-
-        from tensorflow.keras.wrappers.scikit_learn import KerasClassifier, KerasRegressor
-        if task == "classification":
-            self.obj = KerasClassifier(
-                build_fn=create_model, epochs=epochs, batch_size=batch_size
-            )
-        else:
-            self.obj = KerasRegressor(
-                build_fn=create_model, epochs=epochs, batch_size=batch_size
-            )
-
-    def predict(self, X):
-        if self.task == "classification":
-            return [x[1] for x in self.obj.predict_proba(X)]
-        else:
-            return self.obj.predict(X)
-
-    def _save(self):
-        with NamedTemporaryFile(suffix=".h5") as f:
-            try:
-                self.obj.model.save(f.name)
-            except:
-                self.obj.save(f.name)
-            return {"save": f.read()}
-
-    def _load(self, d):
-        with NamedTemporaryFile(suffix=".h5") as f:
-            from tensorflow.keras.models import load_model
-            f.write(d["save"])
-            self.obj.model = load_model(f.name)
-
-
 class RandomForestModel(BaseSKLearnModel):
     """ Random forest model
 
@@ -790,7 +697,8 @@ class MLP(BaseSKLearnModel):
 
         super().__init__(
             representation,
-            BaseKerasMLP(
+            TorchMLP(
+                None,
                 layer_dims=layer_dims,
                 activation=activation,
                 epochs=epochs,
@@ -800,7 +708,8 @@ class MLP(BaseSKLearnModel):
                 lr=lr,
                 task="regression",
             ),
-            BaseKerasMLP(
+            TorchMLP(
+                None,
                 layer_dims=layer_dims,
                 activation=activation,
                 epochs=epochs,
