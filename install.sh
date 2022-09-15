@@ -5,6 +5,15 @@ if [[ $(python -c "import sys, os; print(os.path.exists(os.path.join(sys.prefix,
     CONDA=1
 else
     echo "Detected non-conda environment, using pip commands going forward..."
+    if [[ $OSTYPE == 'darwin'* ]]; then
+        which -s brew
+        if [[ $? != 0 ]] ; then
+            echo "Missing Homebrew on OSX - please install first at https://brew.sh/ and add to path"
+            exit 1
+        else
+            brew install python@3.8
+        fi
+    fi
 fi
 
 # Check if pytorch is installed
@@ -18,7 +27,7 @@ if ! python -c "import torch; print(torch.__version__)" 2>/dev/null | grep -q "1
             conda install pytorch==1.11.0 cudatoolkit=11.3 -c pytorch
         else
             echo ">> python -m pip install torch==1.11.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113 install"
-            python -m pip install torch==1.11.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113 install
+            python3.8 -m pip install torch==1.11.0+cu113 --extra-index-url https://download.pytorch.org/whl/cu113 install
         fi
     else
         echo "Could not detect NVIDIA GPU or drivers, installing with PyTorch without CUDA enabled:"
@@ -27,7 +36,7 @@ if ! python -c "import torch; print(torch.__version__)" 2>/dev/null | grep -q "1
             conda install pytorch==1.11.0 cpuonly -c pytorch
         else
             echo ">> python -m pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu install"
-            python -m pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu install
+            python3.8 -m pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu install
         fi
     fi
 else
@@ -45,7 +54,7 @@ if ! python -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader(sys.argv[
             conda install -y pyg -c pyg
         else
             echo ">> python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu113.html"
-            python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
+            python3.8 -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cu113.html
         fi
     else
         if [ $CONDA == 1 ]; then
@@ -54,7 +63,7 @@ if ! python -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader(sys.argv[
         else
             echo "Found PyTorch without CUDA=11.3, installing torch geometric without GPU support..."
             echo ">> python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cpu.html"
-            python -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cpu.html
+            python3.8 -m pip install torch-scatter torch-sparse torch-cluster torch-spline-conv torch-geometric -f https://data.pyg.org/whl/torch-1.11.0+cpu.html
         fi
     fi
 else
@@ -67,8 +76,15 @@ if [[ $* == *--docker* ]]; then
 else
     if [[ $* == *--dev* ]]; then
         SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-        pip install -e $SCRIPT_DIR # install editable copy of the package for dev
+        python -m pip install -e $SCRIPT_DIR # install editable copy of the package for dev
     else
-        pip install olorenchemengine
+        python -m pip install olorenchemengine
     fi
 fi
+
+if [[ $OSTYPE == 'darwin'* ]]; then
+  echo "Detected OSX - upgrading pytorch lightning to fix TF issue..."
+  python -m pip install --upgrade pytorch-lightning
+fi
+
+echo "Installation succesful - check out https://docs.oloren.ai to get started with OCE!"
