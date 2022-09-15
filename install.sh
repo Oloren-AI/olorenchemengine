@@ -36,7 +36,7 @@ if ! python -c "import torch; print(torch.__version__)" 2>/dev/null | grep -q "1
             conda install pytorch==1.11.0 cpuonly -c pytorch
         else
             echo ">> python3.8 -m pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu install"
-            python3.8 -m pip install torch==1.11.0+cpu --extra-index-url https://download.pytorch.org/whl/cpu install
+            python3.8 -m pip install torch==1.11.0 --extra-index-url https://download.pytorch.org/whl/cpu install
         fi
     fi
 else
