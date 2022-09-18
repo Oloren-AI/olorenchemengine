@@ -354,16 +354,23 @@ class VisualizeDatasetCompounds(BaseVisualization):
         shuffle = True (bool): Whether or not to shuffle the compounds."""
 
     @log_arguments
-    def __init__(self, dataset: Union[BaseDataset, list, pd.Series], table_width: int = 2, table_height: int = 5,
-        compound_width: int = 250, compound_height: int = 250, annotations = None, kekulize = True,
-        box=True, shuffle=True,log=True, **kwargs):
+    def __init__(self, dataset: Union[BaseDataset, list, pd.Series, str, Chem.Mol], table_width: int = 1, table_height: int = 5,
+        compound_width: int = 500, compound_height: int = 500, annotations = None, kekulize = True,
+        box=False, shuffle=True,log=True, **kwargs):
         self.dataset = dataset
         if issubclass(type(dataset), BaseDataset):
             self.compounds = dataset.data[dataset.structure_col].head(table_width * table_height).tolist()
         elif isinstance(dataset, pd.Series):
             self.compounds = dataset.tolist()
         elif isinstance(dataset, list):
-            self.compounds = dataset
+            if isinstance(dataset[0], str):
+                self.compounds = dataset
+            if isinstance(dataset[0], Chem.Mol):
+                self.compounds = [Chem.MolToSmiles(m) for m in dataset]
+        elif isinstance(dataset, str):
+            self.compounds = [dataset]
+        elif issubclass(type(dataset), Chem.Mol):
+            self.compounds = [Chem.MolToSmiles(dataset)]
         if shuffle:
             import random
             random.shuffle(self.compounds)
