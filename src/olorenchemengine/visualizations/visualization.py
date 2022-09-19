@@ -52,7 +52,7 @@ class BaseVisualization(BaseClass):
     # A list of packages that can be specified in self.packages to be loaded
     package_urls = {
         "d3": "https://d3js.org/d3.v4.js",
-        "plotly": "https://cdn.plot.ly/plotly-2.12.1.min.js",
+        "plotly": "https://cdn.plot.ly/plotly-2.14.0.min.js",
         "smilesdrawer": "https://unpkg.com/smiles-drawer@1.0.10/dist/smiles-drawer.min.js",
         "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
     }
@@ -163,7 +163,7 @@ class BaseVisualization(BaseClass):
         # Formats the data to be properly JSON
         if data is None:
             data_str = (
-                json.dumps(self.get_data())
+                json.dumps(self.get_data(), separators=(',', ':'))
                 .replace('"', "&quot;")
                 .replace("None", "null")
                 .replace("NaN", "null")
@@ -172,7 +172,7 @@ class BaseVisualization(BaseClass):
             )
         else:
             data_str = (
-                json.dumps(data)
+                json.dumps(data, separators=(',', ':'))
                 .replace('"', "&quot;")
                 .replace("None", "null")
                 .replace("NaN", "null")
@@ -181,8 +181,7 @@ class BaseVisualization(BaseClass):
             )
 
         # Compiles package imports into HTML
-        packages = "".join([f'<script src="{self.package_urls[package]}"></script>' for package in self.packages])
-
+        packages = "".join([f'<script src = "{self.package_urls[package]}"></script>' for package in self.packages])
         # Get base HTML code for visualization
         html = self.get_html(data_str, packages)
 
@@ -335,7 +334,7 @@ class VisualizeError(BaseVisualization):
 
         return d
 
-class VisualizeDatasetCompounds(BaseVisualization):
+class VisualizeCompounds(BaseVisualization):
     """Visualizes the compounds in a set.
 
     Parameters:
@@ -354,9 +353,9 @@ class VisualizeDatasetCompounds(BaseVisualization):
         shuffle = True (bool): Whether or not to shuffle the compounds."""
 
     @log_arguments
-    def __init__(self, dataset: Union[BaseDataset, list, pd.Series], table_width: int = 2, table_height: int = 5,
-        compound_width: int = 250, compound_height: int = 250, annotations = None, kekulize = True,
-        box=True, shuffle=True,log=True, **kwargs):
+    def __init__(self, dataset: Union[BaseDataset, list, pd.Series], table_width: int = 1, table_height: int = 5,
+        compound_width: int = 500, compound_height: int = 500, annotations = None, kekulize = True,
+        box=False, shuffle=True,log=True, **kwargs):
         self.dataset = dataset
         if issubclass(type(dataset), BaseDataset):
             self.compounds = dataset.data[dataset.structure_col].head(table_width * table_height).tolist()
@@ -400,6 +399,9 @@ class VisualizeDatasetCompounds(BaseVisualization):
 
         return d
 
+class VisualizeDatasetCompounds(VisualizeCompounds):
+    """Alias for VisualizeCompounds"""
+    pass
 
 class ScatterPlot(BaseVisualization):
     """Scatter plot visualization.
