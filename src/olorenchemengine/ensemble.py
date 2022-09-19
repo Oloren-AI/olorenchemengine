@@ -451,9 +451,12 @@ class BaseBoosting(BaseModel):
             models = [models]
 
         self.models = []
+        self.errors = [] 
+        self.stdevs = []
         for i in range(n):
             for model in models:
                 self.models.append(model.copy())
+                self.errors.append(0)
 
         self.oof = oof
         self.nfolds = nfolds
@@ -465,15 +468,32 @@ class BaseBoosting(BaseModel):
             from sklearn.model_selection import KFold
             kf = KFold(n_splits = self.nfolds)
 
+        errors = [] 
         for i, model in enumerate(self.models):
             if self.oof:
                 y_pred = get_oof(model, X_train, y_train, kf)
                 model.fit(X_train, y_train)
                 y_train = y_train - y_pred
+                errors.append(np.array(y_train))
             else:
                 model.fit(X_train, y_train)
                 y_pred = np.array(model.predict(X_train)).flatten()
                 y_train = y_train - y_pred
+                errors.append(np.array(y_train))
+
+        self.errors = errors
+
+    def _error_calc(self):
+        initial_residual, other_residuals = self.errors[0], self.errors[1:]
+        y = np.array(([initial_residual]))
+        for index in range(len(other_residuals)):
+            curr_residual = other_residuals[index]
+            total_residual = y[-1] - curr_residual
+            y = np.append(y, [total_residual], axis = 0)
+        
+        stdevs = np.std(y, axis = 1)
+        self.stdevs = stdevs
+        return(stdevs)
 
     def _predict(self, X):
         y = np.zeros((len(X)))
