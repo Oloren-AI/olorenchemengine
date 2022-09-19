@@ -56,12 +56,6 @@ class BaseVisualization(BaseClass):
         "smilesdrawer": "https://unpkg.com/smiles-drawer@1.0.10/dist/smiles-drawer.min.js",
         "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
     }
-    package_urls = {
-        "d3": os.path.join(os.path.dirname(__file__), "libraries/d3.v4.js"),
-        "plotly": os.path.join(os.path.dirname(__file__), "libraries/plotly-2.12.1.min.js"),
-        "smilesdrawer": os.path.join(os.path.dirname(__file__), "libraries/smiles-drawer.min.js"),
-        "rdkit": os.path.join(os.path.dirname(__file__), "libraries/RDKit_minimal.js"),
-    }
 
     @log_arguments
     def __init__(self, log=True, **kwargs):
@@ -187,13 +181,7 @@ class BaseVisualization(BaseClass):
             )
 
         # Compiles package imports into HTML
-        def load_packages(package):
-            """Load packages for visualization."""
-            with open(self.package_urls[package], "r") as f:
-                return f.read()
-        packages = "".join([f'<script>{load_packages(package)}</script>' for package in self.packages])
-
-        # packages = "".join([f'<script src = "{self.package_urls[package]}"></script>' for package in self.packages])
+        packages = "".join([f'<script src = "{self.package_urls[package]}"></script>' for package in self.packages])
         # Get base HTML code for visualization
         html = self.get_html(data_str, packages)
 
