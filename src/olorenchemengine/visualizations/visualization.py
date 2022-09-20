@@ -52,8 +52,8 @@ class BaseVisualization(BaseClass):
     # A list of packages that can be specified in self.packages to be loaded
     package_urls = {
         "d3": "https://d3js.org/d3.v4.js",
-        "plotly": "https://cdn.plot.ly/plotly-2.12.1.min.js",
-        "smilesdrawer": "https://unpkg.com/smiles-drawer@1.0.10/dist/smiles-drawer.min.js",
+        "plotly": "https://cdn.plot.ly/plotly-2.14.0.min.js",
+        "olorenrenderer": "https://unpkg.com/olorenrenderer@1.0.0-a/dist/oloren-renderer.min.js",
         "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
     }
 
@@ -163,7 +163,7 @@ class BaseVisualization(BaseClass):
         # Formats the data to be properly JSON
         if data is None:
             data_str = (
-                json.dumps(self.get_data())
+                json.dumps(self.get_data(), separators=(',', ':'))
                 .replace('"', "&quot;")
                 .replace("None", "null")
                 .replace("NaN", "null")
@@ -172,7 +172,7 @@ class BaseVisualization(BaseClass):
             )
         else:
             data_str = (
-                json.dumps(data)
+                json.dumps(data, separators=(',', ':'))
                 .replace('"', "&quot;")
                 .replace("None", "null")
                 .replace("NaN", "null")
@@ -181,8 +181,7 @@ class BaseVisualization(BaseClass):
             )
 
         # Compiles package imports into HTML
-        packages = "".join([f'<script src="{self.package_urls[package]}"></script>' for package in self.packages])
-
+        packages = "".join([f'<script src = "{self.package_urls[package]}"></script>' for package in self.packages])
         # Get base HTML code for visualization
         html = self.get_html(data_str, packages)
 
@@ -335,7 +334,7 @@ class VisualizeError(BaseVisualization):
 
         return d
 
-class VisualizeDatasetCompounds(BaseVisualization):
+class VisualizeCompounds(BaseVisualization):
     """Visualizes the compounds in a set.
 
     Parameters:
@@ -390,7 +389,7 @@ class VisualizeDatasetCompounds(BaseVisualization):
         self.kekulize = kekulize
         self.box = box
         super().__init__(**kwargs)
-        self.packages = ["smilesdrawer", "plotly"]
+        self.packages = ["olorenrenderer", "plotly"]
 
     def get_data(self):
         if self.kekulize:
@@ -407,6 +406,9 @@ class VisualizeDatasetCompounds(BaseVisualization):
 
         return d
 
+class VisualizeDatasetCompounds(VisualizeCompounds):
+    """Alias for VisualizeCompounds"""
+    pass
 
 class ScatterPlot(BaseVisualization):
     """Scatter plot visualization.
@@ -567,7 +569,7 @@ class CompoundScatterPlot(BaseVisualization):
         super().__init__(log=False, **kwargs)
 
         # Add packages to import for JavaScript
-        self.packages += ["plotly", "smilesdrawer"]
+        self.packages += ["plotly", "olorenrenderer"]
 
     @property
     def JS_NAME(self) -> str:
@@ -941,7 +943,7 @@ class MorganContributions(BaseVisualization):
         self.original_prediction, self.predictions = self._make_predictions(self.smiles)
         self.args = args
         self.kwargs = kwargs
-        self.packages = ["plotly", "rdkit", "smilesdrawer"]
+        self.packages = ["plotly", "rdkit", "olorenrenderer"]
 
     def _train_model(self):
         """ Train random forest model based on the morgan vec representation"""
