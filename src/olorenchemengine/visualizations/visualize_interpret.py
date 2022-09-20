@@ -43,10 +43,9 @@ class VisualizePredictionSensitivity(BaseVisualization):
 
         vals = []
         for i, a in tqdm(enumerate(self.mol.GetAtoms())):
-            print(f"Generating perturbations for atom {i}")
             smiles_list = []
             for i in range(n):
-                smiles = self.mutator.get_compound_at_idx(self.mol, a.GetIdx())
+                smiles = self.mutator.get_compound_at_idx(Chem.Mol(self.mol), a.GetIdx())
                 if smiles is None or Chem.MolFromSmiles(smiles) is None:
                     continue
                 else:

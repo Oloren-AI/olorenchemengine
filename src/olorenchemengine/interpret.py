@@ -170,7 +170,6 @@ class SwapMutations(PerturbationEngine):
         ref_m = mol
 
         l, a, sub_a = self.get_substitution(ref_m, idx, r = self.radius)
-
         # if the current substructure to replace has no replacements in the database
         if str(l) not in self.trans:
             return None
