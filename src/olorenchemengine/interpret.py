@@ -16,6 +16,7 @@ import PIL
 import selfies as sf
 
 from rdkit.DataStructs.cDataStructs import BulkTanimotoSimilarity, TanimotoSimilarity
+from rdkit import Chem
 from rdkit.Chem import AllChem
 
 class PerturbationEngine(BaseClass):
@@ -24,14 +25,15 @@ class PerturbationEngine(BaseClass):
     into a similar one with a small difference.
 
     Methods:
-        get_compound_at_idx:
+        get_compound_at_idx: returns a compound with a modification at a given 
+            atom index
         get_compound: returns a compound with a randomly chosen modification
         get_compound_list: returns a list of compounds with modifications, the list
             is meant to be comprehensive of the result of the application of an
             entire class of modifications."""
             
     @abstractmethod
-    def get_compound_at_idx(self, smiles, idx):
+    def get_compound_at_idx(self, mol: Chem.Mol, idx: int) -> str:
         pass
 
     @abstractmethod
@@ -164,8 +166,8 @@ class SwapMutations(PerturbationEngine):
             m.RemoveAtom(remove.GetIdx())
         return m
 
-    def get_compound_at_idx(self, smiles, idx, n: int = 1, **kwargs):
-        ref_m = Chem.MolFromSmiles(smiles)
+    def get_compound_at_idx(self, mol, idx, **kwargs):
+        ref_m = mol
 
         l, a, sub_a = self.get_substitution(ref_m, idx, r = self.radius)
 
@@ -208,7 +210,7 @@ class SwapMutations(PerturbationEngine):
         else:
             mol = Chem.MolFromSmiles(smiles)
         idx = np.random.choice(mol.GetNumAtoms(), replace = False)
-        return self.get_compound_at_idx(smiles, idx, **kwargs)
+        return self.get_compound_at_idx(mol, idx, **kwargs)
 
     def get_compound_list(self, smiles, idx: int = None, **kwargs) -> list:
         outs = []
@@ -276,7 +278,8 @@ class STONEDMutations(PerturbationEngine):
     def __init__(self, mutations: int = 1, log = True):
         self.mutations = mutations
 
-    def get_compound_at_idx(self, smiles: str, idx: int, **kwargs) -> str:
+    def get_compound_at_idx(self, mol: Chem.Mol, idx: int, **kwargs) -> str:
+        smiles = Chem.MolToSmiles(mol)
         selfie = sf.encoder(smiles)
         selfie_chars = get_selfie_chars(selfie)
         max_molecules_len = len(selfie_chars) + self.mutations

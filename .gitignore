@@ -22,6 +22,7 @@ experiments
 __pycache__/*
 .cache/*
 .*.swp
+tmp.ipynb
 */.ipynb_checkpoints/*
 .ipynb_checkpoints
 .DS_Store
