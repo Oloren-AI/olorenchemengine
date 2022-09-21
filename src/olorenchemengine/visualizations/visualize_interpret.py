@@ -60,19 +60,17 @@ class VisualizePredictionSensitivity(BaseVisualization):
         
         bottom_threshold = np.quantile(vals, 0.1)
         top_threshold = np.quantile(vals, 0.9)
-        _ = np.where(np.logical_and(vals>=bottom_threshold, vals<=top_threshold))
-        mean = np.mean(_)
-        std = np.std(_)
 
         for a in self.mol.GetAtoms():
             if a.HasProp("stdev"):
+                a.SetAtomMapNum(a.GetIdx())
                 val = a.GetDoubleProp("stdev")
                 if val <= bottom_threshold:
                     a.SetDoubleProp("stdev", 0)
                 elif val >= top_threshold:
                     a.SetDoubleProp("stdev", 1)
                 else:
-                    a.SetDoubleProp("stdev", (val - mean) / std)
+                    a.SetDoubleProp("stdev", (val - bottom_threshold) / (top_threshold - bottom_threshold))
 
     def get_data(self):
         import plotly
@@ -80,13 +78,15 @@ class VisualizePredictionSensitivity(BaseVisualization):
         def rgb_to_hex(x, colorscale = self.colorscale):
             if not isinstance(x, list):
                 x = [x]
-            x = plotly.colors.sample_colorscale(colorscale, x, colortype = "hex")
+            x = plotly.colors.sample_colorscale(colorscale, x, colortype="hex")
             x = np.rint(np.array(x)*255).astype(int)
             return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
-
+        print([
+                a.GetDoubleProp("stdev") for a in self.mol.GetAtoms() if a.HasProp("stdev")
+            ])
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
-                [[a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("stdev"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("stdev")]
+                [a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("stdev"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("stdev")
             ]
         }
