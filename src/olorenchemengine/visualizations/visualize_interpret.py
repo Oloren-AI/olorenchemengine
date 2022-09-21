@@ -28,8 +28,9 @@ class VisualizePredictionSensitivity(BaseVisualization):
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel, query_compound: str, radius: int = 1,
-        n: int = 30, colorscale = "viridis", log=True, **kwargs):
+    def __init__(self, model: BaseModel, query_compound: str, radius: int = 2,
+        n: int = 200, colorscale = "viridis", bottom_quantile = 0.75,
+        top_quantile = 0.95, nbins = 3, log=True, **kwargs):
 
         super().__init__(log=False, **kwargs)
         self.packages = ["olorenrenderer"]
@@ -37,16 +38,18 @@ class VisualizePredictionSensitivity(BaseVisualization):
         self.mutator = SwapMutations(radius = radius)
         self.model = model
         self.colorscale = colorscale
+        self.bottom_quantile = bottom_quantile
+        self.top_quantile = top_quantile
+        self.nbins = nbins
 
         self.smiles = query_compound
         self.mol = Chem.MolFromSmiles(self.smiles)
 
         vals = []
         for i, a in tqdm(enumerate(self.mol.GetAtoms())):
-            print(f"Generating perturbations for atom {i}")
             smiles_list = []
             for i in range(n):
-                smiles = self.mutator.get_compound_at_idx(self.mol, a.GetIdx())
+                smiles = self.mutator.get_compound_at_idx(Chem.Mol(self.mol), a.GetIdx())
                 if smiles is None or Chem.MolFromSmiles(smiles) is None:
                     continue
                 else:
@@ -59,35 +62,37 @@ class VisualizePredictionSensitivity(BaseVisualization):
             else:
                 print("Not enough perturbations for atom", a.GetIdx())
         
-        bottom_threshold = np.quantile(vals, 0.1)
-        top_threshold = np.quantile(vals, 0.9)
-        _ = np.where(np.logical_and(vals>=bottom_threshold, vals<=top_threshold))
-        mean = np.mean(_)
-        std = np.std(_)
+        bottom_threshold = np.quantile(vals, self.bottom_quantile)
+        top_threshold = np.quantile(vals, self.top_quantile)
 
         for a in self.mol.GetAtoms():
             if a.HasProp("stdev"):
                 val = a.GetDoubleProp("stdev")
                 if val <= bottom_threshold:
-                    a.SetDoubleProp("stdev", 0)
+                    pass
                 elif val >= top_threshold:
-                    a.SetDoubleProp("stdev", 1)
+                    a.SetDoubleProp("bin", 1)
+                    a.SetAtomMapNum(self.nbins)
                 else:
-                    a.SetDoubleProp("stdev", (val - mean) / std)
+                    normalized_val = (val - bottom_threshold) / (top_threshold - bottom_threshold)
+                    bin_number = np.around(normalized_val * self.nbins)
+                    if int(bin_number) > 0:
+                        a.SetAtomMapNum(int(bin_number))
 
     def get_data(self):
+        
         import plotly
 
         def rgb_to_hex(x, colorscale = self.colorscale):
             if not isinstance(x, list):
                 x = [x]
-            x = plotly.colors.sample_colorscale(colorscale, x, colortype = "hex")
+            x = plotly.colors.sample_colorscale(colorscale, x, colortype="hex")
             x = np.rint(np.array(x)*255).astype(int)
             return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
 
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
-                [[a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("stdev"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("stdev")]
+                [i+1, rgb_to_hex((i+1)/self.nbins)[0]]  for i in range(self.nbins)
             ]
         }
