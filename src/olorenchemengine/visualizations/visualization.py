@@ -53,7 +53,7 @@ class BaseVisualization(BaseClass):
     package_urls = {
         "d3": "https://d3js.org/d3.v4.js",
         "plotly": "https://cdn.plot.ly/plotly-2.14.0.min.js",
-        "olorenrenderer": "https://unpkg.com/olorenrenderer@1.0.0-a/dist/oloren-renderer.min.js",
+        "olorenrenderer": "https://unpkg.com/olorenrenderer@1.0.0-c/dist/oloren-renderer.min.js",
         "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
     }
 

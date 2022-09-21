@@ -90,10 +90,6 @@ class VisualizePredictionSensitivity(BaseVisualization):
             x = np.rint(np.array(x)*255).astype(int)
             return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
 
-        print([
-                [i, rgb_to_hex(i/self.nbins)[0]]  for i in range(self.nbins)
-            ])
-        
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
