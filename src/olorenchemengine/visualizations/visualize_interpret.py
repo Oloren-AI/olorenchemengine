@@ -67,18 +67,20 @@ class VisualizePredictionSensitivity(BaseVisualization):
 
         for a in self.mol.GetAtoms():
             if a.HasProp("stdev"):
-                a.SetAtomMapNum(a.GetIdx())
                 val = a.GetDoubleProp("stdev")
                 if val <= bottom_threshold:
-                    a.SetDoubleProp("bin", 0)
+                    pass
                 elif val >= top_threshold:
                     a.SetDoubleProp("bin", 1)
+                    a.SetAtomMapNum(self.nbins)
                 else:
                     normalized_val = (val - bottom_threshold) / (top_threshold - bottom_threshold)
-                    bin_number = np.around(normalized_val * self.nbins)/ self.nbins
-                    a.SetDoubleProp("bin", bin_number)
+                    bin_number = np.around(normalized_val * self.nbins)
+                    if int(bin_number) > 0:
+                        a.SetAtomMapNum(int(bin_number))
 
     def get_data(self):
+        
         import plotly
 
         def rgb_to_hex(x, colorscale = self.colorscale):
@@ -88,9 +90,13 @@ class VisualizePredictionSensitivity(BaseVisualization):
             x = np.rint(np.array(x)*255).astype(int)
             return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
 
+        print([
+                [i, rgb_to_hex(i/self.nbins)[0]]  for i in range(self.nbins)
+            ])
+        
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
-                [a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("bin"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("bin") and a.GetDoubleProp("bin") > 0
+                [i+1, rgb_to_hex((i+1)/self.nbins)[0]]  for i in range(self.nbins)
             ]
         }
