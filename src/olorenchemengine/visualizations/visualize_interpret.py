@@ -28,8 +28,9 @@ class VisualizePredictionSensitivity(BaseVisualization):
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel, query_compound: str, radius: int = 1,
-        n: int = 30, colorscale = "viridis", log=True, **kwargs):
+    def __init__(self, model: BaseModel, query_compound: str, radius: int = 2,
+        n: int = 200, colorscale = "viridis", bottom_quantile = 0.75,
+        top_quantile = 0.95, nbins = 3, log=True, **kwargs):
 
         super().__init__(log=False, **kwargs)
         self.packages = ["olorenrenderer"]
@@ -37,6 +38,9 @@ class VisualizePredictionSensitivity(BaseVisualization):
         self.mutator = SwapMutations(radius = radius)
         self.model = model
         self.colorscale = colorscale
+        self.bottom_quantile = bottom_quantile
+        self.top_quantile = top_quantile
+        self.nbins = nbins
 
         self.smiles = query_compound
         self.mol = Chem.MolFromSmiles(self.smiles)
@@ -58,19 +62,21 @@ class VisualizePredictionSensitivity(BaseVisualization):
             else:
                 print("Not enough perturbations for atom", a.GetIdx())
         
-        bottom_threshold = np.quantile(vals, 0.6)
-        top_threshold = np.quantile(vals, 0.9)
+        bottom_threshold = np.quantile(vals, self.bottom_quantile)
+        top_threshold = np.quantile(vals, self.top_quantile)
 
         for a in self.mol.GetAtoms():
             if a.HasProp("stdev"):
                 a.SetAtomMapNum(a.GetIdx())
                 val = a.GetDoubleProp("stdev")
                 if val <= bottom_threshold:
-                    a.SetDoubleProp("stdev", 0)
+                    a.SetDoubleProp("bin", 0)
                 elif val >= top_threshold:
-                    a.SetDoubleProp("stdev", 1)
+                    a.SetDoubleProp("bin", 1)
                 else:
-                    a.SetDoubleProp("stdev", (val - bottom_threshold) / (top_threshold - bottom_threshold))
+                    normalized_val = (val - bottom_threshold) / (top_threshold - bottom_threshold)
+                    bin_number = np.around(normalized_val * self.nbins)/ self.nbins
+                    a.SetDoubleProp("bin", bin_number)
 
     def get_data(self):
         import plotly
@@ -81,12 +87,10 @@ class VisualizePredictionSensitivity(BaseVisualization):
             x = plotly.colors.sample_colorscale(colorscale, x, colortype="hex")
             x = np.rint(np.array(x)*255).astype(int)
             return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
-        print([
-                a.GetDoubleProp("stdev") for a in self.mol.GetAtoms() if a.HasProp("stdev")
-            ])
+
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
-                [a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("stdev"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("stdev") and a.GetDoubleProp("stdev") > 0
+                [a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("bin"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("bin") and a.GetDoubleProp("bin") > 0
             ]
         }
