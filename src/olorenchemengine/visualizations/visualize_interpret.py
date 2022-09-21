@@ -58,7 +58,7 @@ class VisualizePredictionSensitivity(BaseVisualization):
             else:
                 print("Not enough perturbations for atom", a.GetIdx())
         
-        bottom_threshold = np.quantile(vals, 0.1)
+        bottom_threshold = np.quantile(vals, 0.6)
         top_threshold = np.quantile(vals, 0.9)
 
         for a in self.mol.GetAtoms():
@@ -87,6 +87,6 @@ class VisualizePredictionSensitivity(BaseVisualization):
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
-                [a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("stdev"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("stdev")
+                [a.GetAtomMapNum(), rgb_to_hex(a.GetDoubleProp("stdev"))[0]]  for a in self.mol.GetAtoms() if a.HasProp("stdev") and a.GetDoubleProp("stdev") > 0
             ]
         }
