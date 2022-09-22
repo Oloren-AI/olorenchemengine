@@ -495,6 +495,15 @@ class BaseModel(BaseClass):
 
         self.fit(X_train, y_train)
 
+    def _unnormalize(self, Y): 
+        if self.normalization == "zscore" and hasattr(self, "ymean") and hasattr(self, "ystd"):
+                result = Y * self.ystd + self.ymean
+        elif issubclass(type(self.normalization), BasePreprocessor):
+            result = self.normalization.inverse_transform(Y)
+        else:
+            result = Y
+        return result
+
     @abstractmethod
     def _predict(self, X: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
         """To be implemented by the child class; returns the predicted values for provided dataset given preprocessed features.
@@ -536,12 +545,7 @@ class BaseModel(BaseClass):
             X = self.preprocess(X, None, fit=False)
         Y = self._predict(X)
         if self.setting == "regression":
-            if self.normalization == "zscore" and hasattr(self, "ymean") and hasattr(self, "ystd"):
-                result = Y * self.ystd + self.ymean
-            elif issubclass(type(self.normalization), BasePreprocessor):
-                result = self.normalization.inverse_transform(Y)
-            else:
-                result = Y
+            result = self._unnormalize(Y)
             if self.calibrator is not None:
                 result = self.calibrator.predict(result.reshape(-1, 1)).reshape(-1)
             if return_ci or return_vis:
