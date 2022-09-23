@@ -1,4 +1,6 @@
 from cmath import e
+from dataclasses import dataclass
+import dataclasses
 from lib2to3.pgen2.literals import simple_escapes
 import os
 from re import escape
@@ -15,6 +17,7 @@ from olorenchemengine.dataset import *
 from olorenchemengine.uncertainty import *
 from olorenchemengine.interpret import *
 from olorenchemengine.internal import *
+from olorenchemengine.ensemble import *
 
 from rdkit import Chem
 from rdkit.Chem import Draw
@@ -1740,3 +1743,49 @@ class ModelPR(BaseVisualization):
         d["score"] = np.around(self.score, decimals=2)
         d["baseline"] = self.baseline
         return d
+
+class BaseErrorWaterfall(BaseVisualization):
+    """ Visualize the error waterfall for a base boosting model.
+
+    Parameters:
+        model (BaseBoosting): Model to evaluate on
+        normalization (bool): If the data is normalized 
+    """
+
+    @log_arguments
+    def __init__(self, model: BaseBoosting, log=True, normalization = False, **kwargs):
+        self.model = model
+        self.normalization = normalization
+        super().__init__(log=False)
+        self.packages += ["plotly"]
+
+        self.df = pd.DataFrame({})
+
+    def get_data(self) -> dict:
+        """Get data for visualization in JSON-like dictionary.
+
+        Returns:
+            dict: Data for visualization."""
+        data = self.model.unnormal_stdevs
+        if self.normalization:
+            data = self.model.stdevs
+ 
+        diffs = [j - i for i, j in zip(data, data[1:])]
+        diffs.insert(0, data[0])
+        diffs.append(0)
+        self.df['diffs'] = diffs
+
+        model_names = ["Model " + str(i) for i in range(1, len(data))]
+        model_names.insert(0, "Dataset Baseline")
+        model_names.append("Boosted Model")
+        self.df['model_names'] = model_names
+
+        text = [f'{val:.2f}' for val in diffs]
+        text[-1] = f'{data[-1]:.2f}'
+        self.df['text'] = text
+
+        w_type = ['relative' for val in diffs]
+        w_type[-1] = 'total'
+        self.df['w_type'] = w_type
+
+        return self.df.to_dict("l")

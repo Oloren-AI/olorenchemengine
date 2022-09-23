@@ -451,6 +451,9 @@ class BaseBoosting(BaseModel):
             models = [models]
 
         self.models = []
+        self.residuals = [] 
+        self.stdevs = []
+        self.unnormal = []
         for i in range(n):
             for model in models:
                 self.models.append(model.copy())
@@ -464,16 +467,41 @@ class BaseBoosting(BaseModel):
         if self.oof:
             from sklearn.model_selection import KFold
             kf = KFold(n_splits = self.nfolds)
+        
+        naive_mean = np.average(y_train)
+        naive_residuals = [y - naive_mean for y in y_train]
+        unnorm_naive = self._unnormalize(np.array(naive_residuals))
 
         for i, model in enumerate(self.models):
             if self.oof:
                 y_pred = get_oof(model, X_train, y_train, kf)
                 model.fit(X_train, y_train)
-                y_train = y_train - y_pred
             else:
                 model.fit(X_train, y_train)
                 y_pred = np.array(model.predict(X_train)).flatten()
-                y_train = y_train - y_pred
+            y_train = y_train - y_pred
+            self.residuals.append(np.array(y_train))
+            self.unnormal.append(self._unnormalize(y_train))
+
+        self.stdevs = self._error_calc(self.residuals)
+        self.residuals.insert(0, naive_residuals)
+        self.stdevs.insert(0, np.std(naive_residuals))
+
+        self.unnormal_stdevs = self._error_calc(self.unnormal)
+        self.unnormal.insert(0, unnorm_naive)
+        self.unnormal_stdevs.insert(0, np.std(unnorm_naive))
+
+        
+    def _error_calc(self, residuals):
+        initial_residual, other_residuals = residuals[0], residuals[1:]
+        y = np.array(([initial_residual]))
+        for index in range(len(other_residuals)):
+            curr_residual = other_residuals[index]
+            total_residual = y[-1] - curr_residual
+            y = np.append(y, [total_residual], axis = 0)
+        
+        stdevs = list(np.std(y, axis = 1))
+        return stdevs
 
     def _predict(self, X):
         y = np.zeros((len(X)))
