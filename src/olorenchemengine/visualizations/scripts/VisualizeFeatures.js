@@ -7,7 +7,7 @@ let options = {};
 
 let smilesDrawer = new SmilesDrawer.Drawer(options);
 
-PROP_DATA = data.datacols[data.PROPERTY];
+PROP_DATA = data.PROPERTY_VALUES;
 
 title = document.createElement("h1");
 title.innerHTML = "Analyze Property Correlation with Features";
