@@ -440,24 +440,27 @@ class BaseModel(BaseClass):
 
         # Calibrate model
         if not valid is None and self.setting == "classification":
-            y_pred_valid = self.predict(X_valid)
-
-            from sklearn.calibration import calibration_curve
-
-            prob_pred, prob_true = calibration_curve(y_valid, y_pred_valid, n_bins=min(len(y_valid), 10))
-            prob_pred, prob_true = zip(*[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1])
-            prob_true = np.array(prob_true)
-            prob_true = np.log(prob_true / (1 - prob_true))
-            prob_pred = np.array(prob_pred)
-            if np.unique(prob_true).shape[0] > 1 and np.unique(prob_pred).shape[0] > 1:
-                self.calibrator = LinearRegression()
-                self.calibrator.fit(prob_pred.reshape(-1, 1), prob_true.reshape(-1, 1))
+            self.calibrate_model(X_valid, y_valid)
 
         # Build error model
         if not error_model is None:
             error_model.build(self, X_train_original, y_train_original)
             self.error_model = error_model
             self.em_status = "built"
+
+    def calibrate(self, X_valid, y_valid):
+        y_pred_valid = self.predict(X_valid)
+
+        from sklearn.calibration import calibration_curve
+
+        prob_pred, prob_true = calibration_curve(y_valid, y_pred_valid, n_bins=min(len(y_valid), 10))
+        prob_pred, prob_true = zip(*[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1])
+        prob_true = np.array(prob_true)
+        prob_true = np.log(prob_true / (1 - prob_true))
+        prob_pred = np.array(prob_pred)
+        if np.unique(prob_true).shape[0] > 1 and np.unique(prob_pred).shape[0] > 1:
+            self.calibrator = LinearRegression()
+            self.calibrator.fit(prob_pred.reshape(-1, 1), prob_true.reshape(-1, 1))
 
     def fit_class(
         self,

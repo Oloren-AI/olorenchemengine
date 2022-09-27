@@ -475,6 +475,18 @@ class BaseVecRepresentation(BaseRepresentation):
         np.save(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy"), output, allow_pickle=True)
         return output
 
+    def calculate_similarity(self, x1: Union[str, List[str]], x2: Union[str, List[str]],
+        metric: str = "cosine", **kwargs) -> np.ndarray:
+        if isinstance(x1, str):
+            x1 = [x1]
+        if isinstance(x2, str):
+            x2 = [x2]
+        x1 = self.convert(x1)
+        x2 = self.convert(x2)
+        return pairwise_distances(x1, x2, metric=metric, **kwargs)
+        
+        return
+
     def __add__(self, other):
         """ Adds two representations together
 
