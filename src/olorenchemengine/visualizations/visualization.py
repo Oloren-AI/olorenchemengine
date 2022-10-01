@@ -396,7 +396,7 @@ class VisualizeCompounds(BaseVisualization):
 
     def get_data(self):
         if self.kekulize:
-            self.compounds = [Chem.MolToSmiles(Chem.MolFromSmiles(s), kekuleSmiles = True) for s in self.compounds]
+            self.compounds = [Chem.MolToSmiles(Chem.MolFromSmiles(s, sanitize=False), kekuleSmiles = True) for s in self.compounds]
         d =  {"smiles": self.compounds,
             "table_width": self.table_width,
             "table_height": self.table_height,
