@@ -358,7 +358,7 @@ class VisualizeCompounds(BaseVisualization):
     @log_arguments
     def __init__(self, dataset: Union[BaseDataset, list, pd.Series, str, Chem.Mol], table_width: int = 1, table_height: int = 5,
         compound_width: int = 500, compound_height: int = 500, annotations = None, kekulize = True,
-        box=False, shuffle=True,log=True, **kwargs):
+        box=False, shuffle=False,log=True, **kwargs):
         self.dataset = dataset
         if issubclass(type(dataset), BaseDataset):
             self.compounds = dataset.data[dataset.structure_col].head(table_width * table_height).tolist()
@@ -397,12 +397,12 @@ class VisualizeCompounds(BaseVisualization):
     def get_data(self):
         if self.kekulize:
             self.compounds = [Chem.MolToSmiles(Chem.MolFromSmiles(s, sanitize=False), kekuleSmiles = True) for s in self.compounds]
-        d =  {"smiles": self.compounds,
-            "table_width": self.table_width,
-            "table_height": self.table_height,
-            "compound_width": self.compound_width,
-            "compound_height": self.compound_height,
-            "box": self.box}
+            d =  {"smiles": self.compounds,
+                "table_width": self.table_width,
+                "table_height": self.table_height,
+                "compound_width": self.compound_width,
+                "compound_height": self.compound_height,
+                "box": self.box}
 
         if not self.annotations is None:
             d.update({"annotations": {col: self.dataset.data[col].tolist() for col in self.annotations}})
