@@ -500,7 +500,7 @@ class BaseModel(BaseClass):
 
     def _unnormalize(self, Y): 
         if self.normalization == "zscore" and hasattr(self, "ymean") and hasattr(self, "ystd"):
-                result = Y * self.ystd + self.ymean
+            result = Y * self.ystd + self.ymean
         elif issubclass(type(self.normalization), BasePreprocessor):
             result = self.normalization.inverse_transform(Y)
         else:
@@ -528,6 +528,7 @@ class BaseModel(BaseClass):
         return_ci=False,
         return_vis=False,
         skip_preprocess=False,
+        **kwargs,
     ) -> np.ndarray:
         """Calls the _predict method of the model and returns the predicted values for provided dataset.
 
@@ -546,7 +547,7 @@ class BaseModel(BaseClass):
         X_original = X
         if not skip_preprocess:
             X = self.preprocess(X, None, fit=False)
-        Y = self._predict(X)
+        Y = self._predict(X, **kwargs)
         if self.setting == "regression":
             result = self._unnormalize(Y)
             if self.calibrator is not None:

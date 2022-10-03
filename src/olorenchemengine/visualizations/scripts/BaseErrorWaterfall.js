@@ -22,7 +22,7 @@ const data = JSON.parse(
   
   var layout = {
     title: {
-        text: "Waterfall Plot for Base Boosted Model"
+        text: "Base Boosted Model Waterfall Plot Residuals (Standard Deviation)",
     },
     xaxis: {
         title: {text: "Model Iterations"},
