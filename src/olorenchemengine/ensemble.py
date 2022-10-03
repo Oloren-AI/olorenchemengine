@@ -1,5 +1,6 @@
 """ Ensembling methods to combine `BaseModel`s to create better, combined models.
 """
+from encodings import normalize_encoding
 from .base_class import *
 from .representations import *
 from .basics import *
@@ -451,9 +452,7 @@ class BaseBoosting(BaseModel):
             models = [models]
 
         self.models = []
-        self.residuals = [] 
-        self.stdevs = []
-        self.unnormal = []
+
         for i in range(n):
             for model in models:
                 self.models.append(model.copy())
@@ -467,10 +466,6 @@ class BaseBoosting(BaseModel):
         if self.oof:
             from sklearn.model_selection import KFold
             kf = KFold(n_splits = self.nfolds)
-        
-        naive_mean = np.average(y_train)
-        naive_residuals = [y - naive_mean for y in y_train]
-        unnorm_naive = self._unnormalize(np.array(naive_residuals))
 
         for i, model in enumerate(self.models):
             if self.oof:
@@ -480,18 +475,7 @@ class BaseBoosting(BaseModel):
                 model.fit(X_train, y_train)
                 y_pred = np.array(model.predict(X_train)).flatten()
             y_train = y_train - y_pred
-            self.residuals.append(np.array(y_train))
-            self.unnormal.append(self._unnormalize(y_train))
-
-        self.stdevs = self._error_calc(self.residuals)
-        self.residuals.insert(0, naive_residuals)
-        self.stdevs.insert(0, np.std(naive_residuals))
-
-        self.unnormal_stdevs = self._error_calc(self.unnormal)
-        self.unnormal.insert(0, unnorm_naive)
-        self.unnormal_stdevs.insert(0, np.std(unnorm_naive))
-
-        
+    
     def _error_calc(self, residuals):
         initial_residual, other_residuals = residuals[0], residuals[1:]
         y = np.array(([initial_residual]))
@@ -503,12 +487,35 @@ class BaseBoosting(BaseModel):
         stdevs = list(np.std(y, axis = 1))
         return stdevs
 
-    def _predict(self, X):
+    def _waterfall(self, y_data = None, normalize = False):
+        self.stdevs = self._error_calc(self.residuals)
+        if y_data is not None: 
+            naive_mean = np.average(y_data)
+            naive_residuals = [(y - naive_mean)/np.std(y_data) for y in y_data] #normalized so they're in the same format as predict's input
+            if normalize:    
+                naive_residuals = naive_residuals 
+            else: 
+                naive_residuals = self._unnormalize(np.array(naive_residuals))
+            self.residuals.insert(0, naive_residuals)
+            self.stdevs.insert(0, np.std(naive_residuals))  
+        return self.stdevs
+
+    def _predict(self, X, waterfall = False, normalize = False):
+        if waterfall: 
+            self.residuals = [] 
         y = np.zeros((len(X)))
         for model in self.models:
-            y = y + np.array(model.predict(X)).flatten()
+            prediction = np.array(model.predict(X)).flatten()
+            y = y + prediction
+            if waterfall:
+                if normalize: 
+                    self.residuals.append(prediction)
+                else:
+                    self.residuals.append(self._unnormalize(prediction))
         if self.setting == "classification":
             y = np.clip(y, 0, 1)
+            if waterfall: 
+                self.residuals = [np.clip(residual, 0, 1) for residual in self.residuals]
         return y.flatten()
 
     def _save(self):
