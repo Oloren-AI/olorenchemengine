@@ -1,7 +1,7 @@
 import olorenchemengine as oce
 
 from olorenchemengine.base_class import log_arguments, BaseModel
-from olorenchemengine.representations import AtomFeaturizer, BondFeaturizer, TorchGeometricGraph
+from olorenchemengine.representations import AtomFeaturizer, BondFeaturizer, TorchGeometricGraph, SMILESRepresentation, BaseVecRepresentation
 from olorenchemengine.internal import download_public_file
 
 from rdkit import Chem
@@ -94,10 +94,10 @@ class MolCLR(BaseModel):
         from torch.optim.lr_scheduler import CosineAnnealingLR
         from sklearn.metrics import roc_auc_score, mean_squared_error, mean_absolute_error
 
-        if self.setting == 'classification':
+        if self.setting == 'regression':
             self.criterion = nn.MSELoss()
-        elif self.setting == 'regression':
-            self.criterion = nn.BCEWithLogitsLoss()
+        elif self.setting == 'classification':
+            self.criterion = nn.BCEWithLogitsLoss(reduction = "none")
         
         if self.model_type == "ginet":
             from .model import GINet
@@ -126,17 +126,22 @@ class MolCLR(BaseModel):
 
         train_loader = DataLoader(X, batch_size=self.config["batch_size"], shuffle=True, num_workers=oce.CONFIG["NUM_WORKERS"])
         for epoch_counter in range(self.config['epochs']):
-            for bn, data in enumerate(train_loader):
-                if self.setting == "classification":
-                    data.y = data.y
+            print(f"Epoch {epoch_counter+1}/{self.config['epochs']}")
+            for bn, batch in enumerate(train_loader):
+
+                batch = batch.to(oce.CONFIG["DEVICE"])
+                _, pred = self.model(batch)
+                y = batch.y.view(pred.shape).to(torch.float64)
+
+                #Loss matrix
+                loss_mat = self.criterion(pred.double(), y)
+
                 optimizer.zero_grad()
 
-                data = data.to(oce.CONFIG["DEVICE"])
-                loss = self._step(self.model, data, epoch_counter)
+                loss = torch.mean(loss_mat)
                 loss.backward()
 
                 optimizer.step()
-                epoch_counter += 1
                 
     def _step(self, model, data, n_iter):
         # get the prediction
@@ -148,6 +153,67 @@ class MolCLR(BaseModel):
     def _predict(self, X, **kwargs):
         import torch
         
+        loader = DataLoader(X, batch_size=self.config["batch_size"], shuffle=False, num_workers=oce.CONFIG["NUM_WORKERS"])
+        self.model.eval()
+        y_pred = []
+
+        for step, batch in enumerate(tqdm(loader, desc="Iteration")):
+            batch = batch.to(oce.CONFIG["DEVICE"])
+
+            with torch.no_grad():
+                _, pred = self.model(batch)
+            y_pred.append(pred.cpu().detach().numpy())
+
+        return np.vstack(y_pred).flatten()
+
+class MolCLRVecRep(BaseVecRepresentation):
+
+    model_config = {"num_layer": 5,      # number of graph conv layers
+            "emb_dim": 300,                  # embedding dimension in graph conv layers
+            "feat_dim": 512,                 # output feature dimention
+            "drop_ratio": 0.3,               # dropout ratio
+            "pool": "mean"}
+
+    @log_arguments
+    def __init__(self, model_type = "ginet", epochs = 100, batch_size = 32,
+                 init_lr = 0.0005, init_base_lr = 0.0001, weight_decay = 1e-6,
+                 **kwargs):
+        self.model_type = model_type
+
+        self.config = {
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "init_lr": init_lr,
+            "init_base_lr": init_base_lr,
+            "weight_decay": weight_decay
+        }
+
+        import torch
+        from torch import nn
+        import torch.nn.functional as F
+        from torch.utils.tensorboard import SummaryWriter
+        from torch.optim.lr_scheduler import CosineAnnealingLR
+        from sklearn.metrics import roc_auc_score, mean_squared_error, mean_absolute_error
+        
+        if self.model_type == "ginet":
+            from .model import GINet
+            self.model = GINet("regression", **self.model_config)
+            save_path = download_public_file("MolCLR/pretrained_gin.pth")
+        elif self.model_type == "gcn":
+            from .model import GCN
+            self.model = GCN("regression", **self.model_config)
+            save_path = download_public_file("MolCLR/pretrained_gcn.pth")
+
+        self.model.load_my_state_dict(torch.load(save_path, map_location = oce.CONFIG["MAP_LOCATION"]))
+        self.model.to(oce.CONFIG["DEVICE"])
+    
+    def _convert(self, X, **kwargs):
+        return self.convert(X)
+
+    def convert(self, X, **kwargs):
+        X = MolCLR_PYG().convert(X, ys=None)
+        import torch
+        
         loader = DataLoader(X, batch_size=self.config["batch_size"], shuffle=True, num_workers=oce.CONFIG["NUM_WORKERS"])
         self.model.eval()
         y_pred = []
@@ -156,7 +222,7 @@ class MolCLR(BaseModel):
             batch = batch.to(oce.CONFIG["DEVICE"])
 
             with torch.no_grad():
-                ___, pred = self.model(batch)
-            y_pred.append(pred.cpu().detach().numpy())
+                rep, _ = self.model(batch)
+            y_pred.append(rep.cpu().detach().numpy())
 
-        return np.array(y_pred).flatten()
+        return np.concatenate(y_pred)

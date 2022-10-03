@@ -384,6 +384,12 @@ class TorchGeometricGraph(BaseRepresentation):
         del graph["node_feat"]
 
         return data
+    
+    def convert(
+        self, Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray] = None, **kwargs
+    ) -> List[Any]:
+        Xs = SMILESRepresentation().convert(Xs)
+        return super().convert(Xs, ys = ys, **kwargs)
 
     def _save(self):
         return {"atom_featurizer": self.atom_featurizer._save(), "bond_featurizer": self.bond_featurizer._save()}

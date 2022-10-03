@@ -119,6 +119,7 @@ def ExampleDataset():
 
 def BACEDataset():
     df = pd.read_csv(download_public_file("MoleculeNet/load_bace_regression.csv"))
+    df["split"] = df["split"].replace({"Train": "train", "Valid": "valid", "Test": "test"})
     return oce.BaseDataset(data = df.to_csv(), structure_col = "smiles", property_col = "pIC50")
 
 def test_oce():
