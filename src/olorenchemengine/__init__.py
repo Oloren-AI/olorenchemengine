@@ -109,8 +109,13 @@ from .benchmarks import *
 from .hyperparameters import *
 
 def ExampleDataset():
-    return BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
-        property_col = "pChEMBL Value") + RandomSplit()
+    if os.path.exists(path.join(path.expanduser("~"), f".oce/exampledataset.oce")):
+        return load(path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
+    else:
+        dataset =  BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
+            property_col = "pChEMBL Value") + RandomSplit()
+        save(dataset, path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
+        return dataset
 
 def BACEDataset():
     df = pd.read_csv(download_public_file("MoleculeNet/load_bace_regression.csv"))

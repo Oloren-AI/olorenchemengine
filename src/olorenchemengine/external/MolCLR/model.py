@@ -104,7 +104,7 @@ class GINet(nn.Module):
         self.feat_lin = nn.Linear(self.emb_dim, self.feat_dim)
 
         if self.task == 'classification':
-            out_dim = 2
+            out_dim = 1
         elif self.task == 'regression':
             out_dim = 1
         
@@ -277,7 +277,7 @@ class GCN(nn.Module):
             self.pred_head = nn.Sequential(
                 nn.Linear(self.feat_dim, self.feat_dim//2), 
                 nn.Softplus(),
-                nn.Linear(self.feat_dim//2, 2)
+                nn.Linear(self.feat_dim//2, 1)
             )
         elif self.task == 'regression':
             self.pred_head = nn.Sequential(

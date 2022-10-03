@@ -14,6 +14,8 @@ import numpy as np
 
 from .model import GNN_graphpred, GNN, global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 from sklearn.metrics import roc_auc_score
+
+import olorenchemengine as oce
 from olorenchemengine.representations import AtomFeaturizer, BaseRepresentation, BondFeaturizer, TorchGeometricGraph, BaseVecRepresentation
 
 import os
@@ -112,8 +114,6 @@ class SPGNNVecRep(BaseVecRepresentation):
 
     @log_arguments
     def __init__(self, model_type = "contextpred",
-        map_location = "cuda:0",
-        num_workers = 4,
         batch_size = 32,
         epochs = 100,
         lr = 0.001,
@@ -136,9 +136,9 @@ class SPGNNVecRep(BaseVecRepresentation):
 
         self.batch_size = batch_size
         self.epochs = epochs
-        self.num_workers = num_workers
-        self.map_location = map_location
-        self.device = torch.device(self.map_location)
+        self.num_workers = oce.CONFIG["NUM_WORKERS"]
+        self.map_location = oce.CONFIG["MAP_LOCATION"]
+        self.device = oce.CONFIG["DEVICE"]
 
         self.model = GNN(num_layer, emb_dim, JK, dropout_ratio, gnn_type = gnn_type)
 
@@ -254,8 +254,6 @@ class SPGNN(BaseModel):
 
     @log_arguments
     def __init__(self, model_type = "contextpred",
-        map_location = "cuda:0",
-        num_workers = 4,
         batch_size = 32,
         epochs = 100,
         lr = 0.001,
@@ -277,9 +275,11 @@ class SPGNN(BaseModel):
 
         self.batch_size = batch_size
         self.epochs = epochs
-        self.num_workers = num_workers
-        self.map_location = map_location
-        self.device = torch.device(self.map_location)
+        
+        self.num_workers = oce.CONFIG["NUM_WORKERS"]
+        self.map_location = oce.CONFIG["MAP_LOCATION"]
+        self.device = oce.CONFIG["DEVICE"]
+        
         self.model = GNN_graphpred(num_layer,
             emb_dim,
             1,

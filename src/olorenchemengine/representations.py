@@ -324,13 +324,15 @@ class TorchGeometricGraph(BaseRepresentation):
     def dimensions(self):
         return (self.atom_featurizer.length, self.bond_featurizer.length)
 
-    def _convert(self, smiles, y=None):
+    def _convert(self, smiles, y=None, addHs=False):
         from torch_geometric.data import Data
         from torch import from_numpy, Tensor
 
         data = Data()
 
         mol = Chem.MolFromSmiles(smiles)
+        if addHs:
+            mol = Chem.AddHs(mol)
 
         # atoms
         atom_features_list = []
