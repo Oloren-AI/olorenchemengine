@@ -5,8 +5,6 @@ from lib2to3.pgen2.literals import simple_escapes
 import os
 from re import escape
 import urllib.parse
-import fasttreeshap
-
 
 from IPython.display import IFrame
 from pandas.core.indexes.accessors import NoNewAttributesMixin
@@ -20,7 +18,6 @@ from olorenchemengine.uncertainty import *
 from olorenchemengine.interpret import *
 from olorenchemengine.internal import *
 from olorenchemengine.ensemble import *
-
 
 from rdkit import Chem
 from rdkit.Chem import Draw
