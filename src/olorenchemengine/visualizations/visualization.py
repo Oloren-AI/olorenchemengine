@@ -397,12 +397,12 @@ class VisualizeCompounds(BaseVisualization):
     def get_data(self):
         if self.kekulize:
             self.compounds = [Chem.MolToSmiles(Chem.MolFromSmiles(s, sanitize=False), kekuleSmiles = True) for s in self.compounds]
-        d =  {"smiles": self.compounds,
-            "table_width": self.table_width,
-            "table_height": self.table_height,
-            "compound_width": self.compound_width,
-            "compound_height": self.compound_height,
-            "box": self.box}
+            d =  {"smiles": self.compounds,
+                "table_width": self.table_width,
+                "table_height": self.table_height,
+                "compound_width": self.compound_width,
+                "compound_height": self.compound_height,
+                "box": self.box}
 
         if not self.annotations is None:
             d.update({"annotations": {col: self.dataset.data[col].tolist() for col in self.annotations}})
