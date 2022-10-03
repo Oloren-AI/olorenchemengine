@@ -324,13 +324,15 @@ class TorchGeometricGraph(BaseRepresentation):
     def dimensions(self):
         return (self.atom_featurizer.length, self.bond_featurizer.length)
 
-    def _convert(self, smiles, y=None):
+    def _convert(self, smiles, y=None, addHs=False):
         from torch_geometric.data import Data
         from torch import from_numpy, Tensor
 
         data = Data()
 
         mol = Chem.MolFromSmiles(smiles)
+        if addHs:
+            mol = Chem.AddHs(mol)
 
         # atoms
         atom_features_list = []
@@ -382,6 +384,12 @@ class TorchGeometricGraph(BaseRepresentation):
         del graph["node_feat"]
 
         return data
+    
+    def convert(
+        self, Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray] = None, **kwargs
+    ) -> List[Any]:
+        Xs = SMILESRepresentation().convert(Xs)
+        return super().convert(Xs, ys = ys, **kwargs)
 
     def _save(self):
         return {"atom_featurizer": self.atom_featurizer._save(), "bond_featurizer": self.bond_featurizer._save()}
