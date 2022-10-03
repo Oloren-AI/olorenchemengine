@@ -53,7 +53,6 @@ else:
 
 CONFIG = CONFIG_.copy()
 
-
 def update_config():
     """Update the configuration file.
 
