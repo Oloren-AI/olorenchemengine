@@ -1,6 +1,5 @@
 """ Ensembling methods to combine `BaseModel`s to create better, combined models.
 """
-from encodings import normalize_encoding
 from .base_class import *
 from .representations import *
 from .basics import *
