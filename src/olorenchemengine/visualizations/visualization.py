@@ -5,6 +5,7 @@ from lib2to3.pgen2.literals import simple_escapes
 import os
 from re import escape
 import urllib.parse
+import fasttreeshap
 
 from IPython.display import IFrame
 from pandas.core.indexes.accessors import NoNewAttributesMixin
@@ -1778,5 +1779,64 @@ class BaseErrorWaterfall(BaseVisualization):
         w_type = ['relative' for val in diffs]
         w_type[-1] = 'total'
         self.df['w_type'] = w_type
+
+        return self.df.to_dict("l")
+
+class ShapleyValues(BaseVisualization):
+    """ Visualize the error waterfall for a base boosting model.
+
+   Args:
+        model (BaseBoosting): Model to evaluate on. must be base boosting model.
+        x_data (Union[pd.DataFrame, np.ndarray]): Data to predict on using the model
+        y_data (Union[pd.Series, list, np.ndarray], optional): True values to compare to. Defaults to None. If None, then the waterfall plot will be for residuals.
+        normalization (bool, optional): If the data is normalized. Defaults to False.
+    """
+
+    @log_arguments
+    def __init__(self, model: BaseModel,dataset: BaseDataset, log=True, **kwargs):
+        self.model = model
+        self.dataset = dataset
+        
+        self.surrogate_data = self.model.predict(self.dataset.entire_dataset[0]) # predict on x values 
+        print('model stuff')
+        oce_surrogate_model = oce.XGBoostModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048))
+        print('arch created')
+        oce_surrogate_model.fit(self.dataset.entire_dataset[0], self.surrogate_data)
+        print('fitted')
+        self.oce_model = oce_surrogate_model
+
+        self.surrogate_model = oce_surrogate_model.model
+
+        self.tree_shap = fasttreeshap.TreeExplainer(self.surrogate_model, algorithm = "auto")
+        print('hello world')
+
+        print('got my explainer')
+        data = "Clc1ccc(Nc2nnc(Cc3ccncc3)c3cccnc23)cc1"
+        prediction = self.oce_model.predict(data)
+
+        shap_values = self.tree_shap(self.oce_model.preprocess(data, prediction)).values
+        print('hello')
+        print(shap_values)
+        print(shap_values.shape)
+        
+        super().__init__(log=False)
+        self.packages += ["plotly"]
+        
+        self.df = pd.DataFrame({})
+
+    def get_data(self, data) -> dict:
+        """Get data for visualization in JSON-like dictionary.
+
+        Returns:
+            dict: Data for visualization."""
+        
+        prediction = self.oce_model.predict(data)
+
+        shap_values = self.tree_shap(self.oce_model.preprocess(data, prediction)).values
+        print('hello')
+        print(shap_values)
+        print(shap_values.shape)
+
+        
 
         return self.df.to_dict("l")
