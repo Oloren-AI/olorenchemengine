@@ -885,7 +885,6 @@ class MakeMultiClassModel(BaseModel):
         super()._load(d)
         self.classifiers = [loads(classifier) for classifier in d["classifiers"]]
         self.sorted_classes = d["sorted_classes"]
-        
 
 
 class BaseSKLearnModel(BaseModel):
