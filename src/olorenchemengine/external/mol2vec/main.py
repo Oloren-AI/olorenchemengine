@@ -5,6 +5,8 @@ import numpy as np
 from typing import List, Union, Any
 from rdkit import Chem
 
+import olorenchemengine as oce
+
 from olorenchemengine.base_class import log_arguments
 from olorenchemengine.representations import BaseVecRepresentation
 from olorenchemengine.internal import download_public_file
@@ -17,7 +19,11 @@ class Mol2Vec(BaseVecRepresentation):
         print("Requires gensim installation https://github.com/RaRe-Technologies/gensim")
 
         model_path = download_public_file("mol2vec/model_300dim.pkl")
+        
+        oce.import_or_install("gensim")
+        
         from gensim.models import word2vec
+        
         self.model = word2vec.Word2Vec.load(model_path)
         super().__init__(log=False)
 

@@ -1077,6 +1077,8 @@ class PubChemFingerprint(BaseCompoundVecRepresentation):
         super().__init__(log=False)
 
     def _convert(self, s: str) -> np.ndarray:
+        oce.import_or_install("pubchempy")
+        
         import pubchempy as pcp
         #Check if retrieval of compound and subsequent descriptor calculation succeed without error
         try:
@@ -1098,6 +1100,8 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
 
     @log_arguments
     def __init__(self, descriptor_set: Union[str, list] = "all", log: bool = True, normalize: bool = False, **kwargs):
+        oce.import_or_install("mordred")
+        
         from mordred import Calculator, descriptors
 
         if descriptor_set == "all":
