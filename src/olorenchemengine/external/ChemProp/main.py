@@ -211,7 +211,7 @@ def train(config, loader, setting, device=torch.device("cpu")):
 
     model = model.to(device)
     model.train()
-    for batch in tqdm(loader, total=len(loader)):
+    for batch in loader:
         batch = batch.to(device)
 
         optimizer.zero_grad()

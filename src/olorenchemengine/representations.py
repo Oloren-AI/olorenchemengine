@@ -153,8 +153,12 @@ class SMILESRepresentation(BaseRepresentation):
                 smiles = Xs["SMILES"]
             elif "smi" in keys:
                 smiles = Xs["smi"]
+            else:
+                smiles = Xs.iloc[:, 0]
         elif isinstance(Xs, str):
             smiles = [Xs]
+        elif isinstance(Xs, pd.Series):
+            smiles = Xs.tolist()
         else:
             smiles = Xs
 
@@ -324,7 +328,7 @@ class TorchGeometricGraph(BaseRepresentation):
     def dimensions(self):
         return (self.atom_featurizer.length, self.bond_featurizer.length)
 
-    def _convert(self, smiles, y=None, addHs=False):
+    def _convert(self, smiles, y=None, addHs=False, **kwargs):
         from torch_geometric.data import Data
         from torch import from_numpy, Tensor
 
@@ -564,7 +568,7 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
         converted_2 = self.rep2._convert_list(smiles_list, ys=ys, fit = fit)
         return np.concatenate((converted_1, converted_2), axis=1)
 
-    def convert(self, smiles_list, ys = None, fit = False):
+    def convert(self, smiles_list, ys = None, fit = False, **kwargs):
         converted_1 = self.rep1.convert(smiles_list, ys=ys, fit = fit)
         converted_2 = self.rep2.convert(smiles_list, ys=ys, fit = fit)
         return np.concatenate((converted_1, converted_2), axis=1)

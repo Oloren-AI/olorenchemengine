@@ -171,7 +171,7 @@ class SPGNNVecRep(BaseVecRepresentation):
     def _convert(self, smiles: str, y: Union[int, float, np.number] = None) -> np.ndarray:
         assert Exception, "Please directly use convert method"
     
-    def convert(self, smiles):
+    def convert(self, smiles, **kwargs):
         X = self.representation.convert(smiles)
         loader = DataLoader(X, batch_size=self.batch_size, 
             shuffle=False, num_workers=self.num_workers)
