@@ -170,7 +170,8 @@ class BenchmarkTDC(BenchmarkDatasets):
         self.metrics = []
         for name in datasets:
             benchmark = group.get(name)
-            train, test = benchmark['train_val'], benchmark['test']
+            test = benchmark['test']
+            train, valid = group.get_train_valid_split(benchmark = name, split_type = 'default', seed = 0)
             train['split'] = 'train'
             test['split'] = 'test'
             self.metrics.append(self.metrics_dict[name])
@@ -183,6 +184,7 @@ class BenchmarkTDC(BenchmarkDatasets):
             datasets_wrapped[i].train = train
             datasets_wrapped[i].test = test
             datasets_wrapped[i].data = pd.concat([datasets_wrapped[i].train, datasets_wrapped[i].test])
+            
         self.dataset_names = datasets
         self.datasets = datasets_wrapped
         self.managers = [ModelManager(dataset, metrics=[metric]) for dataset, metric in zip(self.datasets, self.metrics)]

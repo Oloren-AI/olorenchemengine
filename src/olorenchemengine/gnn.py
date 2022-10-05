@@ -10,7 +10,7 @@ import torch.nn as nn
 from pytorch_lightning import LightningModule
 
 
-class BaseLightningModule(LightningModule, BaseClass):
+class BaseLightningModule(BaseClass, LightningModule):
 
     """ BaseLightningModule allows for the use of a Pytorch Lightning module as a BaseClass to be incorporated into the framework.
 
@@ -243,7 +243,7 @@ class BaseTorchGeometricModel(BaseModel):
     @log_arguments
     def __init__(
         self,
-        network: nn.Module,
+        network: BaseLightningModule,
         representation: BaseRepresentation = TorchGeometricGraph(),
         epochs: int = 1,
         batch_size: int = 16,

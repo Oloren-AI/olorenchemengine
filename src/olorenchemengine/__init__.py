@@ -53,7 +53,6 @@ else:
 
 CONFIG = CONFIG_.copy()
 
-
 def update_config():
     """Update the configuration file.
 
@@ -110,11 +109,17 @@ from .benchmarks import *
 from .hyperparameters import *
 
 def ExampleDataset():
-    return BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
-        property_col = "pChEMBL Value") + RandomSplit()
+    if os.path.exists(path.join(path.expanduser("~"), f".oce/exampledataset.oce")):
+        return load(path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
+    else:
+        dataset =  BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
+            property_col = "pChEMBL Value") + RandomSplit()
+        save(dataset, path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
+        return dataset
 
 def BACEDataset():
     df = pd.read_csv(download_public_file("MoleculeNet/load_bace_regression.csv"))
+    df["split"] = df["split"].replace({"Train": "train", "Valid": "valid", "Test": "test"})
     return oce.BaseDataset(data = df.to_csv(), structure_col = "smiles", property_col = "pIC50")
 
 def test_oce():

@@ -353,7 +353,6 @@ class GNN_graphpred(torch.nn.Module):
             self.graph_pred_linear = torch.nn.Linear(self.mult * self.emb_dim, self.num_tasks)
 
     def from_pretrained(self, model_file, map_location = "cpu"):
-        #self.gnn = GNN(self.num_layer, self.emb_dim, JK = self.JK, drop_ratio = self.drop_ratio)
         self.gnn.load_state_dict(torch.load(model_file, map_location=map_location))
 
     def forward(self, *argv):

@@ -216,6 +216,8 @@ from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 
 from rdkit import RDLogger
 
+import olorenchemengine as oce
+
 RDLogger.DisableLog("rdApp.*")
 
 def randomize_smiles(mol):
@@ -296,6 +298,8 @@ def mutate_selfie(selfie, max_molecules_len, write_fail_cases=False, index=None)
     
     while not valid:
         fail_counter += 1
+        
+        oce.import_or_install("selfies")
         
         import selfies
 

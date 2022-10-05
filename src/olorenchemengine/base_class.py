@@ -500,7 +500,7 @@ class BaseModel(BaseClass):
 
     def _unnormalize(self, Y): 
         if self.normalization == "zscore" and hasattr(self, "ymean") and hasattr(self, "ystd"):
-                result = Y * self.ystd + self.ymean
+            result = Y * self.ystd + self.ymean
         elif issubclass(type(self.normalization), BasePreprocessor):
             result = self.normalization.inverse_transform(Y)
         else:
@@ -528,6 +528,7 @@ class BaseModel(BaseClass):
         return_ci=False,
         return_vis=False,
         skip_preprocess=False,
+        **kwargs,
     ) -> np.ndarray:
         """Calls the _predict method of the model and returns the predicted values for provided dataset.
 
@@ -546,7 +547,7 @@ class BaseModel(BaseClass):
         X_original = X
         if not skip_preprocess:
             X = self.preprocess(X, None, fit=False)
-        Y = self._predict(X)
+        Y = self._predict(X, **kwargs)
         if self.setting == "regression":
             result = self._unnormalize(Y)
             if self.calibrator is not None:
@@ -743,14 +744,6 @@ class BaseModel(BaseClass):
 
         return d
 
-    @classmethod
-    def Opt(cls, *args, **kwargs):
-        return {
-            **{"BC_class_name": cls.__name__},
-            **{"args": args},
-            **{"kwargs": kwargs},
-        }
-
     def _save(self) -> dict:
         d = {}
         if hasattr(self, "ymean") and hasattr(self, "ystd"):
@@ -820,8 +813,9 @@ class MakeMultiClassModel(BaseModel):
     Base class for extending the classification capabilities of BaseModel to more than two classes, e.g. classes {W,X,Y,Z}.
     Uses the commonly-implemented One-vs-Rest (OvR) strategy. For each classifier, the class is fitted against all the other classes. The probabilities are then normalized and compared for each class.
 
-    Attributes:
-        individual_classifier (BaseModel): Model generated earlier for binary classification tasks.
+    Parameters:
+        individual_classifier (BaseModel): Model for binary classification tasks,
+            which is to be turned into a multi-class model.
     """
 
     @log_arguments
@@ -881,6 +875,16 @@ class MakeMultiClassModel(BaseModel):
         predictions = (predictions.T / predictions.sum(axis=1)).T  # normalizes outputs between 0 and 1
 
         return predictions
+    
+    def _save(self):
+        d = super()._save()
+        d.update({"classifiers": [saves(classifier) for classifier in self.classifiers],
+                  "sorted_classes": self.sorted_classes})
+    
+    def _load(self, d):
+        super()._load(d)
+        self.classifiers = [loads(classifier) for classifier in d["classifiers"]]
+        self.sorted_classes = d["sorted_classes"]
 
 
 class BaseSKLearnModel(BaseModel):

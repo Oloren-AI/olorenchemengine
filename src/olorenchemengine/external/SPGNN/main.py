@@ -12,11 +12,15 @@ import torch.optim as optim
 from tqdm import tqdm
 import numpy as np
 
-from .model import GNN_graphpred
+from .model import GNN_graphpred, GNN, global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 from sklearn.metrics import roc_auc_score
-from olorenchemengine.representations import AtomFeaturizer, BaseRepresentation, BondFeaturizer, TorchGeometricGraph
+
+import olorenchemengine as oce
+from olorenchemengine.representations import AtomFeaturizer, BaseRepresentation, BondFeaturizer, TorchGeometricGraph, BaseVecRepresentation
+
 import os
 import io
+from typing import Union, List, Tuple, Dict, Optional
 
 from olorenchemengine.base_class import BaseModel, log_arguments, QuantileTransformer
 from olorenchemengine.internal import download_public_file
@@ -84,51 +88,9 @@ class SPGNN_PYG(TorchGeometricGraph):
     def __init__(self):
         super().__init__(SPGNN_AF(), SPGNN_BF(), log = False)
 
-def train(model, device, loader, optimizer, setting):
-    if setting == "classification":
-        criterion = nn.BCEWithLogitsLoss(reduction = "none")
-    else:
-        criterion = nn.MSELoss()
-    model.train()
-
-    for step, batch in enumerate(loader):
-        batch = batch.to(device)
-        pred = model(batch.x, batch.edge_index, batch.edge_attr, batch.batch)
-        y = batch.y.view(pred.shape).to(torch.float64)
-
-        #Loss matrix
-        loss_mat = criterion(pred.double(), y)
-
-        optimizer.zero_grad()
-
-        loss = torch.mean(loss_mat)
-        loss.backward()
-
-        optimizer.step()
-
-def predict(model, device, loader, setting = "classification"):
-
-    model.eval()
-    y_pred = []
-
-    for step, batch in enumerate(tqdm(loader, desc="Iteration")):
-        batch = batch.to(device)
-
-        with torch.no_grad():
-            pred = model(batch.x, batch.edge_index, batch.edge_attr, batch.batch)
-
-        y_pred.append(pred)
-    if setting == "classification":
-        y_pred = nn.Sigmoid()(torch.cat(y_pred, dim = 0)).cpu().numpy()
-    else:
-        y_pred = torch.cat(y_pred, dim = 0).cpu().numpy()
-    return y_pred.flatten()
-
-class SPGNN(BaseModel):
-    """SPGNN is the model presented in `Strategies for pre-training graph neural networks <https://arxiv.org/abs/1905.12265>`_
-    `GitHub repository <https://github.com/snap-stanford/pretrain-gnns>`_
-
-    Note it is often useful to feed the output of SPGNN through a LinearRegressionStacker to get a final prediction.
+class SPGNNVecRep(BaseVecRepresentation):
+    """SPGNN_REP gives the output of the model presented in `Strategies for pre-training graph neural networks <https://arxiv.org/abs/1905.12265>`_
+    `GitHub repository <https://github.com/snap-stanford/pretrain-gnns>` as a molecular representation.
 
     Attributes:
         available_pretrained_models (List[str]): List of available pretrained models; passed in the model_type parameter
@@ -152,8 +114,146 @@ class SPGNN(BaseModel):
 
     @log_arguments
     def __init__(self, model_type = "contextpred",
-        map_location = "cuda:0",
-        num_workers = 4,
+        batch_size = 32,
+        epochs = 100,
+        lr = 0.001,
+        lr_scale = 1,
+        decay = 0,
+        num_layer = 5,
+        emb_dim = 300,
+        dropout_ratio = 0.5,
+        graph_pooling = "mean",
+        JK = "last",
+        gnn_type = "gin", **kwargs):
+
+        self.model_type = model_type
+
+        if "gat" in model_type:
+            gnn_type = "gat"
+            emb_dim= 300
+
+        self.representation = SPGNN_PYG()
+
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.num_workers = oce.CONFIG["NUM_WORKERS"]
+        self.map_location = oce.CONFIG["MAP_LOCATION"]
+        self.device = oce.CONFIG["DEVICE"]
+
+        self.model = GNN(num_layer, emb_dim, JK, dropout_ratio, gnn_type = gnn_type)
+
+        input_model_file = download_public_file(f"SPGNN_saves/{self.model_type}.pth")
+
+        self.model.load_state_dict(torch.load(input_model_file, map_location=self.map_location))
+        self.model.eval()
+        self.model.to(self.device)
+
+        if graph_pooling == "sum":
+            self.pool = global_add_pool
+        elif graph_pooling == "mean":
+            self.pool = global_mean_pool
+        elif graph_pooling == "max":
+            self.pool = global_max_pool
+        elif graph_pooling == "attention":
+            if self.JK == "concat":
+                self.pool = GlobalAttention(gate_nn = torch.nn.Linear((self.num_layer + 1) * emb_dim, 1))
+            else:
+                self.pool = GlobalAttention(gate_nn = torch.nn.Linear(emb_dim, 1))
+        elif graph_pooling[:-1] == "set2set":
+            set2set_iter = int(graph_pooling[-1])
+            if self.JK == "concat":
+                self.pool = Set2Set((self.num_layer + 1) * emb_dim, set2set_iter)
+            else:
+                self.pool = Set2Set(emb_dim, set2set_iter)
+        else:
+            raise ValueError("Invalid graph pooling type.")
+    
+    def _convert(self, smiles: str, y: Union[int, float, np.number] = None) -> np.ndarray:
+        assert Exception, "Please directly use convert method"
+    
+    def convert(self, smiles, **kwargs):
+        X = self.representation.convert(smiles)
+        loader = DataLoader(X, batch_size=self.batch_size, 
+            shuffle=False, num_workers=self.num_workers)
+
+        self.model.eval()
+        y_pred = []
+
+        for step, batch in enumerate(tqdm(loader, desc="Iteration")):
+            batch = batch.to(self.device)
+
+            with torch.no_grad():
+                pred = self.model(batch.x, batch.edge_index, batch.edge_attr)
+                pred = self.pool(pred, batch.batch).detach().cpu().numpy()
+
+            y_pred.append(pred)
+        return np.concatenate(y_pred)
+
+def train(model, device, loader, optimizer, setting):
+    if setting == "classification":
+        criterion = nn.BCEWithLogitsLoss(reduction = "none")
+    else:
+        criterion = nn.MSELoss()
+    model.train()
+
+    for step, batch in enumerate(loader):
+        batch = batch.to(device)
+        pred = model(batch.x, batch.edge_index, batch.edge_attr, batch.batch)
+        y = batch.y.view(pred.shape).to(torch.float64)
+
+        #Loss matrix
+        loss_mat = criterion(pred.double(), y)
+
+        optimizer.zero_grad()
+
+        loss = torch.mean(loss_mat)
+        loss.backward()
+
+        optimizer.step()
+
+def predict(model, device, loader, setting = "classification"):
+    model.eval()
+    y_pred = []
+
+    for step, batch in enumerate(tqdm(loader, desc="Iteration")):
+        batch = batch.to(device)
+
+        with torch.no_grad():
+            pred = model(batch.x, batch.edge_index, batch.edge_attr, batch.batch)
+
+        y_pred.append(pred)
+    if setting == "classification":
+        y_pred = nn.Sigmoid()(torch.cat(y_pred, dim = 0)).cpu().numpy()
+    else:
+        y_pred = torch.cat(y_pred, dim = 0).cpu().numpy()
+    return y_pred.flatten()
+
+class SPGNN(BaseModel):
+    """SPGNN is the model presented in `Strategies for pre-training graph neural networks <https://arxiv.org/abs/1905.12265>`_
+    `GitHub repository <https://github.com/snap-stanford/pretrain-gnns>`_
+
+    Attributes:
+        available_pretrained_models (List[str]): List of available pretrained models; passed in the model_type parameter
+
+    Parameters:
+        model_type (str): Type of model to use; default: "contextpred"
+    """
+
+    available_pretrained_models = ["contextpred",
+        "edgepred",
+        "infomax",
+        "masking",
+        "supervised_contextpred",
+        "supervised_edgepred",
+        "supervised_infomax",
+        "supervised_masking",
+        "supervised",
+        "gat_supervised_contextpred",
+        "gat_supervised",
+        "gat_contextpred"]
+
+    @log_arguments
+    def __init__(self, model_type = "contextpred",
         batch_size = 32,
         epochs = 100,
         lr = 0.001,
@@ -175,9 +275,11 @@ class SPGNN(BaseModel):
 
         self.batch_size = batch_size
         self.epochs = epochs
-        self.num_workers = num_workers
-        self.map_location = map_location
-        self.device = torch.device(self.map_location)
+        
+        self.num_workers = oce.CONFIG["NUM_WORKERS"]
+        self.map_location = oce.CONFIG["MAP_LOCATION"]
+        self.device = oce.CONFIG["DEVICE"]
+        
         self.model = GNN_graphpred(num_layer,
             emb_dim,
             1,
@@ -186,7 +288,7 @@ class SPGNN(BaseModel):
             graph_pooling = graph_pooling,
             gnn_type = gnn_type)
 
-        input_model_file = download_public_file("SPGNN_saves/contextpred.pth")
+        input_model_file = download_public_file(f"SPGNN_saves/{self.model_type}.pth")
 
         self.model.from_pretrained(input_model_file, map_location=self.map_location)
 
