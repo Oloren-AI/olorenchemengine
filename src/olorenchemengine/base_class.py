@@ -875,6 +875,16 @@ class MakeMultiClassModel(BaseModel):
         predictions = (predictions.T / predictions.sum(axis=1)).T  # normalizes outputs between 0 and 1
 
         return predictions
+    
+    def _save(self):
+        d = super()._save()
+        d.update({"classifiers": [saves(classifier) for classifier in self.classifiers],
+                  "sorted_classes": self.sorted_classes})
+    
+    def _load(self, d):
+        super()._load(d)
+        self.classifiers = [loads(classifier) for classifier in d["classifiers"]]
+        self.sorted_classes = d["sorted_classes"]
 
 
 class BaseSKLearnModel(BaseModel):
