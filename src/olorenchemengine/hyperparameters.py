@@ -100,7 +100,10 @@ def index_hyperparameters(object: BaseClass) -> dict:
     Returns a dictionary of hyperparameters for the model.
     """
     if issubclass(type(object), Opt):
-        return {object.label: object.hp}
+        d = {object.label: object.hp}
+        for arg in object.args:
+            d.update(index_hyperparameters(arg))
+        return d
     if issubclass(type(object), BaseClass):
         d = {}
         for arg in object.args:
@@ -153,7 +156,7 @@ def index_hyperparameters(object: BaseClass) -> dict:
 
 def load_hyperparameters_(object: BaseClass, hyperparameter_dictionary: dict) -> dict:
     if issubclass(type(object), Opt):
-        return hyperparameter_dictionary[object.label]
+        return load_hyperparameters_(hyperparameter_dictionary[object.label], hyperparameter_dictionary)
 
     if issubclass(type(object), BaseClass):
         return {

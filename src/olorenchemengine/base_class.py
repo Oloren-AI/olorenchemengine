@@ -744,14 +744,6 @@ class BaseModel(BaseClass):
 
         return d
 
-    @classmethod
-    def Opt(cls, *args, **kwargs):
-        return {
-            **{"BC_class_name": cls.__name__},
-            **{"args": args},
-            **{"kwargs": kwargs},
-        }
-
     def _save(self) -> dict:
         d = {}
         if hasattr(self, "ymean") and hasattr(self, "ystd"):
@@ -821,8 +813,9 @@ class MakeMultiClassModel(BaseModel):
     Base class for extending the classification capabilities of BaseModel to more than two classes, e.g. classes {W,X,Y,Z}.
     Uses the commonly-implemented One-vs-Rest (OvR) strategy. For each classifier, the class is fitted against all the other classes. The probabilities are then normalized and compared for each class.
 
-    Attributes:
-        individual_classifier (BaseModel): Model generated earlier for binary classification tasks.
+    Parameters:
+        individual_classifier (BaseModel): Model for binary classification tasks,
+            which is to be turned into a multi-class model.
     """
 
     @log_arguments

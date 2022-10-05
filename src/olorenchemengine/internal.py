@@ -250,6 +250,14 @@ class BaseClass(ABC):
                 return [o for sc in cls.__subclasses__() for o in sc.AllInstances()]
         else:
             return [o for sc in cls.__subclasses__() for o in sc.AllInstances()]
+    
+    @classmethod
+    def Opt(cls, *args, **kwargs):
+        return {
+            **{"BC_class_name": cls.__name__},
+            **{"args": args},
+            **{"kwargs": kwargs},
+        }
 
     @abstractmethod
     def _save(self) -> dict:
