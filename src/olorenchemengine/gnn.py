@@ -3,7 +3,7 @@
 
 from .base_class import *
 from .representations import BaseRepresentation, TorchGeometricGraph
-from olorenchemengine.internal import mock_imports
+from .internal import mock_imports
 
 try:
     import torch
@@ -344,6 +344,7 @@ class BaseTorchGeometricModel(BaseModel):
     def _load(self, d):
         super()._load(d)
         import sys
+
         self.network = torch.load(io.BytesIO(d["save"]))
 
 
