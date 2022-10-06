@@ -4,10 +4,18 @@
 from .base_class import *
 from .representations import BaseRepresentation, TorchGeometricGraph
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+except:
+    from unittest.mock import MagicMock
+    torch = MagicMock()
 
-from pytorch_lightning import LightningModule
+try:
+
+    from pytorch_lightning import LightningModule
+except:
+    LightningModule = object
 
 
 class BaseLightningModule(BaseClass, LightningModule):
