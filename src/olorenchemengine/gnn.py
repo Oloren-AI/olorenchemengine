@@ -3,11 +3,19 @@
 
 from .base_class import *
 from .representations import BaseRepresentation, TorchGeometricGraph
+from olorenchemengine.internal import mock_imports
 
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+except:
+    mock_imports(globals(), "torch", "nn")
 
-from pytorch_lightning import LightningModule
+try:
+
+    from pytorch_lightning import LightningModule
+except:
+    LightningModule = object
 
 
 class BaseLightningModule(BaseClass, LightningModule):

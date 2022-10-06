@@ -295,9 +295,17 @@ class SklearnMLP(BaseSKLearnModel):
             power_t=power_t, max_iter=max_iter)
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
 
-import pytorch_lightning as pl
-import torch.nn as nn
-import torch
+try:
+    import pytorch_lightning as pl
+except ImportError:
+    oce.mock_imports(globals(), "pl")
+
+try:
+    import torch.nn as nn
+    import torch
+except ImportError:
+    oce.mock_imports(globals(), "nn", "torch")
+
 class plMLP(pl.LightningModule):
 
     def __init__(self, hidden_layer_sizes, norm_layer, activation_layer, setting):

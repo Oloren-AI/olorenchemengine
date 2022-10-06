@@ -13,7 +13,10 @@ from .external.stoned import *
 
 import PIL
 
-import selfies as sf
+try:
+    import selfies as sf
+except ImportError:
+    mock_imports(globals(), "sf")
 
 from rdkit.DataStructs.cDataStructs import BulkTanimotoSimilarity, TanimotoSimilarity
 from rdkit import Chem
@@ -25,13 +28,13 @@ class PerturbationEngine(BaseClass):
     into a similar one with a small difference.
 
     Methods:
-        get_compound_at_idx: returns a compound with a modification at a given 
+        get_compound_at_idx: returns a compound with a modification at a given
             atom index
         get_compound: returns a compound with a randomly chosen modification
         get_compound_list: returns a list of compounds with modifications, the list
             is meant to be comprehensive of the result of the application of an
             entire class of modifications."""
-            
+
     @abstractmethod
     def get_compound_at_idx(self, mol: Chem.Mol, idx: int) -> str:
         pass
@@ -63,7 +66,7 @@ class SwapMutations(PerturbationEngine):
         if not radius in (0, 1, 2):
             raise ValueError("radius must be 0, 1, or 2")
 
-        
+
         self.trans = dict()
         for radius in range(radius+1):
             transformation_path = download_public_file(f"swap-mutations/trans_{radius}.json")
@@ -184,7 +187,7 @@ class SwapMutations(PerturbationEngine):
         m = Chem.CombineMols(ref_m, Chem.MolFromSmiles(sub, sanitize=False))
 
         m = Chem.RWMol(m)
-        
+
         removal = []
         for i in range(len(m.GetAtoms())):
             if m.GetAtomWithIdx(i).GetAtomMapNum() == 10000:

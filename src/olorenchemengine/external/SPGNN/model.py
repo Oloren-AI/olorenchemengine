@@ -1,27 +1,32 @@
 """ Defines the model architecture of SPGNN.
 """
 
-import torch
-from torch_geometric.nn import MessagePassing
-from torch_geometric.utils import add_self_loops, degree, softmax
-from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
-import torch.nn.functional as F
-from torch_scatter import scatter_add
-from torch_geometric.nn.inits import glorot, zeros
+from olorenchemengine.internal import mock_imports
+
+try:
+    import torch
+    from torch_geometric.nn import MessagePassing
+    from torch_geometric.utils import add_self_loops, degree, softmax
+    from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
+    import torch.nn.functional as F
+    from torch_scatter import scatter_add
+    from torch_geometric.nn.inits import glorot, zeros
+except:
+    mock_imports(globals(), "torch", "MessagePassing", "add_self_loops", "degree", "softmax", "global_add_pool", "global_mean_pool", "global_max_pool", "GlobalAttention", "Set2Set", "F", "scatter_add", "glorot", "zeros")
 
 num_atom_type = 120 #including the extra mask tokens
 num_chirality_tag = 3
 
 num_bond_type = 6 #including aromatic and self-loop edge, and extra masked tokens
-num_bond_direction = 3 
+num_bond_direction = 3
 
 class GINConv(MessagePassing):
     """
     Extension of GIN aggregation to incorporate edge information by concatenation.
     Args:
         emb_dim (int): dimensionality of embeddings for nodes and edges.
-        embed_input (bool): whether to embed input or not. 
-        
+        embed_input (bool): whether to embed input or not.
+
     See https://arxiv.org/abs/1810.00826
     """
     def __init__(self, emb_dim, aggr = "add"):
@@ -210,7 +215,7 @@ class GraphSAGEConv(MessagePassing):
 
 class GNN(torch.nn.Module):
     """
-    
+
     Args:
         num_layer (int): the number of GNN layers
         emb_dim (int): dimensionality of embeddings
@@ -303,7 +308,7 @@ class GNN_graphpred(torch.nn.Module):
         JK (str): last, concat, max or sum.
         graph_pooling (str): sum, mean, max, attention, set2set
         gnn_type: gin, gcn, graphsage, gat
-        
+
     See https://arxiv.org/abs/1810.00826
     JK-net: https://arxiv.org/abs/1806.03536
     """
@@ -346,7 +351,7 @@ class GNN_graphpred(torch.nn.Module):
             self.mult = 2
         else:
             self.mult = 1
-        
+
         if self.JK == "concat":
             self.graph_pred_linear = torch.nn.Linear(self.mult * (self.num_layer + 1) * self.emb_dim, self.num_tasks)
         else:

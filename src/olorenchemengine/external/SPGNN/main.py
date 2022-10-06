@@ -3,11 +3,20 @@
 `GitHub repository <https://github.com/snap-stanford/pretrain-gnns>`_
 """
 
-from torch_geometric.data import DataLoader
+from olorenchemengine.internal import mock_imports
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
+try:
+    from torch_geometric.data import DataLoader
+except ImportError:
+    mock_imports(globals(), "DataLoader")
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+except ImportError:
+    mock_imports(globals(), "torch", "nn", "optim")
+
 
 from tqdm import tqdm
 import numpy as np
@@ -167,13 +176,13 @@ class SPGNNVecRep(BaseVecRepresentation):
                 self.pool = Set2Set(emb_dim, set2set_iter)
         else:
             raise ValueError("Invalid graph pooling type.")
-    
+
     def _convert(self, smiles: str, y: Union[int, float, np.number] = None) -> np.ndarray:
         assert Exception, "Please directly use convert method"
-    
+
     def convert(self, smiles, **kwargs):
         X = self.representation.convert(smiles)
-        loader = DataLoader(X, batch_size=self.batch_size, 
+        loader = DataLoader(X, batch_size=self.batch_size,
             shuffle=False, num_workers=self.num_workers)
 
         self.model.eval()
@@ -275,11 +284,11 @@ class SPGNN(BaseModel):
 
         self.batch_size = batch_size
         self.epochs = epochs
-        
+
         self.num_workers = oce.CONFIG["NUM_WORKERS"]
         self.map_location = oce.CONFIG["MAP_LOCATION"]
         self.device = oce.CONFIG["DEVICE"]
-        
+
         self.model = GNN_graphpred(num_layer,
             emb_dim,
             1,

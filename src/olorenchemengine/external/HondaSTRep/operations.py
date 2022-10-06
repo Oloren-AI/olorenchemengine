@@ -30,6 +30,7 @@ import argparse
 import pickle
 from collections import Counter
 import olorenchemengine as oce
+from olorenchemengine.internal import mock_imports
 
 class TorchVocab(object):
     """
@@ -60,7 +61,7 @@ class TorchVocab(object):
         # まず頻度でソートし、次に文字順で並び替える
         words_and_frequencies = sorted(counter.items(), key=lambda tup: tup[0])
         words_and_frequencies.sort(key=lambda tup: tup[1], reverse=True)
-        
+
         # 出現頻度がmin_freq未満のものはvocabに加えない
         for word, freq in words_and_frequencies:
             if freq < min_freq or len(self.itos) == max_size:
@@ -178,15 +179,21 @@ class WordVocab(Vocab):
     def load_vocab(vocab_path: str):
         with open(vocab_path, "rb") as f:
             return pickle.load(f)
-        
+
 import numpy as np
 import pandas as pd
-import torch
-from torch import nn
-from torch import optim
-from torch.autograd import Variable
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
+
+try:
+    import torch
+    from torch import nn
+    from torch import optim
+    from torch.autograd import Variable
+    from torch.nn import functional as F
+    from torch.utils.data import DataLoader
+except ImportError:
+    mock_imports(globals(), "torch", "nn", "optim", "Variable", "F", "DataLoader")
+
+
 from tqdm import tqdm
 import math
 
@@ -201,7 +208,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, d_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-        
+
         # Compute the positional encodings once in log space.
         pe = torch.zeros(max_len, d_model) # (T,H)
         position = torch.arange(0., max_len).unsqueeze(1)
@@ -210,9 +217,9 @@ class PositionalEncoding(nn.Module):
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
-        
+
     def forward(self, x):
-        x = x + Variable(self.pe[:, :x.size(1)], 
+        x = x + Variable(self.pe[:, :x.size(1)],
                          requires_grad=False)
         return self.dropout(x)
 
@@ -223,17 +230,17 @@ class TrfmSeq2seq(nn.Module):
         self.hidden_size = hidden_size
         self.embed = nn.Embedding(in_size, hidden_size)
         self.embed.to(oce.CONFIG["DEVICE"])
-        
+
         self.pe = PositionalEncoding(hidden_size, dropout)
         self.pe.to(oce.CONFIG["DEVICE"])
-        
+
         self.trfm = nn.Transformer(d_model=hidden_size, nhead=4,
             num_encoder_layers=n_layers, num_decoder_layers=n_layers, dim_feedforward=hidden_size)
         self.trfm.to(oce.CONFIG["DEVICE"])
-        
+
         self.out = nn.Linear(hidden_size, out_size)
         self.trfm.to(oce.CONFIG["DEVICE"])
-         
+
     def forward(self, src):
         # src: (T,B)
         embedded = self.embed(src)  # (T,B,H)
@@ -257,7 +264,7 @@ class TrfmSeq2seq(nn.Module):
         output = output.detach().cpu().numpy()
         # mean, max, first*2
         return np.hstack([np.mean(output, axis=0), np.max(output, axis=0), output[0,:,:], penul[0,:,:] ]) # (B,4H)
-    
+
     def encode(self, src):
         # src: (T,B)
         batch_size = src.shape[1]
@@ -272,8 +279,11 @@ class TrfmSeq2seq(nn.Module):
                 ed += 100
                 out = np.concatenate([out, self._encode(src[:,st:ed])], axis=0)
             return out
-        
-from torch.utils.data import Dataset
+
+try:
+    from torch.utils.data import Dataset
+except ImportError:
+    mock_imports(globals(), "Dataset")
 
 def split(sm):
     '''
@@ -404,7 +414,7 @@ def split(sm):
             i += 1
     if i == len(sm)-1:
         arr.append(sm[i])
-    return ' '.join(arr) 
+    return ' '.join(arr)
 
 class Seq2seqDataset(Dataset):
 

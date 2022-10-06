@@ -1,5 +1,7 @@
+import contextlib
 from locale import D_FMT
 import sys
+import contextlib
 
 if sys.version_info[:2] >= (3, 8):
     # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
@@ -39,7 +41,6 @@ if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/")):
 import pandas as pd
 
 import json
-import torch
 
 
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".oce/CONFIG.json")
@@ -61,8 +62,12 @@ def update_config():
 
     global CONFIG
     CONFIG = CONFIG_.copy()
-    CONFIG["DEVICE"] = torch.device(CONFIG["MAP_LOCATION"])
-    CONFIG["USE_CUDA"] = "cuda" in CONFIG["MAP_LOCATION"]
+
+    with contextlib.suppress(ImportError):
+        import torch
+        CONFIG["DEVICE"] = torch.device(CONFIG["MAP_LOCATION"])
+        CONFIG["USE_CUDA"] = "cuda" in CONFIG["MAP_LOCATION"]
+
     with open(CONFIG_PATH, "w+") as f:
         json.dump(CONFIG_, f)
 

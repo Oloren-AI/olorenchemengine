@@ -7,7 +7,10 @@ from olorenchemengine.internal import download_public_file
 from rdkit import Chem
 from rdkit.Chem.rdchem import BondType as BT
 
-from torch_geometric.data import DataLoader
+try:
+    from torch_geometric.data import DataLoader
+except ImportError:
+    oce.mock_imports(globals(), "DataLoader")
 
 import numpy as np
 from tqdm import tqdm
@@ -79,7 +82,7 @@ class MolCLR(BaseModel):
         self.representation = MolCLR_PYG()
 
         super().__init__(**kwargs)
-        
+
     def preprocess(self, X, y, **kwargs):
         if y is None:
             y = [None]*len(X)
@@ -98,7 +101,7 @@ class MolCLR(BaseModel):
             self.criterion = nn.MSELoss()
         elif self.setting == 'classification':
             self.criterion = nn.BCEWithLogitsLoss(reduction = "none")
-        
+
         if self.model_type == "ginet":
             from .model import GINet
             self.model = GINet(self.setting, **self.model_config)
@@ -142,7 +145,7 @@ class MolCLR(BaseModel):
                 loss.backward()
 
                 optimizer.step()
-                
+
     def _step(self, model, data, n_iter):
         # get the prediction
         __, pred = model(data)  # [N,C]
@@ -152,7 +155,7 @@ class MolCLR(BaseModel):
 
     def _predict(self, X, **kwargs):
         import torch
-        
+
         loader = DataLoader(X, batch_size=self.config["batch_size"], shuffle=False, num_workers=oce.CONFIG["NUM_WORKERS"])
         self.model.eval()
         y_pred = []
@@ -194,7 +197,7 @@ class MolCLRVecRep(BaseVecRepresentation):
         from torch.utils.tensorboard import SummaryWriter
         from torch.optim.lr_scheduler import CosineAnnealingLR
         from sklearn.metrics import roc_auc_score, mean_squared_error, mean_absolute_error
-        
+
         if self.model_type == "ginet":
             from .model import GINet
             self.model = GINet("regression", **self.model_config)
@@ -206,14 +209,14 @@ class MolCLRVecRep(BaseVecRepresentation):
 
         self.model.load_my_state_dict(torch.load(save_path, map_location = oce.CONFIG["MAP_LOCATION"]))
         self.model.to(oce.CONFIG["DEVICE"])
-    
+
     def _convert(self, X, **kwargs):
         return self.convert(X)
 
     def convert(self, X, **kwargs):
         X = MolCLR_PYG().convert(X, ys=None)
         import torch
-        
+
         loader = DataLoader(X, batch_size=self.config["batch_size"], shuffle=True, num_workers=oce.CONFIG["NUM_WORKERS"])
         self.model.eval()
         y_pred = []
