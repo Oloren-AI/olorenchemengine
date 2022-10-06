@@ -280,7 +280,10 @@ class TrfmSeq2seq(nn.Module):
                 out = np.concatenate([out, self._encode(src[:,st:ed])], axis=0)
             return out
 
-from torch.utils.data import Dataset
+try:
+    from torch.utils.data import Dataset
+except ImportError:
+    mock_imports(globals(), "Dataset")
 
 def split(sm):
     '''
