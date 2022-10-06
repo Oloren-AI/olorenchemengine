@@ -1,7 +1,17 @@
 import numpy as np
-import torch
-import torch_geometric.data
-from ogb.utils.features import atom_to_feature_vector, bond_to_feature_vector
+from olorenchemengine.internal import mock_imports
+
+try:
+    import torch
+    import torch_geometric.data
+except:
+    mock_imports(globals(), "torch", "torch_geometric")
+
+try:
+    from ogb.utils.features import atom_to_feature_vector, bond_to_feature_vector
+except ImportError:
+    mock_imports(globals(), "atom_to_feature_vector", "bond_to_feature_vector")
+
 from rdkit import Chem
 
 

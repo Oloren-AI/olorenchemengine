@@ -1,10 +1,21 @@
-import torch
-from torch import nn as nn
-from torch.nn import functional as F
-from torch_geometric.nn import MessagePassing
-from torch_geometric import nn as nng
-from torch_sparse import SparseTensor, coalesce
-from torch_scatter import scatter_add
+from olorenchemengine.internal import mock_imports
+
+try:
+    import torch
+    from torch import nn as nn
+    from torch.nn import functional as F
+except:
+    mock_imports(globals(), "torch", "nn", "F")
+
+try:
+    from torch_geometric.nn import MessagePassing
+    from torch_geometric import nn as nng
+    from torch_sparse import SparseTensor, coalesce
+    from torch_scatter import scatter_add
+except ImportError:
+    mock_imports(globals(), "MessagePassing", "nng", "SparseTensor", "coalesce", "scatter_add")
+
+
 from copy import copy
 
 

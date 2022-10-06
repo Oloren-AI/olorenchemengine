@@ -3,13 +3,13 @@
 
 from .base_class import *
 from .representations import BaseRepresentation, TorchGeometricGraph
+from olorenchemengine.internal import mock_imports
 
 try:
     import torch
     import torch.nn as nn
 except:
-    from unittest.mock import MagicMock
-    torch = MagicMock()
+    mock_imports(globals(), "torch", "nn")
 
 try:
 
