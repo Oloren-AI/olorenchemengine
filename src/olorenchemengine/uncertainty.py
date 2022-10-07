@@ -79,10 +79,10 @@ class SDC(BaseFingerprintModel):
         return np.array([sdc(smi) for _, smi in tqdm(np.ndenumerate(X))])
 
 
-class SDCwRMSD1(SDC):
-    """ SDCwRMSD1 is an error model that calculates the root-mean-square
+class TargetDistDC(SDC):
+    """ TargetDistDC is an error model that calculates the root-mean-square
         difference between the predicted activity of the target molecule and
-        the observed activities of all training molecules, weighted by SDC.
+        the observed activities of all training molecules, weighted by the DC.
 
         Parameters:
             a (int or float, optional): Value of a in the SDC formula. Default 3.
@@ -92,25 +92,25 @@ class SDCwRMSD1(SDC):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.SDCwRMSD1())
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistDC())
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
     def calculate(self, X, y_pred):
-        def wrmsd(smi, pred):
+        def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            sdc = np.exp(-self.a * TD / (1 - TD))
-            return np.sqrt(np.dot(sdc, np.abs(self.y_train - pred)) / np.sum(sdc))
+            DC = np.exp(-self.a * TD / (1 - TD))
+            return np.sqrt(np.dot(DC, np.abs(self.y_train - pred)) / np.sum(DC))
 
         X = np.array(X).flatten()
-        return np.array([wrmsd(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
 
-class SDCwRMSD2(SDC):
-    """ SDCwRMSD2 is an error model that calculates the root-mean-square
+class TrainDistDC(SDC):
+    """ TrainDistDC is an error model that calculates the root-mean-square
         difference between the predicted and observed activities of all
-        training molecules, weighted by SDC.
+        training molecules, weighted by the DC.
 
         Parameters:
             a (int or float, optional): Value of a in the SDC formula. Default 3.
@@ -120,23 +120,23 @@ class SDCwRMSD2(SDC):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.SDCwRMSD2())
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistDC())
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
     def calculate(self, X, y_pred):
         residuals = np.abs(self.y_train - self.y_pred_train)
-        def wrmsd(smi):
+        def dist(smi):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            sdc = np.exp(-self.a * TD / (1 - TD))
-            return np.sqrt(np.dot(sdc, residuals) / np.sum(sdc) )
+            DC = np.exp(-self.a * TD / (1 - TD))
+            return np.sqrt(np.dot(DC, residuals) / np.sum(DC) )
 
-        return np.array([wrmsd(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi) for _, smi in tqdm(np.ndenumerate(X))])
 
-class kNNSimilarity(BaseFingerprintModel):
-    """ kNNSimilarity is an error model that calculates mean Tanimoto similarity
+class KNNSimilarity(BaseFingerprintModel):
+    """ NNSimilarity is an error model that calculates mean Tanimoto similarity
         between the target molecule and the k most similar training molecules
         using a Morgan Fingerprint with a radius of 2 bonds.
 
@@ -148,7 +148,7 @@ class kNNSimilarity(BaseFingerprintModel):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.kNNSimilarity())
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.KNNSimilarity())
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
@@ -165,8 +165,8 @@ class kNNSimilarity(BaseFingerprintModel):
 
         return np.array([mean_sim(smi) for _, smi in tqdm(np.ndenumerate(X))])
 
-class kNNwRMSD1(kNNSimilarity):
-    """ kNNwRMSD1 is an error model that calculates the root-mean-square
+class TargetDistKNN(KNNSimilarity):
+    """ TargetDistKNN is an error model that calculates the root-mean-square
         difference between the predicted activity of the target molecule and
         the observed activities of the k most similar training molecules,
         weighted by their similarity.
@@ -179,24 +179,24 @@ class kNNwRMSD1(kNNSimilarity):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.kNNwRMSD1())
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistKNN())
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
     def calculate(self, X, y_pred):
-        def wrmsd(smi, pred):
+        def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            diff = np.abs(self.y_train - pred)
-            ind = np.argsort(similarity)[-self.k:]
-            return np.sqrt(np.dot(similarity[ind], diff[ind]) / np.sum(similarity[ind]))
+            mae = np.abs(self.y_train - pred)
+            idxs = np.argsort(similarity)[-self.k:]
+            return np.sqrt(np.dot(similarity[idxs], mae[idxs]) / np.sum(similarity[idxs]))
 
         X = np.array(X).flatten()
-        return np.array([wrmsd(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
 
-class kNNwRMSD2(kNNSimilarity):
-    """ kNNwRMSD2 is an error model that calculates the root-mean-square
+class TrainDistKNN(KNNSimilarity):
+    """ TrainDistKNN is an error model that calculates the root-mean-square
         difference between the predicted and observed activities of the k most
         similar training molecules to the target molecule, weighted by their
         similarity.
@@ -209,23 +209,23 @@ class kNNwRMSD2(kNNSimilarity):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.kNNwRMSD2())
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistKNN())
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
     def calculate(self, X, y_pred):
         residuals = np.abs(self.y_train - self.y_pred_train)
-        def wrmsd(smi):
+        def dist(smi):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            ind = np.argsort(similarity)[-self.k:]
-            return np.sqrt(np.dot(similarity[ind], residuals[ind]) / np.sum(similarity[ind]))
+            idxs = np.argsort(similarity)[-self.k:]
+            return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
 
-        return np.array([wrmsd(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi) for _, smi in tqdm(np.ndenumerate(X))])
 
-class PREDICTED(BaseErrorModel):
-    """ PREDICTED is an error model that predicts error bars based on only the
+class Predicted(BaseErrorModel):
+    """ Predicted is an error model that predicts error bars based on only the
         predicted value of a molecule. It is best used as part of an aggregate
         error model rather than by itself.
 
@@ -234,7 +234,7 @@ class PREDICTED(BaseErrorModel):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.PREDICTED()])
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.Predicted()])
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
@@ -246,8 +246,8 @@ class PREDICTED(BaseErrorModel):
     def calculate(self, X, y_pred):
         return y_pred
 
-class BaseADAN(BaseErrorModel):
-    """ BaseADAN is an error model that predicts error bars based on one or
+class ADAN(BaseErrorModel):
+    """ ADAN is an error model that predicts error bars based on one or
         multiple ADAN categories: `Applicability Domain Analysis (ADAN): A
         Robust Method for Assessing the Reliability of Drug Property Predictions
         <https://doi.org/10.1021/ci500172z>`_
@@ -260,20 +260,14 @@ class BaseADAN(BaseErrorModel):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.BaseADAN("E_raw"))
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.ADAN("E_raw"))
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
 
     @log_arguments
-    def __init__(self, criteria: Union[str, list, set]):
-        if criteria == "Category":
-            criteria = {"A","B","C","D","E","F"}
-        elif isinstance(criteria, list):
-            criteria = set(criteria)
-        elif isinstance(criteria, str):
-            criteria = {criteria}
-        self.criteria = criteria
+    def __init__(self, criterion: str):
+        self.criterion = criterion
 
     def build(
         self,
@@ -287,21 +281,24 @@ class BaseADAN(BaseErrorModel):
     ):
         super().build(model, X, y)
         self.rep = rep
-        self.dim_reduction = dim_reduction
 
         self.X_train = self.preprocess(self.X_train)
         thresh = int(self.X_train.shape[0] * threshold)
         max_components = min(100, min(self.X_train.shape))
 
-        if self.dim_reduction == "pls":
+        if dim_reduction == "pls":
             self.reduction = PLSRegression(n_components = max_components)
             self.reduction.fit(self.X_train, self.y_train)
             x_var = np.var(self.reduction.x_scores_, axis=0)
             x_var /= np.sum(x_var)
-        elif self.dim_reduction == "pca":
+        elif dim_reduction == "pca":
             self.reduction = PCA(n_components = max_components)
             self.reduction.fit(self.X_train, self.y_train)
             x_var = self.reduction.explained_variance_ratio_
+        else:
+            raise NameError("dim_reduction {} is not recognized".format(dim_reduction))
+
+        self.dim_reduction = dim_reduction
 
         if np.sum(x_var) > explvar:
             self.n_components = np.where(np.cumsum(x_var) >= explvar)[0][0] + 1
@@ -322,7 +319,7 @@ class BaseADAN(BaseErrorModel):
         y_nei_dist = np.abs(self.y_train - self.y_train[indices[:, 1]])
         SDEP_dist = self.SDEP(self.Xp_train, n_drop = 1)
 
-        self.training = {
+        self.training_ = {
             "A_raw": centroid_dist,
             "B_raw": neighbor_dist,
             "C_raw": model_dist,
@@ -331,7 +328,7 @@ class BaseADAN(BaseErrorModel):
             "F_raw": SDEP_dist,
         }
 
-        self.thresholds = {
+        self.thresholds_ = {
             "A": sorted(centroid_dist)[thresh],
             "B": sorted(neighbor_dist)[thresh],
             "C": sorted(model_dist)[thresh],
@@ -340,41 +337,57 @@ class BaseADAN(BaseErrorModel):
             "F": sorted(SDEP_dist)[thresh],
         }
 
+    def calculate_full(self, X):
+        criteria = ["A","B","C","D","E","F"]
+        y_pred = np.array(self.model.predict(X)).flatten()
+        X = self.preprocess(X)
+        Xp = self.reduction.transform(X)[:, :self.n_components]
+
+        self.results = {}
+        for c in criteria:
+            self.results[c] = self._calculate(X, Xp, y_pred, c)
+        for c in criteria:
+            c += "_raw"
+            self.results[c] = self._calculate(X, Xp, y_pred, c)
+        self.results["Category"] = np.sum([self.results[c] for c in criteria], axis=0)
+
+        self.results = pd.DataFrame(self.results)
+
     def calculate(self, X, y_pred):
         """Calcualtes confidence scores.
         """
         X = self.preprocess(X)
         Xp = self.reduction.transform(X)[:, :self.n_components]
 
-        nbrs = NearestNeighbors(n_neighbors = 1).fit(self.Xp_train)
-        distances, indices = nbrs.kneighbors(Xp)
+        return self._calculate(X, Xp, y_pred, self.criterion)
+    
+    def _calculate(self, X, Xp, y_pred, criterion: str, standardize: bool = True):
+        if criterion in ("A", "A_raw"):
+            dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
+        elif criterion in ("B", "B_raw"):
+            nbrs = NearestNeighbors(n_neighbors = 1).fit(self.Xp_train)
+            distances = nbrs.kneighbors(Xp)[0]
+            dist = distances.flatten()
+        elif criterion in ("C", "C_raw"):
+            dist = self.DModX(X, Xp)
+        elif criterion in ("D", "D_raw"):
+            dist = self.SDEP(Xp, 0)
+        elif criterion in ("E", "E_raw"):
+            dist = np.abs(y_pred - self.y_mean)
+        elif criterion in ("F", "F_raw"):
+            nbrs = NearestNeighbors(n_neighbors = 1).fit(self.Xp_train)
+            indices = nbrs.kneighbors(Xp)[1]
+            dist = np.abs(y_pred - self.y_train[indices.flatten()])
+        else:
+            raise NameError("criterion {} is not recognized".format(criterion))
 
-        def calculate_criterion(criterion: str, standardize: bool = True):
-            if criterion in ("A", "A_raw"):
-                dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
-            elif criterion in ("B", "B_raw"):
-                dist = distances.flatten()
-            elif criterion in ("C", "C_raw"):
-                dist = self.DModX(X, Xp)
-            elif criterion in ("D", "D_raw"):
-                dist = self.SDEP(Xp, 0)
-            elif criterion in ("E", "E_raw"):
-                dist = np.abs(y_pred - self.y_mean)
-            elif criterion in ("F", "F_raw"):
-                dist = np.abs(y_pred - self.y_train[indices.flatten()])
+        if "raw" in criterion:
+            if standardize:
+                return (dist - np.mean(self.training_[criterion])) / np.std(self.training_[criterion])
             else:
-                raise NameError("criterion {} is not recognized".format(criterion))
-
-            if "raw" in criterion:
-                if standardize:
-                    return (dist - np.mean(self.training[criterion])) / np.std(self.training[criterion])
-                else:
-                    return dist
-            else:
-                return np.where(dist > self.thresholds[criterion], 1, 0)
-
-        results = np.array([calculate_criterion(c) for c in self.criteria])
-        return np.sum(results, axis=0)
+                return dist
+        else:
+            return np.where(dist > self.thresholds_[criterion], 1, 0)
 
     def preprocess(self, X, y = None):
         """Preprocesses data into the appropriate representation.
@@ -440,7 +453,7 @@ class RandomForestErrorModel(BaseAggregateErrorModel):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.kNNSimilarity()])
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.KNNSimilarity()])
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
@@ -453,9 +466,37 @@ class RandomForestErrorModel(BaseAggregateErrorModel):
         return self.aggregate_model.predict(scores, **kwargs)
 
 
+class LinearRegressionErrorModel(BaseAggregateErrorModel):
+    """ LinearRegressionErrorModel is an aggregate error model that predicts error
+        bars based on a linear combination score from several BaseErrorModels.
+
+        Parameters:
+            error_models (Union[BaseErrorModel, List[BaseErrorModel]]): a list
+                of error models whose scores will be features for the random
+                forest model
+
+    Example
+    ------------------------------
+    import olorenchemengine as oce
+
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.LinearRegressionErrorModel([oce.SDC(), oce.KNNSimilarity()])
+    model.predict(test["Drug"], return_ci = True)
+    ------------------------------
+    """
+
+    def _train(self, scores, residuals):
+        self.aggregate_model = LinearRegression(**self.kwargs)
+        self.aggregate_model.fit(scores, residuals)
+
+    def _predict(self, scores, **kwargs):
+        return self.aggregate_model.predict(scores, **kwargs)
+
 
 class BaseDomainApplicability(BaseClass):
-    """Base class for analyzing domain applicability of models and estimating
+    """ Depricated. See BaseErrorModel.
+    
+    Base class for analyzing domain applicability of models and estimating
     prediction uncertainty.
 
     Parameters:
@@ -566,223 +607,3 @@ class BaseDomainApplicability(BaseClass):
 
     def _load(self, d: dict):
         return super()._load(d)
-
-
-class ADAN(BaseDomainApplicability):
-    """ Implementation of Applicability Domain Analysis that predicts uncertainty
-        scores for compounds: `Applicability Domain Analysis (ADAN): A Robust
-        Method for Assessing the Reliability of Drug Property Predictions
-        <https://doi.org/10.1021/ci500172z>`_
-    """
-
-    @log_arguments
-    def __init__(self, model: BaseModel, rep: BaseCompoundVecRepresentation = None, dim_reduction: str = "pls"):
-        self.dim_reduction = dim_reduction
-        super().__init__(model = model, rep = rep)
-
-    def _fit(self, X, y, y_pred, explvar: float = 0.8, threshold: float = 0.95):
-        """Fits ADAN to a model and training dataset.
-
-        Parameters:
-            explvar (float): fraction of variance explained by latent variables
-            threshold (float): percentile of training set that defines passing
-        """
-        self.X_train = self.preprocess(X, y)
-        self.y_train = y
-        self.y_pred_train = y_pred
-
-        thresh = int(self.X_train.shape[0] * threshold)
-        max_components = min(100, min(self.X_train.shape))
-
-        if self.dim_reduction == "pls":
-            self.reduction = PLSRegression(n_components = max_components)
-            self.reduction.fit(self.X_train, self.y_train)
-            x_var = np.var(self.reduction.x_scores_, axis=0)
-            x_var /= np.sum(x_var)
-        elif self.dim_reduction == "pca":
-            self.reduction = PCA(n_components = max_components)
-            self.reduction.fit(self.X_train, self.y_train)
-            x_var = self.reduction.explained_variance_ratio_
-
-        if np.sum(x_var) > explvar:
-            self.n_components = np.where(np.cumsum(x_var) >= explvar)[0][0] + 1
-        else:
-            self.n_components = max_components
-        self.Xp_train = self.reduction.transform(self.X_train)[:, :self.n_components]
-
-        nbrs = NearestNeighbors(n_neighbors = 2).fit(self.Xp_train)
-        distances, indices = nbrs.kneighbors(self.Xp_train)
-
-        # criterion A
-        centroid_dist = np.linalg.norm(self.Xp_train - np.mean(self.Xp_train), axis=1)
-        self.centroid_thresh = sorted(centroid_dist)[thresh]
-
-        # criterion B
-        neighbor_dist = distances[:, 1]
-        self.neighbor_thresh = sorted(neighbor_dist)[thresh]
-
-        # criterion C
-        model_dist = self._DModX(self.X_train, self.Xp_train)
-        self.model_thresh = sorted(model_dist)[thresh]
-
-        # criterion F
-        SDEP_dist = self._SDEP(self.Xp_train, 1)
-        self.SDEP_thresh = sorted(SDEP_dist)[thresh]
-
-        if self.model.setting == "classification":
-            # criterion D
-            self.enc = OneHotEncoder()
-            self.enc.fit(self.y_train.reshape(-1, 1))
-            y_enc = self.enc.transform(self.y_train.reshape(-1, 1)).toarray()
-            self.y_mean = np.mean(y_enc, axis=0)
-            y_mean_dist = np.sum(np.abs(y_enc - self.y_mean), axis=1)
-            self.y_mean_thresh = sorted(y_mean_dist)[thresh]
-
-            # criterion E
-            y_nei_dist = (self.y_train != self.y_train[indices[:, 1]]).astype(int)
-            self.y_nei_thresh = sorted(y_nei_dist)[thresh]
-        else:
-            # criterion D
-            self.y_mean = np.mean(self.y_train)
-            y_mean_dist = np.abs(self.y_train - self.y_mean)
-            self.y_mean_thresh = sorted(y_mean_dist)[thresh]
-
-            # criterion E
-            y_nei_dist = np.abs(self.y_train - self.y_train[indices[:, 1]])
-            self.y_nei_thresh = sorted(y_nei_dist)[thresh]
-
-        self.data_ = pd.DataFrame({
-            "A": centroid_dist,
-            "B": neighbor_dist,
-            "C": model_dist,
-            "D": y_mean_dist,
-            "E": y_nei_dist,
-            "F": SDEP_dist,
-        })
-
-        self.thresholds_ = {
-            "A": self.centroid_thresh,
-            "B": self.neighbor_thresh,
-            "C": self.model_thresh,
-            "D": self.y_mean_thresh,
-            "E": self.y_nei_thresh,
-            "F": self.SDEP_thresh,
-        }
-
-    def _test(self, X, y_pred):
-        X = self.preprocess(X)
-        Xp = self.reduction.transform(X)[:, :self.n_components]
-
-        nbrs = NearestNeighbors(n_neighbors = 1).fit(self.Xp_train)
-        distances, indices = nbrs.kneighbors(Xp)
-
-        # criterion A
-        centroid_dist = np.linalg.norm(Xp, axis=1)
-        A_raw = centroid_dist
-        A_res = np.where(centroid_dist > self.centroid_thresh, 1, 0)
-
-        # criterion B
-        neighbor_dist = distances.flatten()
-        B_raw = neighbor_dist
-        B_res = np.where(neighbor_dist > self.neighbor_thresh, 1, 0)
-
-        # criterion C
-        model_dist = self._DModX(X, Xp)
-        C_raw = model_dist
-        C_res = np.where(model_dist > self.model_thresh, 1, 0)
-
-        # criterion F
-        SDEP_dist = self._SDEP(Xp, 0)
-        F_raw = SDEP_dist
-        F_res = np.where(SDEP_dist > self.SDEP_thresh, 1, 0)
-
-        if self.model.setting == "classification":
-            # criterion D
-            y_pred_enc = self.enc.transform(y_pred.reshape(-1, 1)).toarray()
-            y_mean_dist = np.sum(np.abs(y_pred_enc - self.y_mean), axis=1)
-            D_raw = y_mean_dist
-            D_res = np.where(y_mean_dist > self.y_mean_thresh, 1, 0)
-
-            # criterion E
-            y_nei_dist = (y_pred != self.y_train[indices.flatten()]).astype(int)
-            E_raw = y_nei_dist
-            E_res = np.where(y_nei_dist > self.y_nei_thresh, 1, 0)
-        else:
-            # criterion D
-            y_mean_dist = np.abs(y_pred - self.y_mean)
-            D_raw = y_mean_dist
-            D_res = np.where(y_mean_dist > self.y_mean_thresh, 1, 0)
-
-            # criterion E
-            y_nei_dist = np.abs(y_pred - self.y_train[indices.flatten()])
-            E_raw = y_nei_dist
-            E_res = np.where(y_nei_dist > self.y_nei_thresh, 1, 0)
-
-        self.results = pd.DataFrame({
-            "A": A_res,
-            "B": B_res,
-            "C": C_res,
-            "D": D_res,
-            "E": E_res,
-            "F": F_res,
-            "A_raw": A_raw,
-            "B_raw": B_raw,
-            "C_raw": C_raw,
-            "D_raw": D_raw,
-            "E_raw": E_raw,
-            "F_raw": F_raw,
-            "Category": A_res + B_res + C_res + D_res + E_res + F_res
-        })
-
-        self.vars_ = {
-            "X": X,
-            "Xp": Xp,
-            "y_pred": y_pred,
-            "X_train": self.X_train,
-            "Xp_train": self.Xp_train,
-            "y_train": self.y_train,
-            "y_pred_train": self.y_pred_train,
-        }
-
-        return self.results
-
-    def _DModX(self, X: np.ndarray, Xp: np.ndarray) -> np.ndarray:
-        """Computes the distance to the model (DmodX).
-
-        Computes the distance between a datapoint and the PLS model plane. See
-        <https://www.jmp.com/support/help/en/15.2/index.shtml#page/jmp/dmodx-calculation.shtml>
-        for more details about the statistic.
-
-        Parameters:
-            X (np.ndarray): queries
-            Xp (np.ndarray): queries transformed into latent space
-        """
-        if self.dim_reduction == "pls":
-            X_reconstructed = Xp @ self.reduction.x_loadings_[:, :self.n_components].T * self.reduction._x_std + self.reduction._x_mean
-        elif self.dim_reduction == "pca":
-            X_reconstructed = np.dot(Xp, self.reduction.components_[:self.n_components, :]) + self.reduction.mean_
-        return np.linalg.norm(X - X_reconstructed, axis=1) / np.sqrt(self.X_train.shape[1] - self.n_components)
-
-    def _SDEP(self, Xp: np.ndarray, n_drop: int, neighbor_thresh: float = 0.05) -> np.ndarray:
-        """Computes the standard deviation error of predictions (SDEP).
-
-        Computes the standard deviation training error of the `neighbor_thresh`
-        fraction of closest training queries to each query in `Xp` in latent space.
-
-        Parameters:
-            Xp (np.ndarray): queries transformed into latent space
-            n_drop (int): 1 if training, 0 if testing
-            neighbor_thresh (float): fraction of closest training queries to consider
-        """
-        n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
-        nbrs = NearestNeighbors(n_neighbors = n_neighbors).fit(self.Xp_train)
-        distances, indices = nbrs.kneighbors(Xp)
-
-        if self.model.setting == "classification":
-            y_sqerr = self.y_train != self.y_pred_train
-        else:
-            y_sqerr = (self.y_train - self.y_pred_train) ** 2
-        y_sqerr_mean = np.mean(y_sqerr[indices[:, n_drop:]], axis=1).astype(float)
-
-        return np.sqrt(y_sqerr_mean).flatten()
-
