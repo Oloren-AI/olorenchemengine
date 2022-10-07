@@ -1043,10 +1043,10 @@ class BaseErrorModel(BaseClass):
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        method: str = "qbin",
-        bins: int = 10,
-        window: int = 100,
         quantile: float = 0.8,
+        method: str = "roll",
+        window: int = 100,
+        bins: int = 10,
         min_per_bin: int = 5,
         filename: str = "figure.png",
     ):
@@ -1087,22 +1087,15 @@ class BaseErrorModel(BaseClass):
         else:
             raise NameError("method {} is not recognized".format(method))
 
-        def exponential(x, a, b):
-            return a * np.exp(b * x)
-
-        def logarithmic(x, a, b):
-            return a * np.log(x) + b
-
-        def power(x, a, b):
-            return a * x ** b
-
-        def linear(x, a, b):
-            return a * x + b
-
         import matplotlib.pyplot as plt
         from scipy.optimize import curve_fit
 
-        funcs = [exponential, logarithmic, power, linear]
+        funcs = [
+            lambda x, a, b: a * np.exp(b * x),
+            lambda x, a, b: a * np.log(x) + b,
+            lambda x, a, b: a * x ** b,
+            lambda x, a, b: a * x + b
+        ]
         min_mse = None
         for func in funcs:
             try:
