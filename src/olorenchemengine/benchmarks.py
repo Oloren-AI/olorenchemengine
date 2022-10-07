@@ -386,7 +386,7 @@ class BenchmarkMolNet(BenchmarkDatasets):
                 if "geognn" in self.mode:
                     dataset = dataset + oce.gg_ScaffoldSplit(split_proportions = [0.8, 0.1, 0.1])
                 else:
-                    dataset = dataset + oce.dc_ScaffoldSplit(split_proportions = [0.8, 0.1, 0.1])
+                    dataset = dataset + oce.ScaffoldSplit(split_proportions = [0.8, 0.1, 0.1])
 
                 for property_col in tqdm(property_cols):
                     print(f"Running property {property_col}")
