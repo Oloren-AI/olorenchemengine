@@ -22,7 +22,7 @@ molecular vector representations.
     df = oce.ExampleDataFrame()
 
     model = oce.BaseBoosting([
-                oce.RandomForestModel(oce.DescriptastorusDescriptor("rdkit2dnormalized"), n_estimators=1000),
+                oce.SPGNN(),  # fine tune a pre-trained graph neural network model
                 oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000)])
     model.fit(df["Smiles"], df["pChEMBL Value"])
 
