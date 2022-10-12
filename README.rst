@@ -24,7 +24,7 @@ molecular vector representations.
     model = oce.BaseBoosting([
                 oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000), # RF w/ our proprietary fingerprint
                 oce.SPGNN(model_type="contextpred"),  # fine tune a trained GNN on your data
-                )]
+                ])
     model.fit(df["Smiles"], df["pChEMBL Value"])
 
     oce.save(model, "model.oce")
