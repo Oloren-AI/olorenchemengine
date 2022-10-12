@@ -22,8 +22,8 @@ molecular vector representations.
     df = oce.ExampleDataFrame()
 
     model = oce.BaseBoosting([
-                oce.SPGNN(),  # fine tune a pre-trained graph neural network model
-                oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000)])
+                oce.SPGNN(model_type="contextpred"),  # fine tune a trained GNN on your data
+                oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000)]) # RF w/ our proprietary fingerprint
     model.fit(df["Smiles"], df["pChEMBL Value"])
 
     oce.save(model, "model.oce")
