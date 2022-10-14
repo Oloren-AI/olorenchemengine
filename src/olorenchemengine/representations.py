@@ -487,31 +487,8 @@ class BaseVecRepresentation(BaseRepresentation):
         np.save(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy"), output, allow_pickle=True)
         return output
 
-    def calculate_distance(self, x1: Union[str, List[str]], x2: Union[str, List[str]],
+    def calculate_similarity(self, x1: Union[str, List[str]], x2: Union[str, List[str]],
         metric: str = "cosine", **kwargs) -> np.ndarray:
-        """ Calculates the distance between two molecules or list of molecules.
-        
-        Returns a 2D array of distances between each pair of molecules of shape 
-        len(x1) by len(x2).
-        
-        This uses pairwise_distances from sklearn.metrics to calculate distances 
-        between the vector representations of the molecules. Options for distances
-        are Valid values for metric are:
-
-            From scikit-learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, 
-                ‘manhattan’]. These metrics support sparse matrix inputs. 
-                [‘nan_euclidean’] but it does not yet support sparse matrices.
-            From scipy.spatial.distance: [‘braycurtis’, ‘canberra’, ‘chebyshev’,
-                ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’, 
-                ‘mahalanobis’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, 
-                ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, 
-                ‘yule’].
-            
-            See the documentation for scipy.spatial.distance for details on these metrics.
-        """
-        
-        from sklearn.metrics import pairwise_distances
-        
         if isinstance(x1, str):
             x1 = [x1]
         if isinstance(x2, str):
@@ -519,6 +496,8 @@ class BaseVecRepresentation(BaseRepresentation):
         x1 = self.convert(x1)
         x2 = self.convert(x2)
         return pairwise_distances(x1, x2, metric=metric, **kwargs)
+        
+        return
 
     def __add__(self, other):
         """ Adds two representations together
