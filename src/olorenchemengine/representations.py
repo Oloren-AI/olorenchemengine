@@ -1468,15 +1468,25 @@ class ModelAsRep(BaseCompoundVecRepresentation):
     with ModelAsRep as a representation for property A.
 
     Parameters:
-        model (BaseModel): A trained model to be used as the representation
+        model (BaseModel, str): A trained model to be used as the representation,
+            either a BaseModel object or a path to a saved model
+        download_public_file (bool, optional): If True, will download the specified
+            model from OCE's public warehouse of models. Defaults to False.
         name (str): Name of the property the passed model predicts, which
             is usefully for clear save files/interpretability visualizations.
              Optional.
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel, name="ModelAsRep", log=True, **kwargs):
-        self.model = model
+    def __init__(self, model: Union[BaseModel, str], name="ModelAsRep", 
+            download_public_file = False, log=True, **kwargs):
+        if isinstance(model, str):
+            if download_public_file:
+                self.model = oce.load(oce.download_public_file(model))
+            else:
+                self.model = oce.load(model)
+        else:
+            self.model = model
         super().__init__(log=False, names=[name], **kwargs)
 
     def _convert(self, smiles, y=None):
