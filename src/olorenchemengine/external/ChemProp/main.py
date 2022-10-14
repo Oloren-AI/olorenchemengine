@@ -48,7 +48,10 @@ class RevIndexedData(Data):
 
     def __inc__(self, key, value, *args, **kwargs):
         if key == "revedge_index":
-            return self.revedge_index.max().item() + 1
+            if len(self.revedge_index) > 0:
+                return self.revedge_index.max().item() + 1
+            else:
+                return 0
         else:
             return super().__inc__(key, value)
 
