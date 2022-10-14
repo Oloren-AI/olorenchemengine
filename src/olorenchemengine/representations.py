@@ -1267,17 +1267,16 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
     def _convert_list(self, smiles_list, ys=None):
         xs = [self.smiles2pyg(s, None) for s in smiles_list]
 
-        kwargs = {"num_workers": oce.CONFIG["NUM_WORKERS"], "pin_memory": True} if oce.CONFIG["USE_CUDA"] else {}
+        kwargs = {"num_workers": oce.CONFIG["NUM_WORKERS"]} if oce.CONFIG["USE_CUDA"] else {}
 
         dataloader = PyGDataLoader(xs, batch_size=64, **kwargs)
 
         predictions = list()
         for batch in dataloader:
             batch.to(oce.CONFIG["DEVICE"])
-            predictions.append(self.model(batch))
+            predictions.append(self.model(batch).detach().cpu().numpy())
 
-        predictions = torch.cat(predictions, dim=0)
-        predictions = predictions.detach().cpu().numpy()
+        predictions = np.concatenate(predictions, axis=0)
         return predictions
 
     @classmethod

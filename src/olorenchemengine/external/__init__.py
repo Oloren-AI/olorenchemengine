@@ -7,3 +7,4 @@ from .ChemProp.main import ChemPropModel
 from .HondaSTRep.main import HondaSTRep
 from .HondaSTRep.operations import WordVocab
 from .MolCLR.main import MolCLR, MolCLRVecRep
+from .PaDEL.function import PaDELVecRep
