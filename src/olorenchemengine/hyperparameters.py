@@ -187,12 +187,15 @@ def load_hyperparameters(object: BaseClass, hyperparameter_dictionary: dict) -> 
     mp = load_hyperparameters_(object, hyperparameter_dictionary)
     return oce.create_BC(mp)
 
-def optimize(model: Union[BaseModel, dict], manager: BaseModelManager, max_evals = 3):
+def optimize(model: Union[BaseModel, dict], runner: Union[BaseModelManager, Callable], max_evals = 3):
     hyperparameter_index = index_hyperparameters(model)
 
-    def objective(hyperparameter_dictionary, model = model, manager = manager):
+    def objective(hyperparameter_dictionary, model = model, runner = runner):
         model = load_hyperparameters(model, hyperparameter_dictionary)
-        metric = manager.run(model)
+        if issubclass(type(runner), BaseModelManager):
+            metric = runner.run(model)
+        else:
+            metric = runner(model)
         return metric
 
     best = fmin(fn=objective,
