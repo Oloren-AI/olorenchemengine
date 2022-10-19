@@ -309,7 +309,7 @@ class BaseTorchGeometricModel(BaseModel):
         self.network.eval()
         from torch_geometric.data import DataLoader as PyGDataLoader
 
-        dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=8)
+        dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=oce.CONFIG["NUM_WORKERS"])
 
         predictions = self.trainer.predict(self.network, dataloader)
 
