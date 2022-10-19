@@ -65,6 +65,8 @@ _OPTIONAL_IMPORTS_FOR_OCE_ONLINE = [
     "hyperopt.pyll",
 ]
 
+_mocked_imports = []
+
 for imp in _OPTIONAL_IMPORTS_FOR_OCE_ONLINE:
     try:
         __import__(imp)
@@ -73,6 +75,7 @@ for imp in _OPTIONAL_IMPORTS_FOR_OCE_ONLINE:
         from unittest.mock import MagicMock
 
         sys.modules[imp] = MagicMock()
+        _mocked_imports.append(imp)
 
 from rdkit import RDLogger
 
@@ -226,3 +229,50 @@ def test_oce():
     save(model, "model.oce")
     _ = load("model.oce")
     os.remove("model.oce")
+
+online_session = None
+
+def MISSING_DEPENDENCIES():
+    if len(_mocked_imports) == 0:
+        print("No missing dependencies.")
+        return _mocked_imports
+    else:
+        print(textwrap.fill(f"Missing dependencies: {', '.join([x for x in _mocked_imports if '.' not in x])}.", 120))
+        print("\nTo install OCE with all dependencies, run:")
+        print("     bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)")
+
+if len(_mocked_imports) > 0:
+    import textwrap
+    message = f"Some missing imports detected: {(','.join(_mocked_imports)[:30])}..." + \
+    f"Automatically triggering online mode, where all OCE code is compiled locally and sent to AWS for execution." + \
+    f"If you would like to use OCE online mode with private data or hosted on your own infrastructure, email." + \
+    f" contact@oloren.ai for enterprise offerings." + \
+    f"To exit online mode, run oce.online_session.__exit__()"
+
+    message = f"""
+Some missing imports detected: {(','.join(_mocked_imports)[:30])}...
+Automatically triggering online mode, where all OCE code is compiled locally
+and sent to AWS for execution. If you would like to use OCE online mode with private
+data or hosted on your own infrastructure, email contact@oloren.ai for enterprise
+offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
+""".replace("\n", " ")
+
+    message = f"""
+        To complete installation of Oloren ChemEngine, either:
+            (1) Run oce.online() to use the demonstration package, Oloren ChemEngine Online,
+            (2) Install the missing dependencies, instructions can be found oce.MISSING_DEPENDENCIES(), or
+            (3) Email contact@oloren.ai with subject "Oloren ChemEngine Enterprise", for a secure privately hosted
+                Server version.
+
+        Oloren ChemEngine online is the public, dependency-free version of OCE, which compiles OCE code locally for fast,
+        parallelized, remote execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
+        CONFIDENTAIL DATA, and is only intended for demonstration purposes. The securely privately hosted Server version is
+        called Oloren ChemEngine Enterprise.\n"""
+
+    # print(textwrap.fill(textwrap.dedent(message).replace("\n", " ").replace("    (", "\n     ("), 80))
+    print(textwrap.dedent(message))
+
+def online():
+    global online_session
+    online_session = Remote("https://aws.chemengine.org")
+    online_session.__enter__()

@@ -905,7 +905,7 @@ def save(model: BaseClass, fname: str):
 
         REMOTE_ID = model.REMOTE_ID
         oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}/{REMOTE_ID}.oce"
+            f"{oas_connector.uid}/sessions/{_runtime.session_id}/{REMOTE_ID}.oce.delete"
         ).download("", fname, token=oas_connector.authenticate())
     else:
         save_dict = saves(model)
