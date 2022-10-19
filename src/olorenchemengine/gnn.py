@@ -313,16 +313,9 @@ class BaseTorchGeometricModel(BaseModel):
 
     def _predict(self, X):
         self.network.eval()
-        if self.network.hascollate_fn:
-            from torch.utils.data import DataLoader as TorchDataLoader
+        from torch_geometric.data import DataLoader as PyGDataLoader
 
-            dataloader = TorchDataLoader(
-                X, batch_size=self.batch_size, num_workers=8, collate_fn=self.network.collate_fn
-            )
-        else:
-            from torch_geometric.data import DataLoader as PyGDataLoader
-
-            dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=8)
+        dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=8)
 
         predictions = [x for x in self.trainer.predict(self.network, dataloader)]
 
