@@ -1,8 +1,9 @@
 """ Ensembling methods to combine `BaseModel`s to create better, combined models.
 """
 from .base_class import *
-from .representations import *
 from .basics import *
+from .representations import *
+
 
 def get_oof(self, model, X, y, kf):
     # https://www.kaggle.com/code/arthurtok/introduction-to-ensembling-stacking-in-python/notebook
@@ -19,8 +20,9 @@ def get_oof(self, model, X, y, kf):
 
     return oof_train
 
+
 class Averager(BaseModel):
-    """ Averager averages the predictions of multiple models for an ensembled prediction.
+    """Averager averages the predictions of multiple models for an ensembled prediction.
 
     Parameters:
         models (list): list of BaseModel objects to be averaged.
@@ -38,9 +40,10 @@ class Averager(BaseModel):
     model.predict(test['Drug'])
     ------------------------------
     """
+
     @log_arguments
-    def __init__(self, models: List[BaseModel], n: int =1, log: bool = True, **kwargs):
-        """ BaseStacking constructor
+    def __init__(self, models: List[BaseModel], n: int = 1, log: bool = True, **kwargs):
+        """BaseStacking constructor
 
         Args:
             models (List[BaseModel]): List of models to use for the learners to be stacked together.
@@ -58,8 +61,8 @@ class Averager(BaseModel):
                 self.models.append(model)
         super().__init__(log=False, **kwargs)
 
-    def preprocess(self, X, y, fit = False):
-        """ Preprocesses the data for the model.
+    def preprocess(self, X, y, fit=False):
+        """Preprocesses the data for the model.
 
         Parameters:
             X (pd.DataFrame): Dataframe of features.
@@ -69,7 +72,7 @@ class Averager(BaseModel):
             X (pd.DataFrame): Dataframe of features."""
         return X
 
-    def _fit(self, X, y, valid = None):
+    def _fit(self, X, y, valid=None):
         for model in self.models:
             if issubclass(type(model), BaseModel):
                 model.fit(X, y)
@@ -77,7 +80,7 @@ class Averager(BaseModel):
     def _predict(self, X):
         results = np.zeros(X.shape[0])
         for model in self.models:
-            results += model.predict(X)/len(self.models)
+            results += model.predict(X) / len(self.models)
         return results
 
     def _save(self):
@@ -93,9 +96,10 @@ class Averager(BaseModel):
         for i, model in enumerate(self.models):
             model._load(d["model_save_dict"][i])
 
+
 class BaseStacking(BaseModel):
 
-    """ BaseStacking stacks the predictions of models for an ensembled prediction.
+    """BaseStacking stacks the predictions of models for an ensembled prediction.
 
     Parameters:
         models (List[BaseModel]): list of models to use for the learners to be stacked together.
@@ -105,9 +109,17 @@ class BaseStacking(BaseModel):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel], stacker_model: BaseModel, n: int =1, log: bool = True,
-        oof = False, nfolds = 5, **kwargs):
-        """ BaseStacking constructor
+    def __init__(
+        self,
+        models: List[BaseModel],
+        stacker_model: BaseModel,
+        n: int = 1,
+        log: bool = True,
+        oof=False,
+        nfolds=5,
+        **kwargs
+    ):
+        """BaseStacking constructor
 
         Args:
             models (List[BaseModel]): List of models to use for the learners to be stacked together.
@@ -128,7 +140,7 @@ class BaseStacking(BaseModel):
         self.nfolds = nfolds
         super().__init__(log=False, **kwargs)
 
-    def preprocess(self, X, y, fit = False):
+    def preprocess(self, X, y, fit=False):
         return X
 
     def featurize(self, X):
@@ -156,7 +168,7 @@ class BaseStacking(BaseModel):
             data = data.reshape(-1, 1)
         return data
 
-    def _fit(self, X, y, valid = None):
+    def _fit(self, X, y, valid=None):
         if not self.oof:
             for model in self.models:
                 if issubclass(type(model), BaseModel):
@@ -170,7 +182,8 @@ class BaseStacking(BaseModel):
                 self.stacker_model.fit(data, y_valid)
         else:
             from sklearn.model_selection import KFold
-            kf = KFold(n_splits = self.nfolds)
+
+            kf = KFold(n_splits=self.nfolds)
 
             data = []
             for model in self.models:
@@ -215,9 +228,10 @@ class BaseStacking(BaseModel):
             model._load(d["model_save_dict"][i])
         self.stacker_model._load(d["stacker_model"])
 
+
 class BestStacker(BaseStacking):
 
-    """ BestStacker is a stacking method that uses the best model from a collection of models to make an ensembled prediction.
+    """BestStacker is a stacking method that uses the best model from a collection of models to make an ensembled prediction.
 
     Parameters:
         models (List[BaseModel]): list of models to use for the learners to be stacked together.
@@ -238,8 +252,10 @@ class BestStacker(BaseStacking):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel], n: int = 1, k: int = 1, log: bool = True):
-        """ BestStacker constructor
+    def __init__(
+        self, models: List[BaseModel], n: int = 1, k: int = 1, log: bool = True
+    ):
+        """BestStacker constructor
 
         Args:
             models (List[BaseModel]): List of models to use for the learners to be stacked together.
@@ -248,9 +264,10 @@ class BestStacker(BaseStacking):
 
         super().__init__(models, KBestLinearRegression(k=k), n=n, log=False)
 
+
 class LinearRegressionStacker(BaseStacking):
 
-    """ LinearRegressionStacker is a stacking method that uses linear regression on the predictions
+    """LinearRegressionStacker is a stacking method that uses linear regression on the predictions
         from a collection of models to make an ensembled prediction.
 
         Parameters:
@@ -272,21 +289,20 @@ class LinearRegressionStacker(BaseStacking):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel],  n: int = 1, log: bool = True):
-        """ LinearRegressionStacker constructor
+    def __init__(self, models: List[BaseModel], n: int = 1, log: bool = True):
+        """LinearRegressionStacker constructor
 
         Args:
             models (List[BaseModel]): List of models to use for the learners to be stacked together.
             n (int, optional): Number of times to repeat the given models. Defaults to 1.
             log (bool, optional): Whether or not to log the arguments of this constructor,
         """
-        super().__init__(models, LinearRegression(),
-        n=n, log=False)
+        super().__init__(models, LinearRegression(), n=n, log=False)
 
 
 class SKLearnStacker(BaseSKLearnModel):
 
-    """ SKLearnStacker is a stacking method that uses a sklearn-like models to make an ensembled prediction.
+    """SKLearnStacker is a stacking method that uses a sklearn-like models to make an ensembled prediction.
 
     Attributes:
         reg_stack: a sklearn-like model to use for stacking the models for regression tasks.
@@ -296,9 +312,15 @@ class SKLearnStacker(BaseSKLearnModel):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel], regression_stacker_model: BaseEstimator,
-        classification_stacker_model: BaseEstimator, n: int = 1, log: bool = True):
-        """ SKLearnStacker constructor
+    def __init__(
+        self,
+        models: List[BaseModel],
+        regression_stacker_model: BaseEstimator,
+        classification_stacker_model: BaseEstimator,
+        n: int = 1,
+        log: bool = True,
+    ):
+        """SKLearnStacker constructor
 
         Args:
             models (List[BaseModel]): List of models to use for the learners to be stacked together.
@@ -309,14 +331,12 @@ class SKLearnStacker(BaseSKLearnModel):
                 should be True only for unnested classes. Defaults to True."""
         self.reg_stack = BaseStacking(models, regression_stacker_model, n=n)
         self.class_stack = BaseStacking(models, classification_stacker_model, n=n)
-        super().__init__(None,
-            self.reg_stack,
-            self.class_stack,
-            log = False)
+        super().__init__(None, self.reg_stack, self.class_stack, log=False)
+
 
 class RFStacker(SKLearnStacker):
 
-    """ RFStacker is a subclass of SKLearnStacker that uses a random forest models to make an ensembled prediction.
+    """RFStacker is a subclass of SKLearnStacker that uses a random forest models to make an ensembled prediction.
 
         Parameters:
             models (List[BaseModel]): list of models to use for the learners to be stacked together.
@@ -340,9 +360,14 @@ class RFStacker(SKLearnStacker):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel], n_estimators: int = 100,
-        n: int = 1, log: bool = True):
-        """ RFStacker constructor
+    def __init__(
+        self,
+        models: List[BaseModel],
+        n_estimators: int = 100,
+        n: int = 1,
+        log: bool = True,
+    ):
+        """RFStacker constructor
 
         Args:
             models (List[BaseModel]): List of models to use for the learners to be stacked together.
@@ -350,29 +375,28 @@ class RFStacker(SKLearnStacker):
             n (int, optional): Number of times to repeat the given models. Defaults to 1.
             log (bool, optional): Whether or not to log the arguments of this constructor,
         """
-        rf_regressor = RandomForestRegressor(n_estimators = n_estimators,
+        rf_regressor = RandomForestRegressor(
+            n_estimators=n_estimators,
             max_features="log2",
             min_samples_split=4,
-            min_samples_leaf=4)
+            min_samples_leaf=4,
+        )
         rf_classifier = RandomForestClassifier(
             max_features="log2",
             min_samples_split=4,
             min_samples_leaf=4,
-            n_estimators = n_estimators,
+            n_estimators=n_estimators,
             n_jobs=-1,
-            criterion='entropy',
-            class_weight="balanced_subsample"
-            )
+            criterion="entropy",
+            class_weight="balanced_subsample",
+        )
 
-        super().__init__(models,
-            rf_regressor,
-            rf_classifier,
-            n=n,
-            log = False)
+        super().__init__(models, rf_regressor, rf_classifier, n=n, log=False)
+
 
 class MLPStacker(SKLearnStacker):
 
-    """ MLPStacker is a subclass of SKLearnStacker that uses a multi-layer perceptron model to make an ensembled prediction.
+    """MLPStacker is a subclass of SKLearnStacker that uses a multi-layer perceptron model to make an ensembled prediction.
 
         Parameters:
             models (List[BaseModel]): list of models to use for the learners to be stacked together.
@@ -404,16 +428,43 @@ class MLPStacker(SKLearnStacker):
     """
 
     @log_arguments
-    def __init__(self, models, layer_dims = [2048,512,128], activation = "tanh", epochs = 100, batch_size = 16, verbose = 0, n=1,log = True):
+    def __init__(
+        self,
+        models,
+        layer_dims=[2048, 512, 128],
+        activation="tanh",
+        epochs=100,
+        batch_size=16,
+        verbose=0,
+        n=1,
+        log=True,
+    ):
 
-        super().__init__(models,
-            TorchMLP(None, layer_dims= layer_dims, activation = activation, epochs=epochs, batch_size=batch_size, verbose = 0),
-            TorchMLP(None, layer_dims= layer_dims, activation = activation, epochs=epochs, batch_size=batch_size, verbose = 0),
+        super().__init__(
+            models,
+            TorchMLP(
+                None,
+                layer_dims=layer_dims,
+                activation=activation,
+                epochs=epochs,
+                batch_size=batch_size,
+                verbose=0,
+            ),
+            TorchMLP(
+                None,
+                layer_dims=layer_dims,
+                activation=activation,
+                epochs=epochs,
+                batch_size=batch_size,
+                verbose=0,
+            ),
             n=n,
-            log = False)
+            log=False,
+        )
+
 
 class BaseBoosting(BaseModel):
-    """ BaseBoosting uses models in a gradient boosting fashion to create an ensembled model.
+    """BaseBoosting uses models in a gradient boosting fashion to create an ensembled model.
 
     Parameters:
         models (List[BaseModel]): list of models to use for the learners to be stacked together.
@@ -435,9 +486,16 @@ class BaseBoosting(BaseModel):
     ------------------------------
     """
 
-
     @log_arguments
-    def __init__(self, models: List[BaseModel], n: int =1, oof=False, nfolds = 5, log: bool =True, **kwargs):
+    def __init__(
+        self,
+        models: List[BaseModel],
+        n: int = 1,
+        oof=False,
+        nfolds=5,
+        log: bool = True,
+        **kwargs
+    ):
         """
 
         Args:
@@ -459,12 +517,13 @@ class BaseBoosting(BaseModel):
         self.oof = oof
         self.nfolds = nfolds
 
-        super().__init__(log = False, **kwargs)
+        super().__init__(log=False, **kwargs)
 
     def _fit(self, X_train, y_train):
         if self.oof:
             from sklearn.model_selection import KFold
-            kf = KFold(n_splits = self.nfolds)
+
+            kf = KFold(n_splits=self.nfolds)
 
         for i, model in enumerate(self.models):
             if self.oof:
@@ -474,47 +533,51 @@ class BaseBoosting(BaseModel):
                 model.fit(X_train, y_train)
                 y_pred = np.array(model.predict(X_train)).flatten()
             y_train = y_train - y_pred
-    
+
     def _error_calc(self, residuals):
         initial_residual, other_residuals = residuals[0], residuals[1:]
         y = np.array(([initial_residual]))
         for index in range(len(other_residuals)):
             curr_residual = other_residuals[index]
             total_residual = y[-1] - curr_residual
-            y = np.append(y, [total_residual], axis = 0)
-        
-        stdevs = list(np.std(y, axis = 1))
+            y = np.append(y, [total_residual], axis=0)
+
+        stdevs = list(np.std(y, axis=1))
         return stdevs
 
-    def _waterfall(self, y_data = None, normalize = False):
+    def _waterfall(self, y_data=None, normalize=False):
         self.stdevs = self._error_calc(self.residuals)
-        if y_data is not None: 
+        if y_data is not None:
             naive_mean = np.average(y_data)
-            naive_residuals = [(y - naive_mean)/np.std(y_data) for y in y_data] #normalized so they're in the same format as predict's input
-            if normalize:    
-                naive_residuals = naive_residuals 
-            else: 
+            naive_residuals = [
+                (y - naive_mean) / np.std(y_data) for y in y_data
+            ]  # normalized so they're in the same format as predict's input
+            if normalize:
+                naive_residuals = naive_residuals
+            else:
                 naive_residuals = self._unnormalize(np.array(naive_residuals))
             self.residuals.insert(0, naive_residuals)
-            self.stdevs.insert(0, np.std(naive_residuals))  
+            self.stdevs.insert(0, np.std(naive_residuals))
         return self.stdevs
 
-    def _predict(self, X, waterfall = False, normalize = False):
-        if waterfall: 
-            self.residuals = [] 
+    def _predict(self, X, waterfall=False, normalize=False):
+        if waterfall:
+            self.residuals = []
         y = np.zeros((len(X)))
         for model in self.models:
             prediction = np.array(model.predict(X)).flatten()
             y = y + prediction
             if waterfall:
-                if normalize: 
+                if normalize:
                     self.residuals.append(prediction)
                 else:
                     self.residuals.append(self._unnormalize(prediction))
         if self.setting == "classification":
             y = np.clip(y, 0, 1)
-            if waterfall: 
-                self.residuals = [np.clip(residual, 0, 1) for residual in self.residuals]
+            if waterfall:
+                self.residuals = [
+                    np.clip(residual, 0, 1) for residual in self.residuals
+                ]
         return y.flatten()
 
     def _save(self):
@@ -530,8 +593,9 @@ class BaseBoosting(BaseModel):
         for i, model in enumerate(self.models):
             model._load(d["model_save_dict"][i])
 
+
 class Resample1(BaseModel):
-    """ Sample from imbalanced dataset. Take all compounds from smaller class and
+    """Sample from imbalanced dataset. Take all compounds from smaller class and
     then sample an equal number from the larger class.
 
     Parameters:
@@ -552,24 +616,30 @@ class Resample1(BaseModel):
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel, log = True):
+    def __init__(self, model: BaseModel, log=True):
         self.model = model
-        super().__init__(log = False)
+        super().__init__(log=False)
 
     def _fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
     def fit(self, X_train, y_train):
         y_train = np.array(y_train)
-        assert len(np.unique(y_train)) == 2, "Resample1 can only be used on binary classification tasks"
+        assert (
+            len(np.unique(y_train)) == 2
+        ), "Resample1 can only be used on binary classification tasks"
         v1 = np.unique(y_train)[0]
         v2 = np.unique(y_train)[1]
         ix1 = np.where(y_train == v1)[0]
         ix2 = np.where(y_train == v2)[0]
         if len(ix1) > len(ix2):
-            ix = np.concatenate((ix2, np.random.choice(ix1, size = len(ix2), replace = False)))
+            ix = np.concatenate(
+                (ix2, np.random.choice(ix1, size=len(ix2), replace=False))
+            )
         else:
-            ix = np.concatenate((ix1, np.random.choice(ix2, size = len(ix1), replace = False)))
+            ix = np.concatenate(
+                (ix1, np.random.choice(ix2, size=len(ix1), replace=False))
+            )
         if isinstance(X_train, list):
             X_train = [X_train[i] for i in ix]
         elif isinstance(X_train, pd.Series) or isinstance(X_train, pd.DataFrame):
@@ -589,21 +659,24 @@ class Resample1(BaseModel):
     def _load(self, d):
         self.model._load(d["model_save"])
 
+
 class Resample2(BaseModel):
-    """ Sample from imbalanced dataset. Take all compounds from smaller class and
+    """Sample from imbalanced dataset. Take all compounds from smaller class and
     then sample an equal number from the larger class."""
 
     @log_arguments
-    def __init__(self, model: BaseModel, log = True):
+    def __init__(self, model: BaseModel, log=True):
         self.model = model
-        super().__init__(log = False)
+        super().__init__(log=False)
 
     def _fit(self, X_train, y_train):
         self.model.fit(X_train, y_train)
 
     def fit(self, X_train, y_train):
         y_train = np.array(y_train)
-        assert len(np.unique(y_train)) == 2, "Resample2 can only be used on binary classification tasks"
+        assert (
+            len(np.unique(y_train)) == 2
+        ), "Resample2 can only be used on binary classification tasks"
         v1 = np.unique(y_train)[0]
         v2 = np.unique(y_train)[1]
         ix1 = np.where(y_train == v1)[0]
@@ -611,9 +684,21 @@ class Resample2(BaseModel):
         print(len(ix1))
         print(len(ix2))
         if len(ix1) > len(ix2):
-            ix = np.concatenate((ix1, ix2, np.random.choice(ix2, size = len(ix1) - len(ix2), replace = True)))
+            ix = np.concatenate(
+                (
+                    ix1,
+                    ix2,
+                    np.random.choice(ix2, size=len(ix1) - len(ix2), replace=True),
+                )
+            )
         else:
-            ix = np.concatenate((ix1, ix2, np.random.choice(ix1, size = len(ix2) - len(ix1), replace = True)))
+            ix = np.concatenate(
+                (
+                    ix1,
+                    ix2,
+                    np.random.choice(ix1, size=len(ix2) - len(ix1), replace=True),
+                )
+            )
         if isinstance(X_train, list):
             X_train = [X_train[i] for i in ix]
         elif isinstance(X_train, pd.Series) or isinstance(X_train, pd.DataFrame):
@@ -636,7 +721,7 @@ class Resample2(BaseModel):
 
 
 class ResampleAdaboost(BaseBoosting):
-    """ ResampleAdaBoost performs the Adaboost with sampling weighting being done
+    """ResampleAdaBoost performs the Adaboost with sampling weighting being done
     via resampling of the dataset to create an ensembled model.
 
     Parameters:
@@ -664,7 +749,16 @@ class ResampleAdaboost(BaseBoosting):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel], n: int =1, factor: int =8, size: int = None, equation: str ="abs",log: bool=True, **kwargs):
+    def __init__(
+        self,
+        models: List[BaseModel],
+        n: int = 1,
+        factor: int = 8,
+        size: int = None,
+        equation: str = "abs",
+        log: bool = True,
+        **kwargs
+    ):
         """_summary_
 
         Args:
@@ -690,15 +784,15 @@ class ResampleAdaboost(BaseBoosting):
         y_train_df = pd.DataFrame(y_train)
         y_train = np.array(y_train)
 
-        w = np.array([1/len(X_train)] * len(X_train))
+        w = np.array([1 / len(X_train)] * len(X_train))
         self.betas = list()
 
         i = 0
         for model in self.models:
-            i+=1
+            i += 1
 
-            p = w/np.sum(w)
-            idxs = np.random.choice(len(X_train), size=size,replace=True, p=p)
+            p = w / np.sum(w)
+            idxs = np.random.choice(len(X_train), size=size, replace=True, p=p)
             X_train_temp = X_train.iloc[idxs, :]
             y_train_temp = y_train_df.iloc[idxs, :].to_numpy().flatten()
             model.fit(X_train_temp, y_train_temp)
@@ -707,17 +801,17 @@ class ResampleAdaboost(BaseBoosting):
 
             D = np.max(res)
             if self.equation == "abs":
-                loss = res/D
+                loss = res / D
             elif self.equation == "sqr":
-                loss = res**2/D**2
+                loss = res**2 / D**2
             else:
-                loss = 1 - np.exp(-res/D)
+                loss = 1 - np.exp(-res / D)
 
-            loss = loss/np.max(loss)
-            avg_loss = np.sum(loss*p)
-            beta = avg_loss/(1-avg_loss)
+            loss = loss / np.max(loss)
+            avg_loss = np.sum(loss * p)
+            beta = avg_loss / (1 - avg_loss)
 
-            w = w * np.power(beta, 1-loss)
+            w = w * np.power(beta, 1 - loss)
             self.betas.append(beta)
 
         self.betas = np.array(self.betas)
@@ -730,15 +824,20 @@ class ResampleAdaboost(BaseBoosting):
 
         predictions = list()
 
-        predictions = np.dot(ys.transpose(), np.log10(1/self.betas))/np.sum(np.log10(1/self.betas))
+        predictions = np.dot(ys.transpose(), np.log10(1 / self.betas)) / np.sum(
+            np.log10(1 / self.betas)
+        )
 
         return np.array(predictions)
 
     def _save(self):
         d = super()._save()
+        if not hasattr(self, "betas"):
+            return d
         d.update({"betas": self.betas})
         return d
 
     def _load(self, d):
         super()._load(d)
-        self.betas = d["betas"]
+        if "betas" in d:
+            self.betas = d["betas"]

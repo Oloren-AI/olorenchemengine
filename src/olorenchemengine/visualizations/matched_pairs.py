@@ -7,7 +7,12 @@ from olorenchemengine.visualizations.visualization import *
 
 class MatchedPairsTable(BaseVisualization):
     @log_arguments
-    def __init__(self, dataset: BaseDataset, mode: str = "features", annotations: Union[str, List[str]] = []):
+    def __init__(
+        self,
+        dataset: BaseDataset,
+        mode: str = "features",
+        annotations: Union[str, List[str]] = [],
+    ):
 
         self.packages = ["d3"]
 
@@ -31,21 +36,35 @@ class MatchedPairsTable(BaseVisualization):
                         "initial": diff[1],
                         "final": diff[2],
                         **{
-                            f"Delta (Final - Initial) {property_col}": r2[property_col + " mean"]
+                            f"Delta (Final - Initial) {property_col}": r2[
+                                property_col + " mean"
+                            ]
                             - r1[property_col + " mean"]
                             for property_col in dataset.property_col
                         },
                         **{
-                            f"Fold (Final/Initial) {property_col}": r2[property_col + " mean"]
+                            f"Fold (Final/Initial) {property_col}": r2[
+                                property_col + " mean"
+                            ]
                             / r1[property_col + " mean"]
                             for property_col in dataset.property_col
                         },
-                        **{f"Initial {annotation}": r1[annotation] for annotation in self.annotations},
-                        **{f"Final {annotation}": r2[annotation] for annotation in self.annotations},
+                        **{
+                            f"Initial {annotation}": r1[annotation]
+                            for annotation in self.annotations
+                        },
+                        **{
+                            f"Final {annotation}": r2[annotation]
+                            for annotation in self.annotations
+                        },
                     },
                     ignore_index=True,
                 )
-            self.mp_diffs = self.mp_diffs.sort_values(by="col", ascending=True).reset_index().drop(columns=["index"])
+            self.mp_diffs = (
+                self.mp_diffs.sort_values(by="col", ascending=True)
+                .reset_index()
+                .drop(columns=["index"])
+            )
         elif mode == "property":
             self.mp_diffs = pd.DataFrame()
             for mp in self.mps:
@@ -62,13 +81,21 @@ class MatchedPairsTable(BaseVisualization):
                                 "final": diff[2],
                                 f"Initial {property}": r1[property],
                                 f"Final {property}": r2[property],
-                                **{f"Initial {annotation}": r1[annotation] for annotation in annotations},
-                                **{f"Final {annotation}": r2[annotation] for annotation in annotations},
+                                **{
+                                    f"Initial {annotation}": r1[annotation]
+                                    for annotation in annotations
+                                },
+                                **{
+                                    f"Final {annotation}": r2[annotation]
+                                    for annotation in annotations
+                                },
                             },
                             ignore_index=True,
                         )
             self.mp_diffs = (
-                self.mp_diffs.sort_values(by=["col", "initial", "final"], ascending=True)
+                self.mp_diffs.sort_values(
+                    by=["col", "initial", "final"], ascending=True
+                )
                 .reset_index()
                 .drop(columns=["index"])
             )
@@ -95,7 +122,15 @@ class MatchedPairsTable(BaseVisualization):
     def get_data(self):
         data = []
         for i, col in enumerate(self.mp_diffs["col"].unique()):
-            data.append({"col": col, "i": i, "col_data": self.mp_diffs.loc[self.mp_diffs["col"] == col].to_dict("r")})
+            data.append(
+                {
+                    "col": col,
+                    "i": i,
+                    "col_data": self.mp_diffs.loc[self.mp_diffs["col"] == col].to_dict(
+                        "r"
+                    ),
+                }
+            )
         return data
 
     @property
@@ -114,15 +149,18 @@ class MatchedPairsHeatmap(MatchedPairsTable):
             property_col = f"Delta (Final - Initial) {property_col}"
             for i, col in enumerate(self.mp_diffs["col"].unique()):
                 col_data = self.mp_diffs[self.mp_diffs["col"] == col]
-                mapping = {str(x): i for i, x in enumerate(col_data["initial"].unique())}
+                mapping = {
+                    str(x): i for i, x in enumerate(col_data["initial"].unique())
+                }
                 col_heatmap = np.zeros((len(mapping), len(mapping)))
                 for i, col_row in col_data.iterrows():
                     try:
                         x = float(col_row[property_col])
                         if not np.isnan(x):
-                            col_heatmap[mapping[str(col_row["final"])], mapping[str(col_row["initial"])]] += col_row[
-                                property_col
-                            ]
+                            col_heatmap[
+                                mapping[str(col_row["final"])],
+                                mapping[str(col_row["initial"])],
+                            ] += col_row[property_col]
                     except:
                         pass
 

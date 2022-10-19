@@ -2,29 +2,28 @@
 """
 from __future__ import annotations
 
-import os
-from abc import abstractmethod
-from typing import Any, Callable, Tuple, Union
-import pandas as pd
-import numpy as np
 import inspect
 import io
-import sys
-
-import olorenchemengine as oce
-from olorenchemengine.internal import *
-
 import logging
+import os
+import sys
+from abc import abstractmethod
+from typing import Any, Callable, Tuple, Union
 
+import numpy as np
+import pandas as pd
 from sklearn.metrics import (
     average_precision_score,
-    roc_auc_score,
-    r2_score,
     explained_variance_score,
     max_error,
     mean_absolute_error,
     mean_squared_error,
+    r2_score,
+    roc_auc_score,
 )
+
+import olorenchemengine as oce
+from olorenchemengine.internal import *
 
 # List of metrics that can be used for evaluating classification models
 classification_metrics = {
@@ -34,6 +33,7 @@ classification_metrics = {
 
 # List of metrics that can be used for evaluating regression models
 from scipy.stats import spearmanr
+
 regression_metrics = {
     "r2": r2_score,
     "Spearman": lambda y, y_pred: spearmanr(y, y_pred)[0],
@@ -59,6 +59,7 @@ metric_direction = {
     "Root Mean Squared Error": "lower",
     "Spearman": "higher",
 }
+
 
 class BaseObject(BaseClass):
     """BaseObject is the parent class for all classes which directly wrap some object to be saved via joblib.
@@ -90,25 +91,25 @@ class BaseEstimator(BaseObject):
     """Utility class used to wrap any object with a fit and predict method"""
 
     def fit(self, X, y):
-        """ Fit the estimator to the data
+        """Fit the estimator to the data
 
         Parameters:
             X (np.array): The data to fit the estimator to
             y (np.array): The target data to fit the estimator to
         Returns:
             self (object): The estimator object fit to the data
-            """
+        """
 
         return self.obj.fit(X, y)
 
     def predict(self, X):
-        """ Predict the output of the estimator
+        """Predict the output of the estimator
 
-            Parameters:
-                X (np.array): The data to predict the output of the estimator on
-            Returns:
-                y (np.array): The predicted output of the estimator
-            """
+        Parameters:
+            X (np.array): The data to predict the output of the estimator on
+        Returns:
+            y (np.array): The predicted output of the estimator
+        """
         pred = self.obj.predict(X)
         pred = np.array(pred)
         if pred.ndim == 1:
@@ -169,7 +170,7 @@ class BasePreprocessor(BaseObject):
         return X
 
     def transform(self, X):
-        """ Returns the transformed values of the dataset as a numpy array.
+        """Returns the transformed values of the dataset as a numpy array.
 
         Parameters:
             X (np.ndarray): the dataset
@@ -184,7 +185,7 @@ class BasePreprocessor(BaseObject):
         return X
 
     def inverse_transform(self, X):
-        """ Returns the original values from the transformed values.
+        """Returns the original values from the transformed values.
 
         Parameters:
             X (np.ndarray): the transformed values
@@ -207,7 +208,11 @@ class QuantileTransformer(BasePreprocessor):
 
     @log_arguments
     def __init__(
-        self, n_quantiles=1000, output_distribution="normal", subsample=1e5, random_state=None,
+        self,
+        n_quantiles=1000,
+        output_distribution="normal",
+        subsample=1e5,
+        random_state=None,
     ):
 
         from sklearn.preprocessing import QuantileTransformer
@@ -236,8 +241,7 @@ class StandardScaler(BasePreprocessor):
 
 
 class LogScaler(BasePreprocessor):
-    """LogScaler is a BasePreprocessor which standardizes the data by taking the log and then removing the mean and scaling to unit variance.
-    """
+    """LogScaler is a BasePreprocessor which standardizes the data by taking the log and then removing the mean and scaling to unit variance."""
 
     @log_arguments
     def __init__(self, with_mean=True, with_std=True):
@@ -275,7 +279,7 @@ class LogScaler(BasePreprocessor):
         return self.obj.fit_transform(X.reshape(-1, 1)).reshape(-1)
 
     def transform(self, X):
-        """ Returns the transformed values of the dataset as a numpy array.
+        """Returns the transformed values of the dataset as a numpy array.
 
         Parameters:
             X (np.ndarray): the dataset
@@ -287,7 +291,7 @@ class LogScaler(BasePreprocessor):
         return self.obj.transform(X.reshape(-1, 1)).reshape(-1)
 
     def inverse_transform(self, X):
-        """ Returns the original values from the transformed values.
+        """Returns the original values from the transformed values.
 
         Parameters:
             X (np.ndarray): the transformed values
@@ -296,7 +300,11 @@ class LogScaler(BasePreprocessor):
             The original values from the transformed values
         """
         X = np.array(X)
-        return 10 ** (self.obj.inverse_transform(X.reshape(-1, 1)).reshape(-1)) - self.mean - 1e-3
+        return (
+            10 ** (self.obj.inverse_transform(X.reshape(-1, 1)).reshape(-1))
+            - self.mean
+            - 1e-3
+        )
 
     def _save(self):
         d = super()._save()
@@ -370,10 +378,17 @@ class BaseModel(BaseClass):
 
     def visualize_parameters_ipynb(self):
         from urllib.parse import quote
+
         from IPython.display import IFrame, display
 
         parameters = parameterize(self)
-        display(IFrame(f"https://oas.oloren.ai/jsonvis?json={quote(json.dumps(parameters))}", width=800, height=500))
+        display(
+            IFrame(
+                f"https://oas.oloren.ai/jsonvis?json={quote(json.dumps(parameters))}",
+                width=800,
+                height=500,
+            )
+        )
 
     @abstractmethod
     def _fit(self, X_train, y_train: np.ndarray) -> None:
@@ -391,7 +406,9 @@ class BaseModel(BaseClass):
         self,
         X_train: Union[pd.DataFrame, np.ndarray],
         y_train: Union[pd.Series, list, np.ndarray],
-        valid: Tuple[Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]] = None,
+        valid: Tuple[
+            Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]
+        ] = None,
         error_model: BaseErrorModel = None,
     ):
         """Calls the _fit method of the model to fit the model on the provided dataset.
@@ -402,6 +419,8 @@ class BaseModel(BaseClass):
             valid (Tuple[Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]]): Optional validation data, which can be used as with methods like early stopping and model averaging.
             error_model (BaseErrorModel): Optional error model, which can be used to predict confidence intervals.
         """
+        y_train = np.array(y_train)
+
         X_train_original = X_train
         y_train_original = y_train
 
@@ -431,11 +450,15 @@ class BaseModel(BaseClass):
                     y_valid = self.normalization.transform(y_valid)
                     y_valid = np.array(y_valid)
             if (np.isreal(y_train.any()) == False) & (str(y_train).find("%") == -1):
-                logging.warning(" Dataset contains non-numeric values, which is incompatible with regression.")
+                logging.warning(
+                    " Dataset contains non-numeric values, which is incompatible with regression."
+                )
                 y_train.str.replace(r"[^0-9.%]", "", regex=True)
             logging.info("Regression dataset detected")
         else:
-            logging.error("Setting was not defined as either auto, regression, or classification.")
+            logging.error(
+                "Setting was not defined as either auto, regression, or classification."
+            )
             sys.exit(1)
 
         # Train model
@@ -460,8 +483,12 @@ class BaseModel(BaseClass):
 
         from sklearn.calibration import calibration_curve
 
-        prob_pred, prob_true = calibration_curve(y_valid, y_pred_valid, n_bins=min(len(y_valid), 10))
-        prob_pred, prob_true = zip(*[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1])
+        prob_pred, prob_true = calibration_curve(
+            y_valid, y_pred_valid, n_bins=min(len(y_valid), 10)
+        )
+        prob_pred, prob_true = zip(
+            *[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1]
+        )
         prob_true = np.array(prob_true)
         prob_true = np.log(prob_true / (1 - prob_true))
         prob_pred = np.array(prob_pred)
@@ -473,7 +500,9 @@ class BaseModel(BaseClass):
         self,
         X_train: Union[pd.DataFrame, np.ndarray],
         y_train: Union[pd.Series, list, np.ndarray],
-        valid: Tuple[Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]] = None,
+        valid: Tuple[
+            Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]
+        ] = None,
     ):
         from sklearn.model_selection import KFold
         from tqdm import tqdm
@@ -495,8 +524,12 @@ class BaseModel(BaseClass):
 
         from sklearn.calibration import calibration_curve
 
-        prob_pred, prob_true = calibration_curve(y_true, y_pred, n_bins=min(len(y_true), 10))
-        prob_pred, prob_true = zip(*[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1])
+        prob_pred, prob_true = calibration_curve(
+            y_true, y_pred, n_bins=min(len(y_true), 10)
+        )
+        prob_pred, prob_true = zip(
+            *[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1]
+        )
         prob_true = np.array(prob_true)
         prob_true = np.log(prob_true / (1 - prob_true))
         prob_pred = np.array(prob_pred)
@@ -506,7 +539,11 @@ class BaseModel(BaseClass):
         self.fit(X_train, y_train)
 
     def _unnormalize(self, Y):
-        if self.normalization == "zscore" and hasattr(self, "ymean") and hasattr(self, "ystd"):
+        if (
+            self.normalization == "zscore"
+            and hasattr(self, "ymean")
+            and hasattr(self, "ystd")
+        ):
             result = Y * self.ystd + self.ymean
         elif issubclass(type(self.normalization), BasePreprocessor):
             result = self.normalization.inverse_transform(Y)
@@ -566,11 +603,18 @@ class BaseModel(BaseClass):
                 if return_ci:
                     result["ci"] = errors
                 if return_vis:
-                    from olorenchemengine.visualizations.visualization import VisualizeError
+                    from olorenchemengine.visualizations.visualization import (
+                        VisualizeError,
+                    )
 
                     ci = self.error_model.quantile
                     result["vis"] = [
-                        VisualizeError(self.error_model.y_train, float(result["predicted"][i]), float(errors[i]), ci=ci)
+                        VisualizeError(
+                            self.error_model.y_train,
+                            float(result["predicted"][i]),
+                            float(errors[i]),
+                            ci=ci,
+                        )
                         for i in range(len(errors))
                     ]
             return result
@@ -592,7 +636,7 @@ class BaseModel(BaseClass):
         ci: float = 0.8,
         scoring: str = None,
     ):
-        """ Trains a production-ready model.
+        """Trains a production-ready model.
 
         This method trains the model on the entire dataset. It also performs an
         intermediate cross-validation step over dataset to both generate test
@@ -632,8 +676,8 @@ class BaseModel(BaseClass):
             elif self.setting == "classification":
                 scoring = "Average Precision"
 
-        from sklearn.model_selection import KFold
         from sklearn.calibration import calibration_curve
+        from sklearn.model_selection import KFold
 
         kf = KFold(n_splits=n_splits)
 
@@ -646,7 +690,9 @@ class BaseModel(BaseClass):
 
             if hasattr(self, "error_model") and self.setting == "regression":
                 y_pred_test = np.array(y_pred_test).flatten()
-                error_model = type(self.error_model)(*self.error_model.args, **self.error_model.kwargs)
+                error_model = type(self.error_model)(
+                    *self.error_model.args, **self.error_model.kwargs
+                )
                 error_model.build(model, X_train, y_train)
                 if isinstance(error_model, BaseAggregateErrorModel):
                     error_model.train_cv()
@@ -660,8 +706,12 @@ class BaseModel(BaseClass):
                     pred = np.concatenate((pred, y_pred_test))
                     true = np.concatenate((true, y_test))
             elif self.setting == "classification":
-                prob_pred, prob_true = calibration_curve(y_test, y_pred_test, n_bins=min(len(y_test), 10))
-                prob_pred, prob_true = zip(*[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1])
+                prob_pred, prob_true = calibration_curve(
+                    y_test, y_pred_test, n_bins=min(len(y_test), 10)
+                )
+                prob_pred, prob_true = zip(
+                    *[x for x in zip(prob_pred, prob_true) if 0 < x[1] < 1]
+                )
                 prob_true = np.array(prob_true)
                 prob_true = np.log(prob_true / (1 - prob_true))
                 prob_pred = np.array(prob_pred)
@@ -676,10 +726,10 @@ class BaseModel(BaseClass):
 
         if self.setting == "regression":
             self.calibrator = LinearRegression()
-            self.calibrator.fit(pred.reshape(-1,1), true.reshape(-1,1))
-            pred = self.calibrator.predict(pred.reshape(-1,1)).reshape(-1)
+            self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
             true = true.reshape(-1)
-            residuals = np.abs(pred-true)
+            residuals = np.abs(pred - true)
             if hasattr(self, "error_model"):
                 self.error_model._fit(residuals, scores, quantile=ci)
                 self.em_status = "fitted"
@@ -711,8 +761,9 @@ class BaseModel(BaseClass):
             self.error_model.fit(X, y)
             self.em_status = "fitted"
 
-        import joblib
         import json
+
+        import joblib
 
         dataset_hash = joblib.hash(X) + joblib.hash(y)
 
@@ -726,12 +777,15 @@ class BaseModel(BaseClass):
         d = {}
 
         if self.setting == "classification":
-            d.update({k: float(v(y, y_pred)) for k, v in classification_metrics.items()})
+            d.update(
+                {k: float(v(y, y_pred)) for k, v in classification_metrics.items()}
+            )
         elif self.setting == "regression":
             d.update({k: float(v(y, y_pred)) for k, v in regression_metrics.items()})
 
         # LOGGING START
         import requests
+
         try:
             response = requests.get(
                 f"https://api.oloren.ai/firestore/log_model_performance",
@@ -764,7 +818,9 @@ class BaseModel(BaseClass):
             d.update({"error_model": saves(self.error_model)})
         if hasattr(self, "em_status"):
             d.update({"em_status": self.em_status})
-        if hasattr(self, "normalization") and issubclass(type(self.normalization), BasePreprocessor):
+        if hasattr(self, "normalization") and issubclass(
+            type(self.normalization), BasePreprocessor
+        ):
             d.update({"normalization": self.normalization._save()})
         return d
 
@@ -814,7 +870,6 @@ class BaseModel(BaseClass):
         print(f"Access your model at: https://oas.oloren.ai/endpoint/?mid={out[1].id}")
 
 
-
 class MakeMultiClassModel(BaseModel):
     """
     Base class for extending the classification capabilities of BaseModel to more than two classes, e.g. classes {W,X,Y,Z}.
@@ -832,35 +887,43 @@ class MakeMultiClassModel(BaseModel):
         self.classifiers = []
 
     def _fit(self, X_train, y_train: np.ndarray) -> None:
-        """Empty method to correctly override the fit method of the parent BaseModel class.
-        """
+        """Empty method to correctly override the fit method of the parent BaseModel class."""
         pass
 
     def fit(
         self,
         X_train: Union[pd.DataFrame, np.ndarray],
         y_train: Union[pd.Series, list, np.ndarray],
-        valid: Tuple[Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]] = None,
+        valid: Tuple[
+            Union[pd.DataFrame, np.ndarray], Union[pd.Series, list, np.ndarray]
+        ] = None,
     ):
 
         # Outputs a warning if, at a glance, it doesn't make sense for the dataset to be a classification dataset. The 0.1 can be adjusted.
         if ((np.unique(y_train)).size / (y_train.size)) > 0.1:
-            logging.warning(" # of unique values / # of total datapoints is above the default threshold of 0.1.")
+            logging.warning(
+                " # of unique values / # of total datapoints is above the default threshold of 0.1."
+            )
 
-        self.sorted_classes = np.unique(y_train)  # Sorts the unique values in the array. Ex. [Z,X,Y,Z,X,X,Y] -> [X,Y,Z]
+        self.sorted_classes = np.unique(
+            y_train
+        )  # Sorts the unique values in the array. Ex. [Z,X,Y,Z,X,X,Y] -> [X,Y,Z]
         for classes in self.sorted_classes:
             y_train_class = (y_train == classes).astype(
                 int
             )  # Sets the currently iterating class (ex. X) to 1 and all others (ex. Y,Z) to 0, converting the dataset to a binary classification problem.
-            self.model = self.classifier.copy()  # Creates a copy of the user-specified model (ex. Random Forest)
+            self.model = (
+                self.classifier.copy()
+            )  # Creates a copy of the user-specified model (ex. Random Forest)
             self.model.fit(
                 X_train, y_train_class
             )  # Calls the BaseModel fit method, since we now just have a binary classification dataset.
-            self.classifiers.append(self.model)  # Adds the results of the fitted model to an array for later analysis.
+            self.classifiers.append(
+                self.model
+            )  # Adds the results of the fitted model to an array for later analysis.
 
     def _predict(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series]):
-        """Empty method to correctly override the predict method of the parent BaseModel class.
-        """
+        """Empty method to correctly override the predict method of the parent BaseModel class."""
         pass
 
     def predict(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series]):
@@ -879,14 +942,20 @@ class MakeMultiClassModel(BaseModel):
             predictions[y_class] = classifier.predict(X)
 
         predictions = pd.DataFrame(predictions)
-        predictions = (predictions.T / predictions.sum(axis=1)).T  # normalizes outputs between 0 and 1
+        predictions = (
+            predictions.T / predictions.sum(axis=1)
+        ).T  # normalizes outputs between 0 and 1
 
         return predictions
 
     def _save(self):
         d = super()._save()
-        d.update({"classifiers": [saves(classifier) for classifier in self.classifiers],
-                  "sorted_classes": self.sorted_classes})
+        d.update(
+            {
+                "classifiers": [saves(classifier) for classifier in self.classifiers],
+                "sorted_classes": self.sorted_classes,
+            }
+        )
 
     def _load(self, d):
         super()._load(d)
@@ -904,7 +973,9 @@ class BaseSKLearnModel(BaseModel):
     """
 
     @log_arguments
-    def __init__(self, representation, regression_model, classification_model, log=True, **kwargs):
+    def __init__(
+        self, representation, regression_model, classification_model, log=True, **kwargs
+    ):
         self.representation = representation
         self.regression_model = regression_model
         self.classification_model = classification_model
@@ -933,7 +1004,9 @@ class BaseSKLearnModel(BaseModel):
     def _save(self):
         d = super()._save()
         if self.setting == "classification":
-            d.update({"model": self.classification_model._save(), "setting": self.setting})
+            d.update(
+                {"model": self.classification_model._save(), "setting": self.setting}
+            )
         else:
             d.update({"model": self.regression_model._save(), "setting": self.setting})
         return d
@@ -946,6 +1019,7 @@ class BaseSKLearnModel(BaseModel):
         else:
             self.regression_model._load(d["model"])
             self.model = self.regression_model
+
 
 class BaseErrorModel(BaseClass):
     """Base class for error models.
@@ -985,7 +1059,11 @@ class BaseErrorModel(BaseClass):
         self.y_pred_train = np.array(self.model.predict(self.X_train)).flatten()
 
     @abstractmethod
-    def calculate(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y_pred: np.ndarray,) -> np.ndarray:
+    def calculate(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y_pred: np.ndarray,
+    ) -> np.ndarray:
         """To be implemented by the child class; calculates confidence scores from inputs.
 
         Args:
@@ -997,7 +1075,12 @@ class BaseErrorModel(BaseClass):
         """
         pass
 
-    def fit(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y: Union[np.ndarray, list, pd.Series], **kwargs):
+    def fit(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+        **kwargs,
+    ):
         """Fits confidence scores to an external dataset
 
         Args:
@@ -1010,7 +1093,12 @@ class BaseErrorModel(BaseClass):
         scores = np.array(self.calculate(X, y_pred))
         self._fit(residuals, scores, **kwargs)
 
-    def fit_cv(self, n_splits: int = 10, test_size_range: Union[tuple, list] = (0.05, 0.5), **kwargs):
+    def fit_cv(
+        self,
+        n_splits: int = 10,
+        test_size_range: Union[tuple, list] = (0.05, 0.5),
+        **kwargs,
+    ):
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
@@ -1082,8 +1170,15 @@ class BaseErrorModel(BaseClass):
             y = np.array(y)
         elif method == "qbin":
             bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
-            X = np.array([np.mean(scores[bin_labels == i]) for i in range(max(bin_labels) + 1)])
-            y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(max(bin_labels) + 1)])
+            X = np.array(
+                [np.mean(scores[bin_labels == i]) for i in range(max(bin_labels) + 1)]
+            )
+            y = np.array(
+                [
+                    pd.Series(residuals[bin_labels == i]).quantile(quantile)
+                    for i in range(max(bin_labels) + 1)
+                ]
+            )
         elif method == "roll":
             results = list(zip(scores, residuals))
             scores, residuals = zip(*sorted(results))
@@ -1100,8 +1195,8 @@ class BaseErrorModel(BaseClass):
         funcs = [
             lambda x, a, b: a * np.exp(b * x),
             lambda x, a, b: a * np.log(x) + b,
-            lambda x, a, b: a * x ** b,
-            lambda x, a, b: a * x + b
+            lambda x, a, b: a * x**b,
+            lambda x, a, b: a * x + b,
         ]
         min_mse = None
         for func in funcs:
@@ -1119,7 +1214,9 @@ class BaseErrorModel(BaseClass):
                 opt_popt = popt
                 min_mse = mse
         X_min, X_max = np.min(X), np.max(X)
-        self.reg = np.vectorize(lambda x: opt_func(max(min(x, X_max), X_min), *opt_popt))
+        self.reg = np.vectorize(
+            lambda x: opt_func(max(min(x, X_max), X_min), *opt_popt)
+        )
 
         plt.xlabel(self.__class__.__name__)
         plt.ylabel("Absolute Error")
@@ -1139,7 +1236,10 @@ class BaseErrorModel(BaseClass):
         self.min_per_bin = min_per_bin
         self.filename = filename
 
-    def score(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series],) -> np.ndarray:
+    def score(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+    ) -> np.ndarray:
         """Calculates confidence scores on a dataset.
 
         Args:
@@ -1168,7 +1268,9 @@ class BaseErrorModel(BaseClass):
 
     def _save(self) -> dict:
         d = {}
-        if hasattr(self, "model") and not self is getattr(self.model, "error_model", None):
+        if hasattr(self, "model") and not self is getattr(
+            self.model, "error_model", None
+        ):
             d.update({"model": saves(self.model)})
         if hasattr(self, "X_train"):
             d.update({"X_train": self.X_train})
@@ -1202,7 +1304,16 @@ class BaseErrorModel(BaseClass):
             min_per_bin = d["min_per_bin"]
             filename = d["filename"]
 
-            self._fit(residuals, scores, method=method, bins=bins, window=window, quantile=quantile, min_per_bin=min_per_bin, filename=filename)
+            self._fit(
+                residuals,
+                scores,
+                method=method,
+                bins=bins,
+                window=window,
+                quantile=quantile,
+                min_per_bin=min_per_bin,
+                filename=filename,
+            )
 
 
 class BaseAggregateErrorModel(BaseErrorModel):
@@ -1213,7 +1324,9 @@ class BaseAggregateErrorModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, error_models: Union[BaseErrorModel, List[BaseErrorModel]], **kwargs):
+    def __init__(
+        self, error_models: Union[BaseErrorModel, List[BaseErrorModel]], **kwargs
+    ):
         if not isinstance(error_models, list):
             error_models = [error_models]
         self.error_models = error_models
@@ -1229,7 +1342,11 @@ class BaseAggregateErrorModel(BaseErrorModel):
             error_model.build(model, X, y)
         super().build(model, X, y)
 
-    def train(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y: Union[np.ndarray, list, pd.Series]):
+    def train(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+    ):
         """Trains the aggregate model to a validation dataset.
 
         Args:
@@ -1239,10 +1356,14 @@ class BaseAggregateErrorModel(BaseErrorModel):
         y_pred = np.array(self.model.predict(X)).flatten()
         residuals = np.abs(np.array(y) - y_pred)
 
-        scores = np.transpose(np.stack([self.get_scores(em, X, y_pred) for em in self.error_models]))
+        scores = np.transpose(
+            np.stack([self.get_scores(em, X, y_pred) for em in self.error_models])
+        )
         self._train(scores, residuals)
 
-    def train_cv(self, n_splits: int = 9, test_size_range: Union[tuple, list] = (0.1, 0.9)):
+    def train_cv(
+        self, n_splits: int = 9, test_size_range: Union[tuple, list] = (0.1, 0.9)
+    ):
         """Trains the aggregate model to the training dataset via cross validation.
 
         Args:
@@ -1282,7 +1403,10 @@ class BaseAggregateErrorModel(BaseErrorModel):
         self._train(scores, residuals)
 
     def calculate(
-        self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y_pred: np.ndarray, **kwargs
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y_pred: np.ndarray,
+        **kwargs,
     ) -> np.ndarray:
         """Computes aggregate error model score from inputs.
 
@@ -1297,7 +1421,10 @@ class BaseAggregateErrorModel(BaseErrorModel):
         return self._predict(scores, **kwargs)
 
     def get_scores(
-        self, em: BaseErrorModel, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y_pred: np.ndarray,
+        self,
+        em: BaseErrorModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y_pred: np.ndarray,
     ) -> np.ndarray:
         """Gets confidence scores from a model, inputs, and keyword arguments.
 
