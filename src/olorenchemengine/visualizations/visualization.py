@@ -1,11 +1,14 @@
 from cmath import e
 from dataclasses import dataclass
 import dataclasses
+from distutils.command.build_scripts import build_scripts
+from itertools import repeat
 from lib2to3.pgen2.literals import simple_escapes
 import os
 from re import escape
 import urllib.parse
 import fasttreeshap
+import shap
 
 from IPython.display import IFrame
 from pandas.core.indexes.accessors import NoNewAttributesMixin
@@ -1793,50 +1796,126 @@ class ShapleyValues(BaseVisualization):
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel,dataset: BaseDataset, log=True, **kwargs):
-        self.model = model
-        self.dataset = dataset
+    def __init__(
+            self, 
+            model: BaseModel, 
+            training_smiles, 
+            log=True, 
+            colorscale = "viridis", 
+            nbins = 3, 
+            radius = 2, 
+            nbits = 2048,  
+            **kwargs):
         
-        self.surrogate_data = self.model.predict(self.dataset.entire_dataset[0]) # predict on x values 
-        print('model stuff')
-        oce_surrogate_model = oce.XGBoostModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048))
-        print('arch created')
-        oce_surrogate_model.fit(self.dataset.entire_dataset[0], self.surrogate_data)
-        print('fitted')
-        self.oce_model = oce_surrogate_model
-
-        self.surrogate_model = oce_surrogate_model.model
-
+        self.model = model
+        self.smiles = training_smiles
+        self.colorscale = colorscale
+        self.nbins = nbins
+        self.radius = radius 
+        self.nbits = nbits
+        
+        self.oce_surrogate = self.model.make_surrogate_model(training_smiles)
+        self.surrogate_model = self.oce_surrogate.model
         self.tree_shap = fasttreeshap.TreeExplainer(self.surrogate_model, algorithm = "auto")
-        print('hello world')
-
-        print('got my explainer')
-        data = "Clc1ccc(Nc2nnc(Cc3ccncc3)c3cccnc23)cc1"
-        prediction = self.oce_model.predict(data)
-
-        shap_values = self.tree_shap(self.oce_model.preprocess(data, prediction)).values
-        print('hello')
-        print(shap_values)
-        print(shap_values.shape)
         
         super().__init__(log=False)
         self.packages += ["plotly"]
         
         self.df = pd.DataFrame({})
 
-    def get_data(self, data) -> dict:
+    def get_data(self, molecule, **kwargs) -> dict:
         """Get data for visualization in JSON-like dictionary.
 
         Returns:
             dict: Data for visualization."""
         
-        prediction = self.oce_model.predict(data)
+        prediction = self.oce_surrogate.predict(molecule)
+        shap_values = self.tree_shap(self.oce_surrogate.preprocess(molecule, prediction)).values
 
-        shap_values = self.tree_shap(self.oce_model.preprocess(data, prediction)).values
-        print('hello')
-        print(shap_values)
-        print(shap_values.shape)
+        rep = self.oce_surrogate.representation
+
+        top_shap_indices = np.argsort(shap_values[0])[-5:]
+        top_shap_values = shap_values[0][top_shap_indices]
+        data_dict = {"shap_values": top_shap_values.tolist(), "shap_index": top_shap_indices.tolist()}
+        print('--------')
+        print(top_shap_indices)
+        print(top_shap_values)
+        print('done')
+        # normalize with the sum of all the shap values
+
+        print(data_dict)
+
+        # converting this to the molecule 
+
+        
+        mol = Chem.MolFromSmiles(molecule)
+        info = rep.info(molecule)
+        print(info)
+        
+        def get_substructures(bits):
+            """
+            Returns a list of the substructures of the molecule.
+            """
+            mol = Chem.MolFromSmiles(molecule)
+            info = rep.info(molecule)
+            print(info)
+
+            sub_structures = {}
+            for i in bits:
+                if i in info:
+                    atom_tuples = info[i]
+                    atomID = atom_tuples[0][0]
+                    radius = atom_tuples[0][1]
+                    print('been indexed')
+                    sub_structures[str(i)] = str(getSubstructSmi(mol, int(atomID), int(radius)))
+                else:
+                    print('cannot find bit' + str(i))
+
+            return sub_structures
+        
+        def getSubstructSmi(mol,atomID,radius):
+            if radius>0:
+                env = Chem.FindAtomEnvironmentOfRadiusN(mol,radius,atomID)
+                atomsToUse=[]
+                for b in env:
+                    atomsToUse.append(mol.GetBondWithIdx(b).GetBeginAtomIdx())
+                    atomsToUse.append(mol.GetBondWithIdx(b).GetEndAtomIdx())
+                atomsToUse = list(set(atomsToUse))
+            else:
+                atomsToUse = [atomID]
+                env=None
+
+            smi = Chem.MolFragmentToSmiles(mol,atomsToUse,bondsToUse=env,allHsExplicit=True, allBondsExplicit=True, rootedAtAtom=atomID)
+            return smi
+
+
+        sub_structures = get_substructures(top_shap_indices)
+        print(sub_structures)
+        
+        # print('sbbbbbb')
 
         
 
-        return self.df.to_dict("l")
+        # shapley = {str(i): Draw.DrawMorganBit(mol, i, info, useSVG=True) for i in clean_shap}
+
+        # print(shapley)
+        
+        return data_dict
+
+        # import plotly
+
+        # for a in molecule.GetAtoms():
+
+        # def rgb_to_hex(x, colorscale = self.colorscale):
+        #     if not isinstance(x, list):
+        #         x = [x]
+        #     x = plotly.colors.sample_colorscale(colorscale, x, colortype="hex")
+        #     x = np.rint(np.array(x)*255).astype(int)
+        #     return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
+
+        # return {
+        #     "SMILES": Chem.MolToSmiles(molecule),
+        #     "highlights": [
+        #         [i+1, rgb_to_hex((i+1)/self.nbins)[0]]  for i in range(self.nbins)
+        #     ]
+        # }

@@ -2,14 +2,18 @@ import copy
 import io
 
 from abc import abstractmethod
+from re import L
 from tqdm import tqdm
 
 import numpy as np
+import random 
+import pandas as pd
 
 from .base_class import *
 from .dataset import *
 from .representations import *
 from .external.stoned import *
+from olorenchemengine.internal import *
 
 import PIL
 
@@ -482,3 +486,85 @@ def model_molecule_sensitivity(model: BaseModel, smiles: str, perturbation_engin
         a.SetProp("sensitivity", str(v))
         a.SetProp("atomNote", str(np.format_float_scientific(v, precision=2)))
     return mol
+
+def make_surrogate_model(self, 
+    data, 
+    surrogate_rep = None,
+    perturbation_engine: PerturbationEngine = None,
+    generate = 2):
+    """Generates a surrogate model for a given model.
+
+    Args:
+        data: training data
+        rep: representation of the model
+        perturbation_engine: perturbation engine
+        generate: number of samples to generate
+    """
+    if perturbation_engine is None:
+        self.perturbation_engine = SwapMutations(radius = 0)
+    else:
+        self.perturbation_engine = perturbation_engine
+    if surrogate_rep is None:
+        self.surrogate_rep = oce.MorganVecRepresentation(radius = 2, nbits = 2048)
+    else:
+        self.surrogate_rep = surrogate_rep 
+    
+    surrogate_model = oce.XGBoostModel(representation = self.surrogate_rep)
+    generated_data = data.copy()
+    print(generated_data.head())
+    print(generated_data.shape)
+    for index, row in data.iterrows():
+        x = row['Smiles']
+        # generated_data.loc[len(generated_data)] = [x]
+        compounds = self.perturbation_engine.get_compound(x)
+        # print(compounds)
+        generated_data = generated_data.append({'Smiles': compounds}, ignore_index=True)
+        # generated_data.loc[len(generated_data)] = [compounds]
+    
+    lead_like_data = pd.read_csv(oce.download_public_file("lead_like_10k.csv"))
+    lead_like_data['Smiles'] = lead_like_data['smiles']
+    # generated_data = pd.concat([generated_data, lead_like_data])
+    generated_data = generated_data[['Smiles']]
+    print('----------')
+
+    print(generated_data.head())
+    print(generated_data.shape)
+    print('---------- over')
+
+    for row, index in generated_data.iterrows():
+        try:
+            if Chem.MolFromSmiles(index['Smiles']) is None:
+                generated_data.drop(row, inplace=True)
+        except: 
+            generated_data.drop(row, inplace=True)
+
+    print(generated_data.shape)
+    surrogate_model.fit(generated_data, self.predict(generated_data))
+    return surrogate_model
+    # return 1 
+
+BaseModel.make_surrogate_model = make_surrogate_model
+
+def _BaseModel_save_with_surrogate(self) -> dict:
+    d = self._save()
+    if hasattr(self, "surrogate_model"):
+        d.update({"perturbation_engine": saves(self.perturbation_engine)})
+    if hasattr(self, "surrogate_rep"):
+        d.update({"rep": saves(self.surrogate_rep)})
+    if hasattr(self, "surrogate_model"):
+        d.update({"surrogate_model": saves(self.surrogate_model)})
+    return d
+    # d.update(BaseModel._save())
+
+BaseModel._save = _BaseModel_save_with_surrogate
+
+def _BaseModel_load_with_surrogate(self, d) -> None:
+    self._load(d)
+    if "perturbation_engine" in d.keys():
+        self.perturbation_engine = loads(d["perturbation_engine"])
+    if "surrogate_rep" in d.keys():
+        self.rep = loads(d["surrogate_rep"])
+    if "surrogate_model" in d.keys():
+        self.surrogate_model = loads(d["surrogate_model"])
+
+BaseModel._load = _BaseModel_load_with_surrogate

@@ -7,6 +7,7 @@ from abc import abstractmethod
 from typing import Any, Callable, Tuple, Union
 import pandas as pd
 import numpy as np
+import random
 import inspect
 import io
 import sys
@@ -341,7 +342,7 @@ class BaseModel(BaseClass):
         test: test the model on the inputted data, output metrics and optionally predicted values
         copy: returns a copy of the model (internal state not copied)
     """
-
+    @log_arguments
     def __init__(self, normalization="zscore", setting="auto", name=None, **kwargs):
 
         self.normalization = normalization
@@ -813,8 +814,6 @@ class BaseModel(BaseClass):
 
         out = oas_connector.upload_model(self, fname)
         print(f"Access your model at: https://oas.oloren.ai/endpoint/?mid={out[1].id}")
-
-
 
 class MakeMultiClassModel(BaseModel):
     """
