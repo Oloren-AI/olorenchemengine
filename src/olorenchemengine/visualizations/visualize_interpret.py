@@ -3,17 +3,18 @@ Visualize interpret is for visualizations that help explain why a model makes a
 certain prediction. 
 """
 
+from rdkit import Chem
+from tqdm import tqdm
+
 from olorenchemengine.base_class import *
-from olorenchemengine.representations import *
 from olorenchemengine.dataset import *
-from olorenchemengine.uncertainty import *
-from olorenchemengine.interpret import *
 from olorenchemengine.internal import *
+from olorenchemengine.interpret import *
 from olorenchemengine.manager import *
+from olorenchemengine.representations import *
+from olorenchemengine.uncertainty import *
 from olorenchemengine.visualizations import *
 
-from tqdm import tqdm
-from rdkit import Chem
 
 class VisualizePredictionSensitivity(BaseVisualization):
     """
@@ -28,14 +29,24 @@ class VisualizePredictionSensitivity(BaseVisualization):
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel, query_compound: str, radius: int = 2,
-        n: int = 200, colorscale = "viridis", bottom_quantile = 0.75,
-        top_quantile = 0.95, nbins = 3, log=True, **kwargs):
+    def __init__(
+        self,
+        model: BaseModel,
+        query_compound: str,
+        radius: int = 2,
+        n: int = 200,
+        colorscale="viridis",
+        bottom_quantile=0.75,
+        top_quantile=0.95,
+        nbins=3,
+        log=True,
+        **kwargs
+    ):
 
         super().__init__(log=False, **kwargs)
         self.packages = ["olorenrenderer"]
 
-        self.mutator = SwapMutations(radius = radius)
+        self.mutator = SwapMutations(radius=radius)
         self.model = model
         self.colorscale = colorscale
         self.bottom_quantile = bottom_quantile
@@ -49,7 +60,9 @@ class VisualizePredictionSensitivity(BaseVisualization):
         for i, a in tqdm(enumerate(self.mol.GetAtoms())):
             smiles_list = []
             for i in range(n):
-                smiles = self.mutator.get_compound_at_idx(Chem.Mol(self.mol), a.GetIdx())
+                smiles = self.mutator.get_compound_at_idx(
+                    Chem.Mol(self.mol), a.GetIdx()
+                )
                 if smiles is None or Chem.MolFromSmiles(smiles) is None:
                     continue
                 else:
@@ -61,7 +74,7 @@ class VisualizePredictionSensitivity(BaseVisualization):
                 vals.append(stdev)
             else:
                 print("Not enough perturbations for atom", a.GetIdx())
-        
+
         bottom_threshold = np.quantile(vals, self.bottom_quantile)
         top_threshold = np.quantile(vals, self.top_quantile)
 
@@ -74,25 +87,27 @@ class VisualizePredictionSensitivity(BaseVisualization):
                     a.SetDoubleProp("bin", 1)
                     a.SetAtomMapNum(self.nbins)
                 else:
-                    normalized_val = (val - bottom_threshold) / (top_threshold - bottom_threshold)
+                    normalized_val = (val - bottom_threshold) / (
+                        top_threshold - bottom_threshold
+                    )
                     bin_number = np.around(normalized_val * self.nbins)
                     if int(bin_number) > 0:
                         a.SetAtomMapNum(int(bin_number))
 
     def get_data(self):
-        
+
         from . import sample_colorscale
 
-        def rgb_to_hex(x, colorscale = self.colorscale):
+        def rgb_to_hex(x, colorscale=self.colorscale):
             if not isinstance(x, list):
                 x = [x]
             x = sample_colorscale(colorscale, x, colortype="hex")
-            x = np.rint(np.array(x)*255).astype(int)
-            return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
+            x = np.rint(np.array(x) * 255).astype(int)
+            return ["#%02x%02x%02x" % (x_[0], x_[1], x_[2]) for x_ in x]
 
         return {
             "SMILES": Chem.MolToSmiles(self.mol),
             "highlights": [
-                [i+1, rgb_to_hex((i+1)/self.nbins)[0]]  for i in range(self.nbins)
-            ]
+                [i + 1, rgb_to_hex((i + 1) / self.nbins)[0]] for i in range(self.nbins)
+            ],
         }

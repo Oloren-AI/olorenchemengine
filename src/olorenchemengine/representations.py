@@ -2,14 +2,12 @@
 """
 
 from abc import abstractmethod, abstractproperty
-from ctypes.wintypes import COLORREF
+from typing import Any, List, Union
 
 import numpy as np
-from tqdm import tqdm
 from pandas.api.types import is_numeric_dtype
 from rdkit import Chem
-
-from typing import List, Union, Any
+from tqdm import tqdm
 
 import olorenchemengine as oce
 
@@ -23,7 +21,7 @@ def get_all_reps():
 
 class BaseRepresentation(BaseClass):
 
-    """ BaseClass for all molecular representations (PyTorch Geometric graphs, descriptors, fingerprints, etc.)
+    """BaseClass for all molecular representations (PyTorch Geometric graphs, descriptors, fingerprints, etc.)
 
     Parameters:
         log (boolean): Whether to log the representation or not
@@ -39,7 +37,7 @@ class BaseRepresentation(BaseClass):
 
     @abstractmethod
     def _convert(self, smiles: str, y: Union[int, float, np.number] = None) -> Any:
-        """ Converts a single structure (represented by a SMILES string) to a representation
+        """Converts a single structure (represented by a SMILES string) to a representation
 
         Parameters:
             smiles (str): SMILES string of the structure
@@ -50,8 +48,10 @@ class BaseRepresentation(BaseClass):
         """
         pass
 
-    def _convert_list(self, smiles_list: List[str], ys: List[Union[int, float, np.number]] = None) -> List[Any]:
-        """ Converts a list of structures (represented by a SMILES string) to a list of representations
+    def _convert_list(
+        self, smiles_list: List[str], ys: List[Union[int, float, np.number]] = None
+    ) -> List[Any]:
+        """Converts a list of structures (represented by a SMILES string) to a list of representations
 
         Parameters:
             smiles_list (List[str]): list of SMILES strings of the structures
@@ -67,8 +67,10 @@ class BaseRepresentation(BaseClass):
         else:
             return [self._convert(s, y=y) for s, y in tqdm(zip(smiles_list, ys))]
 
-    def _convert_cache(self, smiles: str, y: Union[int, float, np.number] = None) -> Any:
-        """ Converts a single structure (represented by a SMILES string) to a representation
+    def _convert_cache(
+        self, smiles: str, y: Union[int, float, np.number] = None
+    ) -> Any:
+        """Converts a single structure (represented by a SMILES string) to a representation
 
         Parameters:
             smiles (str): SMILES string of the structure
@@ -82,9 +84,12 @@ class BaseRepresentation(BaseClass):
             return self._convert(smiles, y=y)
 
     def convert(
-        self, Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray] = None, **kwargs
+        self,
+        Xs: Union[list, pd.DataFrame, dict, str],
+        ys: Union[list, pd.Series, np.ndarray] = None,
+        **kwargs,
     ) -> List[Any]:
-        """ Converts input data to a list of representations
+        """Converts input data to a list of representations
 
         Parameters:
             Xs (Union[list, pd.DataFrame, dict, str]): input data
@@ -93,7 +98,9 @@ class BaseRepresentation(BaseClass):
         Returns:
             List[Any]: list of representations of the input data
         """
-        if isinstance(Xs, list) and (isinstance(Xs[0], list) or isinstance(Xs[0], tuple)):
+        if isinstance(Xs, list) and (
+            isinstance(Xs[0], list) or isinstance(Xs[0], tuple)
+        ):
             smiles = [X[0] for X in Xs]
         elif isinstance(Xs, pd.DataFrame) or isinstance(Xs, dict):
             if isinstance(Xs, pd.DataFrame):
@@ -123,7 +130,7 @@ class BaseRepresentation(BaseClass):
 
 
 class SMILESRepresentation(BaseRepresentation):
-    """ Extracts the SMILES strings from inputted data
+    """Extracts the SMILES strings from inputted data
 
     Methods:
         convert(Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray]=None) -> List[Any]: converts input data to a list of SMILES strings
@@ -138,7 +145,9 @@ class SMILESRepresentation(BaseRepresentation):
         pass
 
     def convert(self, Xs, ys=None, **kwargs):
-        if isinstance(Xs, list) and (isinstance(Xs[0], list) or isinstance(Xs[0], tuple)):
+        if isinstance(Xs, list) and (
+            isinstance(Xs[0], list) or isinstance(Xs[0], tuple)
+        ):
             smiles = [X[0] for X in Xs]
         elif isinstance(Xs, pd.DataFrame) or isinstance(Xs, dict):
             if isinstance(Xs, pd.DataFrame):
@@ -168,7 +177,7 @@ class SMILESRepresentation(BaseRepresentation):
 
 
 class AtomFeaturizer(BaseClass):
-    """ Abstract class for atom featurizers, which create a vector representation for a single atom.
+    """Abstract class for atom featurizers, which create a vector representation for a single atom.
 
     Methods:
         length(self) -> int: returns the length of the atom vector representation, to be implemented by subclasses
@@ -191,7 +200,7 @@ class AtomFeaturizer(BaseClass):
 
 
 class BondFeaturizer(BaseClass):
-    """ Abstract class for bond featurizers, which create a vector representation for a single bond.
+    """Abstract class for bond featurizers, which create a vector representation for a single bond.
 
     Methods:
         length(self) -> int: returns the length of the bond vector representation, to be implemented by subclasses
@@ -214,7 +223,7 @@ class BondFeaturizer(BaseClass):
 
 
 class ConcatenatedAtomFeaturizers(AtomFeaturizer):
-    """ Concatenates multiple atom featurizers into a single vector representation.
+    """Concatenates multiple atom featurizers into a single vector representation.
 
     Methods:
         length(self) -> int: returns the length of the atom vector representation, to be implemented by subclasses
@@ -240,7 +249,7 @@ class ConcatenatedAtomFeaturizers(AtomFeaturizer):
 
 
 class ConcatenatedBondFeaturizers(BondFeaturizer):
-    """ Concatenates multiple bond featurizers into a single vector representation.
+    """Concatenates multiple bond featurizers into a single vector representation.
 
     Methods:
         length(self) -> int: returns the length of the bond vector representation, to be implemented by subclasses
@@ -266,7 +275,7 @@ class ConcatenatedBondFeaturizers(BondFeaturizer):
 
 
 class OGBAtomFeaturizer(AtomFeaturizer):
-    """ Creates a vector representation for a single atom using the Open Graph Benchmark's atom_to_feature_vector function."""
+    """Creates a vector representation for a single atom using the Open Graph Benchmark's atom_to_feature_vector function."""
 
     @log_arguments
     def __init__(self):
@@ -283,7 +292,7 @@ class OGBAtomFeaturizer(AtomFeaturizer):
 
 
 class OGBBondFeaturizer(BondFeaturizer):
-    """ Creates a vector representation for a single bond using the Open Graph Benchmark's bond_to_feature_vector function."""
+    """Creates a vector representation for a single bond using the Open Graph Benchmark's bond_to_feature_vector function."""
 
     @log_arguments
     def __init__(self):
@@ -300,7 +309,7 @@ class OGBBondFeaturizer(BondFeaturizer):
 
 
 class TorchGeometricGraph(BaseRepresentation):
-    """ Representation which returns torch_geometric.data.Data objects.
+    """Representation which returns torch_geometric.data.Data objects.
 
     Parameters:
         atom_featurizer (AtomFeaturizer): featurizer for atoms
@@ -329,8 +338,8 @@ class TorchGeometricGraph(BaseRepresentation):
         return (self.atom_featurizer.length, self.bond_featurizer.length)
 
     def _convert(self, smiles, y=None, addHs=False, **kwargs):
+        from torch import Tensor, from_numpy
         from torch_geometric.data import Data
-        from torch import from_numpy, Tensor
 
         data = Data()
 
@@ -390,13 +399,19 @@ class TorchGeometricGraph(BaseRepresentation):
         return data
 
     def convert(
-        self, Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray] = None, **kwargs
+        self,
+        Xs: Union[list, pd.DataFrame, dict, str],
+        ys: Union[list, pd.Series, np.ndarray] = None,
+        **kwargs,
     ) -> List[Any]:
         Xs = SMILESRepresentation().convert(Xs)
-        return super().convert(Xs, ys = ys, **kwargs)
+        return super().convert(Xs, ys=ys, **kwargs)
 
     def _save(self):
-        return {"atom_featurizer": self.atom_featurizer._save(), "bond_featurizer": self.bond_featurizer._save()}
+        return {
+            "atom_featurizer": self.atom_featurizer._save(),
+            "bond_featurizer": self.bond_featurizer._save(),
+        }
 
     def _load(self, d):
         self.atom_featurizer._load(d["atom_featurizer"])
@@ -404,10 +419,18 @@ class TorchGeometricGraph(BaseRepresentation):
 
 
 class BaseVecRepresentation(BaseRepresentation):
-    """ Representation where given input data, returns a vector representation for each compound."""
+    """Representation where given input data, returns a vector representation for each compound."""
 
     @log_arguments
-    def __init__(self, *args, collinear_thresh=1.01, scale=StandardScaler(), names = None, log=True, **kwargs):
+    def __init__(
+        self,
+        *args,
+        collinear_thresh=1.01,
+        scale=StandardScaler(),
+        names=None,
+        log=True,
+        **kwargs,
+    ):
         self.collinear_thresh = collinear_thresh
         self.to_drop = None
         if not scale is None:
@@ -417,12 +440,21 @@ class BaseVecRepresentation(BaseRepresentation):
         self._names = names
 
         from os import path
+
         if not path.exists(path.join(path.expanduser("~"), f".oce/cache/")):
             os.mkdir(path.join(path.expanduser("~"), f".oce/cache/"))
         if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/")):
             os.mkdir(path.join(path.expanduser("~"), f".oce/cache/vecrep/"))
-        if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}")):
-            os.mkdir(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}"))
+        if not path.exists(
+            path.join(
+                path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}"
+            )
+        ):
+            os.mkdir(
+                path.join(
+                    path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}"
+                )
+            )
 
         super().__init__(*args, log=False, **kwargs)
 
@@ -431,7 +463,9 @@ class BaseVecRepresentation(BaseRepresentation):
         if not self._names is None:
             return self._names
         else:
-            raise ValueError(f"Names not set for representation {self.__class__.__name__}")
+            raise ValueError(
+                f"Names not set for representation {self.__class__.__name__}"
+            )
 
     def convert(
         self,
@@ -440,7 +474,7 @@ class BaseVecRepresentation(BaseRepresentation):
         fit=False,
         **kwargs,
     ) -> List[np.ndarray]:
-        """ BaseVecRepresentation's convert returns a list of numpy arrays.
+        """BaseVecRepresentation's convert returns a list of numpy arrays.
 
         Args:
             Xs (Union[list, pd.DataFrame, dict, str]): input data
@@ -451,24 +485,46 @@ class BaseVecRepresentation(BaseRepresentation):
         """
         import joblib
 
-        input_hash = (joblib.hash(Xs) +
-            joblib.hash(ys) +
-            joblib.hash(self._save()) +
-            joblib.hash(oce.parameterize(self)))
+        input_hash = (
+            joblib.hash(Xs)
+            + joblib.hash(ys)
+            + joblib.hash(self._save())
+            + joblib.hash(oce.parameterize(self))
+        )
 
         from os import path
-        if path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy")):
-            return np.load(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy"), allow_pickle = True)
+
+        if path.exists(
+            path.join(
+                path.expanduser("~"),
+                f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy",
+            )
+        ):
+            return np.load(
+                path.join(
+                    path.expanduser("~"),
+                    f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy",
+                ),
+                allow_pickle=True,
+            )
 
         feats = super().convert(Xs, ys)
         import pandas as pd
 
-        feats = pd.DataFrame.from_records(feats, columns=[f"col{i}" for i in range(len(feats[0]))])
+        feats = pd.DataFrame.from_records(
+            feats, columns=[f"col{i}" for i in range(len(feats[0]))]
+        )
         if fit and len(Xs) > 2:
             # collinear
             corr_matrix = feats.corr().abs()
-            upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool))
-            self.to_drop = [column for column in upper.columns if any(upper[column] > self.collinear_thresh)]
+            upper = corr_matrix.where(
+                np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool)
+            )
+            self.to_drop = [
+                column
+                for column in upper.columns
+                if any(upper[column] > self.collinear_thresh)
+            ]
             feats = feats.drop(columns=self.to_drop)
             # scale
             if not self.scale is None:
@@ -484,34 +540,46 @@ class BaseVecRepresentation(BaseRepresentation):
                 feats.values[:] = np.nan_to_num(x.reshape(feats.values.shape))
 
         output = np.nan_to_num(np.array(feats.to_records(index=False).tolist()))
-        np.save(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy"), output, allow_pickle=True)
+        np.save(
+            path.join(
+                path.expanduser("~"),
+                f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy",
+            ),
+            output,
+            allow_pickle=True,
+        )
         return output
 
-    def calculate_distance(self, x1: Union[str, List[str]], x2: Union[str, List[str]],
-        metric: str = "cosine", **kwargs) -> np.ndarray:
-        """ Calculates the distance between two molecules or list of molecules.
-        
-        Returns a 2D array of distances between each pair of molecules of shape 
+    def calculate_distance(
+        self,
+        x1: Union[str, List[str]],
+        x2: Union[str, List[str]],
+        metric: str = "cosine",
+        **kwargs,
+    ) -> np.ndarray:
+        """Calculates the distance between two molecules or list of molecules.
+
+        Returns a 2D array of distances between each pair of molecules of shape
         len(x1) by len(x2).
-        
-        This uses pairwise_distances from sklearn.metrics to calculate distances 
+
+        This uses pairwise_distances from sklearn.metrics to calculate distances
         between the vector representations of the molecules. Options for distances
         are Valid values for metric are:
 
-            From scikit-learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, 
-                ‘manhattan’]. These metrics support sparse matrix inputs. 
+            From scikit-learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’,
+                ‘manhattan’]. These metrics support sparse matrix inputs.
                 [‘nan_euclidean’] but it does not yet support sparse matrices.
             From scipy.spatial.distance: [‘braycurtis’, ‘canberra’, ‘chebyshev’,
-                ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’, 
-                ‘mahalanobis’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, 
-                ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, 
+                ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’,
+                ‘mahalanobis’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’,
+                ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’,
                 ‘yule’].
-            
+
             See the documentation for scipy.spatial.distance for details on these metrics.
         """
-        
+
         from sklearn.metrics import pairwise_distances
-        
+
         if isinstance(x1, str):
             x1 = [x1]
         if isinstance(x2, str):
@@ -521,7 +589,7 @@ class BaseVecRepresentation(BaseRepresentation):
         return pairwise_distances(x1, x2, metric=metric, **kwargs)
 
     def __add__(self, other):
-        """ Adds two representations together
+        """Adds two representations together
 
         Parameters:
             other (BaseVecRepresentation): representation to add to the current representation
@@ -548,8 +616,9 @@ class BaseVecRepresentation(BaseRepresentation):
             self.scale._load(d["scale"])
             self.scale_fitted = d["scale_fitted"]
 
+
 class ConcatenatedVecRepresentation(BaseVecRepresentation):
-    """ Creates a structure vector representation by concatenating multiple representations.
+    """Creates a structure vector representation by concatenating multiple representations.
 
     Parameters:
         rep1 (BaseVecRepresentation): first representation to concatenate
@@ -570,7 +639,13 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
     """
 
     @log_arguments
-    def __init__(self, rep1: BaseVecRepresentation, rep2: BaseVecRepresentation, log=True, **kwargs):
+    def __init__(
+        self,
+        rep1: BaseVecRepresentation,
+        rep2: BaseVecRepresentation,
+        log=True,
+        **kwargs,
+    ):
         self.rep1 = rep1
         self.rep2 = rep2
         try:
@@ -579,23 +654,24 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
             self._names = None
         super().__init__(names=self._names, log=False, **kwargs)
 
-    def _convert(self, smiles, y=None, fit = False):
-        converted_1 = self.rep1._convert(smiles, y=y, fit = fit)
-        converted_2 = self.rep2._convert(smiles, y=y, fit = fit)
+    def _convert(self, smiles, y=None, fit=False):
+        converted_1 = self.rep1._convert(smiles, y=y, fit=fit)
+        converted_2 = self.rep2._convert(smiles, y=y, fit=fit)
         return np.concatenate((converted_1, converted_2))
 
-    def _convert_list(self, smiles_list, ys=None, fit = False):
-        converted_1 = self.rep1._convert_list(smiles_list, ys=ys, fit = fit)
-        converted_2 = self.rep2._convert_list(smiles_list, ys=ys, fit = fit)
+    def _convert_list(self, smiles_list, ys=None, fit=False):
+        converted_1 = self.rep1._convert_list(smiles_list, ys=ys, fit=fit)
+        converted_2 = self.rep2._convert_list(smiles_list, ys=ys, fit=fit)
         return np.concatenate((converted_1, converted_2), axis=1)
 
-    def convert(self, smiles_list, ys = None, fit = False, **kwargs):
-        converted_1 = self.rep1.convert(smiles_list, ys=ys, fit = fit)
-        converted_2 = self.rep2.convert(smiles_list, ys=ys, fit = fit)
+    def convert(self, smiles_list, ys=None, fit=False, **kwargs):
+        converted_1 = self.rep1.convert(smiles_list, ys=ys, fit=fit)
+        converted_2 = self.rep2.convert(smiles_list, ys=ys, fit=fit)
         return np.concatenate((converted_1, converted_2), axis=1)
+
 
 class NoisyVec(BaseVecRepresentation):
-    """ Adds noise to a given BaseVecRepresentation
+    """Adds noise to a given BaseVecRepresentation
 
     Parameters:
         rep (BaseVecRepresentation): BaseVecRepresentation to add noise to
@@ -614,14 +690,16 @@ class NoisyVec(BaseVecRepresentation):
     """
 
     @log_arguments
-    def __init__(self, rep: BaseVecRepresentation, *args, a_std=0.1, m_std=0.1, **kwargs):
+    def __init__(
+        self, rep: BaseVecRepresentation, *args, a_std=0.1, m_std=0.1, **kwargs
+    ):
         self.a_std = a_std
         self.m_std = m_std
         self.rep = rep
         super().__init__(*args, **kwargs)
 
     def _convert(self, smiles: str, y=None) -> np.ndarray:
-        """ Returns specified vector representation of inputted compound with added noise.
+        """Returns specified vector representation of inputted compound with added noise.
 
         Args:
             smiles (str): SMILES representation of compound
@@ -631,11 +709,14 @@ class NoisyVec(BaseVecRepresentation):
             np.ndarrary: vector representation of inputted compound with added noise
         """
         x = self.rep._convert(smiles)
-        x = (x + np.random.normal(0, self.a_std, x.shape)) * np.random.normal(1, self.m_std, x.shape)
+        x = (x + np.random.normal(0, self.a_std, x.shape)) * np.random.normal(
+            1, self.m_std, x.shape
+        )
         return x
 
+
 class DatasetFeatures(BaseVecRepresentation):
-    """ Selects features from the input dataset as the vector representation """
+    """Selects features from the input dataset as the vector representation"""
 
     def _convert(self, smiles, y=None):
         pass
@@ -643,13 +724,15 @@ class DatasetFeatures(BaseVecRepresentation):
     def convert(self, X, **kwargs):
         assert isinstance(X, pd.DataFrame)
         self.numeric_cols = [c for c in X.columns.tolist() if is_numeric_dtype(X[c])]
-        assert not len(self.numeric_cols) > 0, "No numeric feature columns found in dataset"
+        assert (
+            not len(self.numeric_cols) > 0
+        ), "No numeric feature columns found in dataset"
         X = X[self.numeric_cols].to_numpy()
         return X
 
 
 class BaseCompoundVecRepresentation(BaseVecRepresentation):
-    """ Computes a vector representation from each structure.
+    """Computes a vector representation from each structure.
 
     Parameters:
         normalize (bool): whether to normalize the vector representation or not
@@ -674,13 +757,13 @@ class BaseCompoundVecRepresentation(BaseVecRepresentation):
         fit=False,
         **kwargs,
     ) -> np.ndarray:
-        """ Computes a vector representation from each structure in Xs."""
+        """Computes a vector representation from each structure in Xs."""
         feats = np.array(super().convert(Xs, ys, fit=fit))
         out = np.nan_to_num(feats.astype(np.float32))
         return out
 
     def inverse(self, Xs):
-        """ Inverts the vector representation to the original feature values
+        """Inverts the vector representation to the original feature values
 
         Parameters:
             Xs (np.ndarray): vector representation of the structures
@@ -690,8 +773,9 @@ class BaseCompoundVecRepresentation(BaseVecRepresentation):
 
         pass
 
+
 class ConcatenatedStructVecRepresentation(BaseCompoundVecRepresentation):
-    """ Creates a structure vector representation by concatenating multiple representations.
+    """Creates a structure vector representation by concatenating multiple representations.
 
     DEPRECEATED, use ConcatenatedVecRepresentation instead.
 
@@ -702,7 +786,13 @@ class ConcatenatedStructVecRepresentation(BaseCompoundVecRepresentation):
     """
 
     @log_arguments
-    def __init__(self, rep1: BaseCompoundVecRepresentation, rep2: BaseCompoundVecRepresentation, log=True, **kwargs):
+    def __init__(
+        self,
+        rep1: BaseCompoundVecRepresentation,
+        rep2: BaseCompoundVecRepresentation,
+        log=True,
+        **kwargs,
+    ):
         self.rep1 = rep1
         self.rep2 = rep2
         try:
@@ -723,7 +813,7 @@ class ConcatenatedStructVecRepresentation(BaseCompoundVecRepresentation):
 
 
 class DescriptastorusDescriptor(BaseCompoundVecRepresentation):
-    """ Wrapper for DescriptaStorus descriptors (https://github.com/bp-kelley/descriptastorus)
+    """Wrapper for DescriptaStorus descriptors (https://github.com/bp-kelley/descriptastorus)
 
     Parameters:
         name (str): name of the descriptor. Either "atompaircounts", "morgan3counts",
@@ -768,7 +858,7 @@ from rdkit.Chem import Lipinski
 
 class LipinskiDescriptor(BaseCompoundVecRepresentation):
 
-    """ Wrapper for Lipinski descriptors (https://www.rdkit.org/docs/RDKit_Book.html#Lipinski_Descriptors)
+    """Wrapper for Lipinski descriptors (https://www.rdkit.org/docs/RDKit_Book.html#Lipinski_Descriptors)
 
     Parameters:
         log (bool): whether to log the representations or not"""
@@ -825,7 +915,7 @@ class LipinskiDescriptor(BaseCompoundVecRepresentation):
 
 
 class FragmentIndicator(BaseCompoundVecRepresentation):
-    """ Indicator variables for all fragments in rdkit.Chem.Fragments
+    """Indicator variables for all fragments in rdkit.Chem.Fragments
 
     http://rdkit.org/docs/source/rdkit.Chem.Fragments.html
     """
@@ -1021,6 +1111,7 @@ class FragmentIndicator(BaseCompoundVecRepresentation):
 
 
 from rdkit.Chem import Descriptors, rdMolDescriptors
+
 from .external import calc_pI
 
 
@@ -1028,14 +1119,23 @@ class PeptideDescriptors1(BaseCompoundVecRepresentation):
     @log_arguments
     def __init__(self, log=True, **kwargs):
         self.calc_pI = calc_pI(ph=7.4)
-        super().__init__(names=["NumAtoms", "MW", *self.calc_pI.names, "NumAmideBonds"], log=False, **kwargs)
+        super().__init__(
+            names=["NumAtoms", "MW", *self.calc_pI.names, "NumAmideBonds"],
+            log=False,
+            **kwargs,
+        )
 
     def _convert(self, smiles, y=None):
         m = Chem.MolFromSmiles(smiles)
         calc_pI_props = self.calc_pI._convert(smiles).tolist()
         x = np.nan_to_num(
             np.array(
-                [m.GetNumAtoms(), Descriptors.MolWt(m), *calc_pI_props, rdMolDescriptors.CalcNumAmideBonds(m),]
+                [
+                    m.GetNumAtoms(),
+                    Descriptors.MolWt(m),
+                    *calc_pI_props,
+                    rdMolDescriptors.CalcNumAmideBonds(m),
+                ]
             ).astype(float)
         )
         return x
@@ -1061,8 +1161,11 @@ class MorganVecRepresentation(BaseCompoundVecRepresentation):
     def info(self, smiles):
         info = {}
         m = Chem.MolFromSmiles(smiles)
-        fp = AllChem.GetMorganFingerprintAsBitVect(m, self.radius, nBits=self.nbits, bitInfo=info)
+        fp = AllChem.GetMorganFingerprintAsBitVect(
+            m, self.radius, nBits=self.nbits, bitInfo=info
+        )
         return info
+
 
 class MACCSKeys(BaseCompoundVecRepresentation):
     """Calculate MACCS (Molecular ACCess System) Keys fingerprint.
@@ -1076,6 +1179,7 @@ class MACCSKeys(BaseCompoundVecRepresentation):
 
     def _convert(self, s: str) -> np.ndarray:
         return AllChem.GetMACCSKeysFingerprint(Chem.MolFromSmiles(s))
+
 
 class PubChemFingerprint(BaseCompoundVecRepresentation):
     """PubChem Fingerprint.
@@ -1093,6 +1197,7 @@ class PubChemFingerprint(BaseCompoundVecRepresentation):
     Certain SMILES strings encountered in datasets are not recognized by PubChem.
     In these cases, the fingerprint is returned with all bits equal to zero.
     """
+
     @log_arguments
     def __init__(self):
         super().__init__(log=False)
@@ -1101,17 +1206,19 @@ class PubChemFingerprint(BaseCompoundVecRepresentation):
         oce.import_or_install("pubchempy")
 
         import pubchempy as pcp
-        #Check if retrieval of compound and subsequent descriptor calculation succeed without error
+
+        # Check if retrieval of compound and subsequent descriptor calculation succeed without error
         try:
-            pubchem_compound = pcp.get_compounds(s, 'smiles')[0]
+            pubchem_compound = pcp.get_compounds(s, "smiles")[0]
             fp = [int(bit) for bit in pubchem_compound.cactvs_fingerprint]
         except:
             fp = [0] * 881
         return np.array(fp)
 
+
 class MordredDescriptor(BaseCompoundVecRepresentation):
 
-    """ Wrapper for Mordred descriptors (https://github.com/mordred-descriptor/mordred)
+    """Wrapper for Mordred descriptors (https://github.com/mordred-descriptor/mordred)
 
     Parameters:
         log (bool): whether to log the representations or not
@@ -1120,7 +1227,13 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
     """
 
     @log_arguments
-    def __init__(self, descriptor_set: Union[str, list] = "all", log: bool = True, normalize: bool = False, **kwargs):
+    def __init__(
+        self,
+        descriptor_set: Union[str, list] = "all",
+        log: bool = True,
+        normalize: bool = False,
+        **kwargs,
+    ):
         oce.import_or_install("mordred")
 
         from mordred import Calculator, descriptors
@@ -1136,7 +1249,7 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
         pass
 
     def convert(self, Xs, ys=None, **kwargs):
-        """ Convert list of SMILES to descriptors in the form of a numpy array.
+        """Convert list of SMILES to descriptors in the form of a numpy array.
 
         Parameters:
             Xs (list): List of SMILES strings.
@@ -1163,7 +1276,7 @@ from rdkit.Chem.Pharm2D import Generate, Gobbi_Pharm2D
 
 class GobbiPharma2D(BaseCompoundVecRepresentation):
 
-    """ 2D Gobbi pharmacophore descriptor (implemented in RDKit, from https://doi.org/10.1002/(SICI)1097-0290(199824)61:1<47::AID-BIT9>3.0.CO;2-Z) """
+    """2D Gobbi pharmacophore descriptor (implemented in RDKit, from https://doi.org/10.1002/(SICI)1097-0290(199824)61:1<47::AID-BIT9>3.0.CO;2-Z)"""
 
     def _convert(self, smiles, y=None):
         m = Chem.MolFromSmiles(smiles)
@@ -1178,7 +1291,7 @@ class GobbiPharma2D(BaseCompoundVecRepresentation):
 
 class GobbiPharma3D(BaseCompoundVecRepresentation):
 
-    """ 3D Gobbi pharmacophore descriptor (implemented in RDKit, from https://doi.org/10.1002/(SICI)1097-0290(199824)61:1<47::AID-BIT9>3.0.CO;2-Z) """
+    """3D Gobbi pharmacophore descriptor (implemented in RDKit, from https://doi.org/10.1002/(SICI)1097-0290(199824)61:1<47::AID-BIT9>3.0.CO;2-Z)"""
 
     def _convert(self, smiles, y=None):
         m = Chem.MolFromSmiles(smiles)
@@ -1195,22 +1308,14 @@ class GobbiPharma3D(BaseCompoundVecRepresentation):
 
 from collections import OrderedDict
 
-try:
-    import torch
-except ImportError:
-    oce.mock_imports(globals(), "torch")
-
-try:
-    import torch_geometric.data
-    from torch_geometric.data import DataLoader as PyGDataLoader
-except:
-    oce.mock_imports(globals(), "torch_geometric", "PyGDataLoader")
-
+import torch
+import torch_geometric.data
 from rdkit import Chem
+from torch_geometric.data import DataLoader as PyGDataLoader
 
 
 class OlorenCheckpoint(BaseCompoundVecRepresentation):
-    """ Use OlorenVec from checkpoint as a molecular representation
+    """Use OlorenVec from checkpoint as a molecular representation
 
     Parameters:
         model_path (str): path to checkpoint file for OlorenVec. Use "default" if unsure
@@ -1219,7 +1324,9 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
     """
 
     @log_arguments
-    def __init__(self, model_path: str, num_tasks: int = 2048, log: bool = True, **kwargs):
+    def __init__(
+        self, model_path: str, num_tasks: int = 2048, log: bool = True, **kwargs
+    ):
         if model_path == "default":
             import os
             from os.path import expanduser
@@ -1240,14 +1347,21 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
         state_dict = OrderedDict(
             [
                 (k.replace("model.", ""), v)
-                for k, v in torch.load(path, map_location=oce.CONFIG["DEVICE"])["state_dict"].items()
+                for k, v in torch.load(path, map_location=oce.CONFIG["DEVICE"])[
+                    "state_dict"
+                ].items()
             ]
         )
 
         from olorenchemengine.pyg.gcn import GNN
 
         self.model = GNN(
-            gnn_type="gcn", num_tasks=num_tasks, num_layer=5, emb_dim=300, drop_ratio=0.5, virtual_node=False
+            gnn_type="gcn",
+            num_tasks=num_tasks,
+            num_layer=5,
+            emb_dim=300,
+            drop_ratio=0.5,
+            virtual_node=False,
         )
 
         self.model.to(oce.CONFIG["DEVICE"])
@@ -1275,7 +1389,11 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
     def _convert_list(self, smiles_list, ys=None):
         xs = [self.smiles2pyg(s, None) for s in smiles_list]
 
-        kwargs = {"num_workers": oce.CONFIG["NUM_WORKERS"], "pin_memory": True} if oce.CONFIG["USE_CUDA"] else {}
+        kwargs = (
+            {"num_workers": oce.CONFIG["NUM_WORKERS"], "pin_memory": True}
+            if oce.CONFIG["USE_CUDA"]
+            else {}
+        )
 
         dataloader = PyGDataLoader(xs, batch_size=64, **kwargs)
 
@@ -1293,7 +1411,7 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
         return [cls("default", num_tasks=2048)]
 
     def molecule2graph(self, mol, include_mol=False):
-        """ Convert a molecule to a PyG graph with features and labels
+        """Convert a molecule to a PyG graph with features and labels
 
         Parameters:
             mol (rdkit.Chem.rdchem.Mol): molecule to convert
@@ -1353,7 +1471,7 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
         return graph
 
     def smiles2pyg(self, smiles_str, y, morgan_params={"radius": 2, "nBits": 1024}):
-        """ Convert a SMILES string to a PyG graph with features and labels
+        """Convert a SMILES string to a PyG graph with features and labels
 
         Parameters:
             smiles_str (str): SMILES string to convert
@@ -1391,7 +1509,7 @@ class OlorenCheckpoint(BaseCompoundVecRepresentation):
 
 
 class MCSClusterRep(BaseCompoundVecRepresentation):
-    """ Clusters a train set of compounds and then finds the maximum common
+    """Clusters a train set of compounds and then finds the maximum common
     substructure (MCS) within each set. The presence of each cluster's MCS is
     used as a feature
     """
@@ -1409,8 +1527,8 @@ class MCSClusterRep(BaseCompoundVecRepresentation):
         **kwargs,
     ):
         if not self.kwargs["cached"]:
-            from rdkit.Chem import AllChem
             from rdkit import DataStructs
+            from rdkit.Chem import AllChem
 
             if eval_set == "train":
                 eval_set = dataset.data[dataset.data["split"] == "train"]
@@ -1421,17 +1539,25 @@ class MCSClusterRep(BaseCompoundVecRepresentation):
             else:
                 eval_set = dataset.data
 
-            fingerprinter = lambda s: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(s), 4)
+            fingerprinter = lambda s: AllChem.GetMorganFingerprint(
+                Chem.MolFromSmiles(s), 4
+            )
             eval_set["fps"] = eval_set[dataset.structure_col].apply(fingerprinter)
             corr = np.array(
-                [DataStructs.BulkTanimotoSimilarity(fp, eval_set["fps"].tolist()) for fp in eval_set["fps"]]
+                [
+                    DataStructs.BulkTanimotoSimilarity(fp, eval_set["fps"].tolist())
+                    for fp in eval_set["fps"]
+                ]
             )
 
-            from sklearn.cluster import AgglomerativeClustering
             from rdkit.Chem.rdFMCS import FindMCS
+            from sklearn.cluster import AgglomerativeClustering
 
             clustering = AgglomerativeClustering(
-                n_clusters=None, distance_threshold=0.4, affinity="precomputed", linkage="single"
+                n_clusters=None,
+                distance_threshold=0.4,
+                affinity="precomputed",
+                linkage="single",
             ).fit(1 - corr)
             eval_set["cluster_id"] = clustering.labels_
 
@@ -1441,14 +1567,21 @@ class MCSClusterRep(BaseCompoundVecRepresentation):
                 if len(data_) < 2:
                     continue
                 data_["mols"] = data_[dataset.structure_col].apply(Chem.MolFromSmiles)
-                mcs = FindMCS(data_["mols"].tolist(), threshold=threshold, timeout=timeout)
+                mcs = FindMCS(
+                    data_["mols"].tolist(), threshold=threshold, timeout=timeout
+                )
                 self.smarts.append(mcs.smartsString)
             self.args = [""]
             self.kwargs["cached"] = True
         super().__init__(*args, **kwargs, log=False)
 
     def _convert(self, smiles):
-        return np.array([Chem.MolFromSmiles(smiles).HasSubstructMatch(Chem.MolFromSmarts(s)) for s in self.smarts])
+        return np.array(
+            [
+                Chem.MolFromSmiles(smiles).HasSubstructMatch(Chem.MolFromSmarts(s))
+                for s in self.smarts
+            ]
+        )
 
     def _save(self):
         d = super()._save()
@@ -1461,7 +1594,7 @@ class MCSClusterRep(BaseCompoundVecRepresentation):
 
 
 class ModelAsRep(BaseCompoundVecRepresentation):
-    """ Uses a trained model itself as a representation.
+    """Uses a trained model itself as a representation.
 
     If we are trying to predict property A, and there is a highly related property B
     that has a lot of data we could train a model on property B and use that model
@@ -1478,8 +1611,14 @@ class ModelAsRep(BaseCompoundVecRepresentation):
     """
 
     @log_arguments
-    def __init__(self, model: Union[BaseModel, str], name="ModelAsRep", 
-            download_public_file = False, log=True, **kwargs):
+    def __init__(
+        self,
+        model: Union[BaseModel, str],
+        name="ModelAsRep",
+        download_public_file=False,
+        log=True,
+        **kwargs,
+    ):
         if isinstance(model, str):
             if download_public_file:
                 self.model = oce.load(oce.download_public_file(model))

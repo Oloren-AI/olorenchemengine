@@ -32,6 +32,6 @@ RUN conda install python=3.8
 
 # Copy the library over
 COPY install.sh install.sh
-RUN bash install.sh --docker
+RUN bash install.sh --docker --gpu
 COPY . .
 RUN pip install .

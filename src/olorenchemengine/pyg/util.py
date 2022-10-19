@@ -1,18 +1,10 @@
 import numpy as np
-from olorenchemengine.internal import mock_imports
-
-try:
-    import torch
-    import torch_geometric.data
-except:
-    mock_imports(globals(), "torch", "torch_geometric")
-
-try:
-    from ogb.utils.features import atom_to_feature_vector, bond_to_feature_vector
-except ImportError:
-    mock_imports(globals(), "atom_to_feature_vector", "bond_to_feature_vector")
-
+import torch
+import torch_geometric.data
+from ogb.utils.features import atom_to_feature_vector, bond_to_feature_vector
 from rdkit import Chem
+
+from olorenchemengine.internal import mock_imports
 
 
 def molecule_to_graph(mol, include_mol=False):

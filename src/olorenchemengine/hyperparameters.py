@@ -14,21 +14,21 @@ https://github.com/hyperopt/hyperopt/wiki/FMin.
 from abc import abstractproperty
 from typing import *
 
-from .base_class import *
-from .manager import *
-from .benchmarks import *
-
-from hyperopt import hp, fmin, tpe, hp
+from hyperopt import fmin, hp, tpe
 from hyperopt.pyll import scope
 
-class Opt(BaseClass):
+from .base_class import *
+from .benchmarks import *
+from .manager import *
 
+
+class Opt(BaseClass):
     @abstractproperty
     def get_hp(self):
         pass
 
     @log_arguments
-    def __init__(self, label, *args, use_int = False, **kwargs):
+    def __init__(self, label, *args, use_int=False, **kwargs):
         self.label = label
         if use_int:
             self.hp = scope.int(self.get_hp(label, *args, **kwargs))
@@ -41,59 +41,60 @@ class Opt(BaseClass):
     def _save(self):
         return {}
 
-class OptChoice(Opt):
 
+class OptChoice(Opt):
     @property
     def get_hp(self):
         return hp.choice
 
-class OptRandInt(Opt):
 
+class OptRandInt(Opt):
     @property
     def get_hp(self):
         return hp.randint
 
-class OptUniform(Opt):
 
+class OptUniform(Opt):
     @property
     def get_hp(self):
         return hp.uniform
 
-class OptQUniform(Opt):
 
+class OptQUniform(Opt):
     @property
     def get_hp(self):
         return hp.quniform
 
-class OptLogUniform(Opt):
 
+class OptLogUniform(Opt):
     @property
     def get_hp(self):
         return hp.loguniform
 
-class OptQLogUniform(Opt):
 
+class OptQLogUniform(Opt):
     @property
     def get_hp(self):
         return hp.qloguniform
 
-class OptQNormal(Opt):
 
+class OptQNormal(Opt):
     @property
     def get_hp(self):
         return hp.qnormal
 
-class OptLogNormal(Opt):
 
+class OptLogNormal(Opt):
     @property
     def get_hp(self):
         return hp.lognormal
 
-class OptQLogNormal(Opt):
 
+class OptQLogNormal(Opt):
     @property
     def get_hp(self):
         return hp.qnormal
+
 
 def index_hyperparameters(object: BaseClass) -> dict:
     """
@@ -111,13 +112,17 @@ def index_hyperparameters(object: BaseClass) -> dict:
             d_ = index_hyperparameters(arg)
             d.update(d_)
             if not len(d) == count + len(d_):
-                raise Exception(f"Hyperparameter indexing failed, overlapping keys in {d_}")
+                raise Exception(
+                    f"Hyperparameter indexing failed, overlapping keys in {d_}"
+                )
         for k, v in object.kwargs.items():
             count = len(d)
             d_ = index_hyperparameters(v)
             d.update(d_)
             if not len(d) == count + len(d_):
-                raise Exception(f"Hyperparameter indexing failed, overlapping keys in {d_}")
+                raise Exception(
+                    f"Hyperparameter indexing failed, overlapping keys in {d_}"
+                )
         return d
     elif issubclass(type(object), dict):
         d = {}
@@ -126,13 +131,17 @@ def index_hyperparameters(object: BaseClass) -> dict:
             d_ = index_hyperparameters(arg)
             d.update(d_)
             if not len(d) == count + len(d_):
-                raise Exception(f"Hyperparameter indexing failed, overlapping keys in {d_}")
+                raise Exception(
+                    f"Hyperparameter indexing failed, overlapping keys in {d_}"
+                )
         for k, v in object["kwargs"].items():
             count = len(d)
             d_ = index_hyperparameters(v)
             d.update(d_)
             if not len(d) == count + len(d_):
-                raise Exception(f"Hyperparameter indexing failed, overlapping keys in {d_}")
+                raise Exception(
+                    f"Hyperparameter indexing failed, overlapping keys in {d_}"
+                )
         return d
     elif issubclass(type(object), list):
         d = {}
@@ -141,7 +150,9 @@ def index_hyperparameters(object: BaseClass) -> dict:
             d_ = index_hyperparameters(x)
             d.update(d_)
             if not len(d) == count + len(d_):
-                raise Exception(f"Hyperparameter indexing failed, overlapping keys in {d_}")
+                raise Exception(
+                    f"Hyperparameter indexing failed, overlapping keys in {d_}"
+                )
         return d
     elif (
         object is None
@@ -154,21 +165,44 @@ def index_hyperparameters(object: BaseClass) -> dict:
         print(object)
         raise ValueError
 
+
 def load_hyperparameters_(object: BaseClass, hyperparameter_dictionary: dict) -> dict:
     if issubclass(type(object), Opt):
-        return load_hyperparameters_(hyperparameter_dictionary[object.label], hyperparameter_dictionary)
+        return load_hyperparameters_(
+            hyperparameter_dictionary[object.label], hyperparameter_dictionary
+        )
 
     if issubclass(type(object), BaseClass):
         return {
             **{"BC_class_name": type(object).__name__},
-            **{"args": [load_hyperparameters_(arg, hyperparameter_dictionary) for arg in object.args]},
-            **{"kwargs": {k: load_hyperparameters_(v, hyperparameter_dictionary) for k, v in object.kwargs.items()}},
+            **{
+                "args": [
+                    load_hyperparameters_(arg, hyperparameter_dictionary)
+                    for arg in object.args
+                ]
+            },
+            **{
+                "kwargs": {
+                    k: load_hyperparameters_(v, hyperparameter_dictionary)
+                    for k, v in object.kwargs.items()
+                }
+            },
         }
     elif issubclass(type(object), dict):
         return {
             **{"BC_class_name": object["BC_class_name"]},
-            **{"args": [load_hyperparameters_(arg, hyperparameter_dictionary) for arg in object["args"]]},
-            **{"kwargs": {k: load_hyperparameters_(v, hyperparameter_dictionary) for k, v in object["kwargs"].items()}},
+            **{
+                "args": [
+                    load_hyperparameters_(arg, hyperparameter_dictionary)
+                    for arg in object["args"]
+                ]
+            },
+            **{
+                "kwargs": {
+                    k: load_hyperparameters_(v, hyperparameter_dictionary)
+                    for k, v in object["kwargs"].items()
+                }
+            },
         }
     elif (
         object is None
@@ -183,11 +217,17 @@ def load_hyperparameters_(object: BaseClass, hyperparameter_dictionary: dict) ->
         print(object)
         raise ValueError
 
+
 def load_hyperparameters(object: BaseClass, hyperparameter_dictionary: dict) -> dict:
     mp = load_hyperparameters_(object, hyperparameter_dictionary)
     return oce.create_BC(mp)
 
-def optimize(model: Union[BaseModel, dict], runner: Union[BaseModelManager, Callable], max_evals = 3):
+
+def optimize(
+    model: Union[BaseModel, dict],
+    runner: Union[BaseModelManager, Callable],
+    max_evals=3,
+):
     hyperparameter_index = index_hyperparameters(model)
 
     def objective(hyperparameter_dictionary, model = model, runner = runner):
@@ -199,8 +239,10 @@ def optimize(model: Union[BaseModel, dict], runner: Union[BaseModelManager, Call
             metric = runner(model)
         return metric
 
-    best = fmin(fn=objective,
+    best = fmin(
+        fn=objective,
         space=hyperparameter_index,
         algo=tpe.suggest,
-        max_evals=max_evals,)
+        max_evals=max_evals,
+    )
     return best
