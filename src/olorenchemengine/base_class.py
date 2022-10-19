@@ -362,9 +362,6 @@ class BaseModel(BaseClass):
         self.calibrator = None
         self.em_status = None
 
-    haspreprocess = False
-    hascollate_fn = False
-
     def preprocess(self, X, y, fit=False):
         """
 
