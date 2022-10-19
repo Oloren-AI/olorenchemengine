@@ -191,6 +191,7 @@ def optimize(model: Union[BaseModel, dict], runner: Union[BaseModelManager, Call
     hyperparameter_index = index_hyperparameters(model)
 
     def objective(hyperparameter_dictionary, model = model, runner = runner):
+        print(hyperparameter_dictionary)
         model = load_hyperparameters(model, hyperparameter_dictionary)
         if issubclass(type(runner), BaseModelManager):
             metric = runner.run(model)

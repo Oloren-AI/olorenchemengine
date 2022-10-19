@@ -27,9 +27,6 @@ class BaseLightningModule(BaseClass, LightningModule):
         input_dimensions (Tuple, optional): Tulpe describing the dimensions of the input data. Defaults to None.
     """
 
-    haspreprocess = False
-    hascollate_fn = False
-
     def __init__(self, optim: str = "adam", input_dimensions: Tuple = None):
         super().__init__()
         self.optim = optim
@@ -272,15 +269,15 @@ class BaseTorchGeometricModel(BaseModel):
         from pytorch_lightning import Trainer
 
         self.trainer = Trainer(
-            accelerator="auto", max_epochs=self.epochs, auto_lr_find=auto_lr_find, num_sanity_val_steps=0
+            accelerator="auto", 
+            max_epochs=self.epochs, 
+            auto_lr_find=auto_lr_find,
+            num_sanity_val_steps=0
         )
 
         super().__init__(log=False, **kwargs)
 
     def preprocess(self, X, y, fit=False):
-        if self.network.haspreprocess:
-            X_ = self.network.preprocess(X, y)
-            return X_
         if y is None:
             y = [None] * len(X)
 
@@ -302,33 +299,19 @@ class BaseTorchGeometricModel(BaseModel):
         else:
             self.network.set_task_type("regression")
 
-        if self.network.hascollate_fn:
-            from torch.utils.data import DataLoader as TorchDataLoader
+        from torch_geometric.data import DataLoader as PyGDataLoader
 
-            dataloader = TorchDataLoader(
-                X_train, batch_size=self.batch_size, shuffle=True, num_workers=8, collate_fn=self.network.collate_fn
-            )
-        else:
-            from torch_geometric.data import DataLoader as PyGDataLoader
-
-            dataloader = PyGDataLoader(X_train, batch_size=self.batch_size, shuffle=True, num_workers=8)
+        dataloader = PyGDataLoader(X_train, batch_size=self.batch_size, shuffle=True, num_workers=oce.CONFIG["NUM_WORKERS"])
 
         self.trainer.fit(self.network, dataloader)
 
     def _predict(self, X):
         self.network.eval()
-        if self.network.hascollate_fn:
-            from torch.utils.data import DataLoader as TorchDataLoader
+        from torch_geometric.data import DataLoader as PyGDataLoader
 
-            dataloader = TorchDataLoader(
-                X, batch_size=self.batch_size, num_workers=8, collate_fn=self.network.collate_fn
-            )
-        else:
-            from torch_geometric.data import DataLoader as PyGDataLoader
+        dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=oce.CONFIG["NUM_WORKERS"])
 
-            dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=8)
-
-        predictions = [x for x in self.trainer.predict(self.network, dataloader)]
+        predictions = self.trainer.predict(self.network, dataloader)
 
         predictions = np.concatenate([x.cpu().numpy() for x in predictions])
 
