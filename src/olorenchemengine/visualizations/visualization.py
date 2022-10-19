@@ -1218,8 +1218,10 @@ class VisualizeADAN(CompoundScatterPlot):
         dataset: BaseDataset,
         model: BaseModel,
         *args,
-        threshold: float = 0.95,
         rep: BaseCompoundVecRepresentation = None,
+        dim_reduction: str = "pls",
+        explvar: float = 0.8,
+        threshold: float = 0.95,
         **kwargs,
     ):
         if not type(dataset) is BaseDataset:
@@ -1229,9 +1231,17 @@ class VisualizeADAN(CompoundScatterPlot):
             )
         self.dataset = dataset
         self.model = model
-        self.adan = oce.ADAN(self.model, rep=rep)
-        self.adan.fit(self.dataset, threshold=threshold)
-        self.adan.test(self.dataset)
+        self.ADAN = oce.ADAN(None)
+        self.ADAN.build(
+            self.model, 
+            X=dataset.train_dataset[0], 
+            y=np.array(dataset.train_dataset[1]), 
+            rep=rep, 
+            dim_reduction=dim_reduction,
+            explvar=explvar,
+            threshold=threshold
+        )
+        self.ADAN.calculate_full(dataset.test_dataset[0])
 
         self.df_ = pd.DataFrame(
             {
@@ -1242,7 +1252,7 @@ class VisualizeADAN(CompoundScatterPlot):
         )
 
         super().__init__(
-            self.adan.results,
+            self.df_,
             *args,
             title="ADAN Visualization",
             xaxis_title="Experimental value",

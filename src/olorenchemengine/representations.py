@@ -153,8 +153,12 @@ class SMILESRepresentation(BaseRepresentation):
                 smiles = Xs["SMILES"]
             elif "smi" in keys:
                 smiles = Xs["smi"]
+            else:
+                smiles = Xs.iloc[:, 0]
         elif isinstance(Xs, str):
             smiles = [Xs]
+        elif isinstance(Xs, pd.Series):
+            smiles = Xs.tolist()
         else:
             smiles = Xs
 
@@ -324,13 +328,15 @@ class TorchGeometricGraph(BaseRepresentation):
     def dimensions(self):
         return (self.atom_featurizer.length, self.bond_featurizer.length)
 
-    def _convert(self, smiles, y=None):
+    def _convert(self, smiles, y=None, addHs=False, **kwargs):
         from torch_geometric.data import Data
         from torch import from_numpy, Tensor
 
         data = Data()
 
         mol = Chem.MolFromSmiles(smiles)
+        if addHs:
+            mol = Chem.AddHs(mol)
 
         # atoms
         atom_features_list = []
@@ -382,6 +388,12 @@ class TorchGeometricGraph(BaseRepresentation):
         del graph["node_feat"]
 
         return data
+
+    def convert(
+        self, Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray] = None, **kwargs
+    ) -> List[Any]:
+        Xs = SMILESRepresentation().convert(Xs)
+        return super().convert(Xs, ys = ys, **kwargs)
 
     def _save(self):
         return {"atom_featurizer": self.atom_featurizer._save(), "bond_featurizer": self.bond_featurizer._save()}
@@ -475,8 +487,31 @@ class BaseVecRepresentation(BaseRepresentation):
         np.save(path.join(path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy"), output, allow_pickle=True)
         return output
 
-    def calculate_similarity(self, x1: Union[str, List[str]], x2: Union[str, List[str]],
+    def calculate_distance(self, x1: Union[str, List[str]], x2: Union[str, List[str]],
         metric: str = "cosine", **kwargs) -> np.ndarray:
+        """ Calculates the distance between two molecules or list of molecules.
+        
+        Returns a 2D array of distances between each pair of molecules of shape 
+        len(x1) by len(x2).
+        
+        This uses pairwise_distances from sklearn.metrics to calculate distances 
+        between the vector representations of the molecules. Options for distances
+        are Valid values for metric are:
+
+            From scikit-learn: [‘cityblock’, ‘cosine’, ‘euclidean’, ‘l1’, ‘l2’, 
+                ‘manhattan’]. These metrics support sparse matrix inputs. 
+                [‘nan_euclidean’] but it does not yet support sparse matrices.
+            From scipy.spatial.distance: [‘braycurtis’, ‘canberra’, ‘chebyshev’,
+                ‘correlation’, ‘dice’, ‘hamming’, ‘jaccard’, ‘kulsinski’, 
+                ‘mahalanobis’, ‘minkowski’, ‘rogerstanimoto’, ‘russellrao’, 
+                ‘seuclidean’, ‘sokalmichener’, ‘sokalsneath’, ‘sqeuclidean’, 
+                ‘yule’].
+            
+            See the documentation for scipy.spatial.distance for details on these metrics.
+        """
+        
+        from sklearn.metrics import pairwise_distances
+        
         if isinstance(x1, str):
             x1 = [x1]
         if isinstance(x2, str):
@@ -484,8 +519,6 @@ class BaseVecRepresentation(BaseRepresentation):
         x1 = self.convert(x1)
         x2 = self.convert(x2)
         return pairwise_distances(x1, x2, metric=metric, **kwargs)
-        
-        return
 
     def __add__(self, other):
         """ Adds two representations together
@@ -522,18 +555,18 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
         rep1 (BaseVecRepresentation): first representation to concatenate
         rep2 (BaseVecRepresentation): second representation to concatenate
         log (bool): whether to log the representations or not
-        
+
     Can be created by adding two representations together using + operator.
-    
+
     Example
     ------------------------------
     import olorenautoml as oam
     combo_rep = oam.MorganVecRepresentation(radius=2, nbits=2048) + oam.Mol2Vec()
     model = oam.RandomForestModel(representation = combo_rep, n_estimators = 1000)
-    
+
     model.fit(train['Drug'], train['Y'])
     model.predict(test['Drug'])
-    ------------------------------  
+    ------------------------------
     """
 
     @log_arguments
@@ -556,7 +589,7 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
         converted_2 = self.rep2._convert_list(smiles_list, ys=ys, fit = fit)
         return np.concatenate((converted_1, converted_2), axis=1)
 
-    def convert(self, smiles_list, ys = None, fit = False):
+    def convert(self, smiles_list, ys = None, fit = False, **kwargs):
         converted_1 = self.rep1.convert(smiles_list, ys=ys, fit = fit)
         converted_2 = self.rep2.convert(smiles_list, ys=ys, fit = fit)
         return np.concatenate((converted_1, converted_2), axis=1)
@@ -569,17 +602,17 @@ class NoisyVec(BaseVecRepresentation):
         a_std (float): standard deviation of the additive noise. Defaults to 0.1.
         m_std (float): standard deviation of the multiplicative noise. Defaults to 0.1.
         names (List[str]): list of the names of the features in the vector representation, optional.
-        
+
     Example
     ------------------------------
     import olorenautoml as oam
     model = oam.RandomForestModel(representation = oam.'''BaseCompoundVecRepresentation(Params)''', n_estimators=1000)
-    
+
     model.fit(train['Drug'], train['Y'])
     model.predict(test['Drug'])
-    ------------------------------      
+    ------------------------------
     """
-    
+
     @log_arguments
     def __init__(self, rep: BaseVecRepresentation, *args, a_std=0.1, m_std=0.1, **kwargs):
         self.a_std = a_std
@@ -1065,6 +1098,8 @@ class PubChemFingerprint(BaseCompoundVecRepresentation):
         super().__init__(log=False)
 
     def _convert(self, s: str) -> np.ndarray:
+        oce.import_or_install("pubchempy")
+
         import pubchempy as pcp
         #Check if retrieval of compound and subsequent descriptor calculation succeed without error
         try:
@@ -1086,6 +1121,8 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
 
     @log_arguments
     def __init__(self, descriptor_set: Union[str, list] = "all", log: bool = True, normalize: bool = False, **kwargs):
+        oce.import_or_install("mordred")
+
         from mordred import Calculator, descriptors
 
         if descriptor_set == "all":
@@ -1158,10 +1195,18 @@ class GobbiPharma3D(BaseCompoundVecRepresentation):
 
 from collections import OrderedDict
 
-import torch
-import torch_geometric.data
+try:
+    import torch
+except ImportError:
+    oce.mock_imports(globals(), "torch")
+
+try:
+    import torch_geometric.data
+    from torch_geometric.data import DataLoader as PyGDataLoader
+except:
+    oce.mock_imports(globals(), "torch_geometric", "PyGDataLoader")
+
 from rdkit import Chem
-from torch_geometric.data import DataLoader as PyGDataLoader
 
 
 class OlorenCheckpoint(BaseCompoundVecRepresentation):
@@ -1423,15 +1468,25 @@ class ModelAsRep(BaseCompoundVecRepresentation):
     with ModelAsRep as a representation for property A.
 
     Parameters:
-        model (BaseModel): A trained model to be used as the representation
+        model (BaseModel, str): A trained model to be used as the representation,
+            either a BaseModel object or a path to a saved model
+        download_public_file (bool, optional): If True, will download the specified
+            model from OCE's public warehouse of models. Defaults to False.
         name (str): Name of the property the passed model predicts, which
             is usefully for clear save files/interpretability visualizations.
              Optional.
     """
 
     @log_arguments
-    def __init__(self, model: BaseModel, name="ModelAsRep", log=True, **kwargs):
-        self.model = model
+    def __init__(self, model: Union[BaseModel, str], name="ModelAsRep", 
+            download_public_file = False, log=True, **kwargs):
+        if isinstance(model, str):
+            if download_public_file:
+                self.model = oce.load(oce.download_public_file(model))
+            else:
+                self.model = oce.load(model)
+        else:
+            self.model = model
         super().__init__(log=False, names=[name], **kwargs)
 
     def _convert(self, smiles, y=None):

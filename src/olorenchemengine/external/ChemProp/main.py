@@ -6,15 +6,25 @@ Here, we adapt its PyTorch Geometric implementation as in the `Github repository
 
 from olorenchemengine.representations import AtomFeaturizer, BondFeaturizer, TorchGeometricGraph
 from olorenchemengine.base_class import BaseModel, log_arguments, QuantileTransformer
-from torch_geometric.loader import DataLoader
 
-import torch
-import torch.nn as nn
-import torch.utils.data
-from torch_geometric.data import Data, Dataset
-from torch_geometric.data.data import size_repr
-from torch_geometric.nn import global_mean_pool
-from torch_scatter import scatter_sum
+from olorenchemengine.internal import mock_imports
+
+try:
+    from torch_geometric.loader import DataLoader
+    from torch_geometric.data import Data, Dataset
+    from torch_geometric.data.data import size_repr
+    from torch_geometric.nn import global_mean_pool
+    from torch_scatter import scatter_sum
+except ImportError:
+    mock_imports(globals(), "DataLoader", "Data", "Dataset", "size_repr", "global_mean_pool", "scatter_sum")
+
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.utils.data
+except ImportError:
+    mock_imports(globals(), "torch", "nn")
 
 import numpy as np
 from rdkit import Chem
@@ -38,7 +48,10 @@ class RevIndexedData(Data):
 
     def __inc__(self, key, value, *args, **kwargs):
         if key == "revedge_index":
-            return self.revedge_index.max().item() + 1
+            if len(self.revedge_index) > 0:
+                return self.revedge_index.max().item() + 1
+            else:
+                return 0
         else:
             return super().__inc__(key, value)
 
@@ -211,7 +224,7 @@ def train(config, loader, setting, device=torch.device("cpu")):
 
     model = model.to(device)
     model.train()
-    for batch in tqdm(loader, total=len(loader)):
+    for batch in loader:
         batch = batch.to(device)
 
         optimizer.zero_grad()

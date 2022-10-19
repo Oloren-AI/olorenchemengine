@@ -81,12 +81,12 @@ class VisualizePredictionSensitivity(BaseVisualization):
 
     def get_data(self):
         
-        import plotly
+        from . import sample_colorscale
 
         def rgb_to_hex(x, colorscale = self.colorscale):
             if not isinstance(x, list):
                 x = [x]
-            x = plotly.colors.sample_colorscale(colorscale, x, colortype="hex")
+            x = sample_colorscale(colorscale, x, colortype="hex")
             x = np.rint(np.array(x)*255).astype(int)
             return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
 

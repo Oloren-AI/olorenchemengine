@@ -3,17 +3,28 @@
 `GitHub repository <https://github.com/snap-stanford/pretrain-gnns>`_
 """
 
-from torch_geometric.data import DataLoader
+from olorenchemengine.internal import mock_imports
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
+try:
+    from torch_geometric.data import DataLoader
+except ImportError:
+    mock_imports(globals(), "DataLoader")
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+except ImportError:
+    mock_imports(globals(), "torch", "nn", "optim")
+
 
 from tqdm import tqdm
 import numpy as np
 
 from .model import GNN_graphpred, GNN, global_add_pool, global_mean_pool, global_max_pool, GlobalAttention, Set2Set
 from sklearn.metrics import roc_auc_score
+
+import olorenchemengine as oce
 from olorenchemengine.representations import AtomFeaturizer, BaseRepresentation, BondFeaturizer, TorchGeometricGraph, BaseVecRepresentation
 
 import os
@@ -112,8 +123,6 @@ class SPGNNVecRep(BaseVecRepresentation):
 
     @log_arguments
     def __init__(self, model_type = "contextpred",
-        map_location = "cuda:0",
-        num_workers = 4,
         batch_size = 32,
         epochs = 100,
         lr = 0.001,
@@ -136,9 +145,9 @@ class SPGNNVecRep(BaseVecRepresentation):
 
         self.batch_size = batch_size
         self.epochs = epochs
-        self.num_workers = num_workers
-        self.map_location = map_location
-        self.device = torch.device(self.map_location)
+        self.num_workers = oce.CONFIG["NUM_WORKERS"]
+        self.map_location = oce.CONFIG["MAP_LOCATION"]
+        self.device = oce.CONFIG["DEVICE"]
 
         self.model = GNN(num_layer, emb_dim, JK, dropout_ratio, gnn_type = gnn_type)
 
@@ -167,13 +176,13 @@ class SPGNNVecRep(BaseVecRepresentation):
                 self.pool = Set2Set(emb_dim, set2set_iter)
         else:
             raise ValueError("Invalid graph pooling type.")
-    
+
     def _convert(self, smiles: str, y: Union[int, float, np.number] = None) -> np.ndarray:
         assert Exception, "Please directly use convert method"
-    
-    def convert(self, smiles):
+
+    def convert(self, smiles, **kwargs):
         X = self.representation.convert(smiles)
-        loader = DataLoader(X, batch_size=self.batch_size, 
+        loader = DataLoader(X, batch_size=self.batch_size,
             shuffle=False, num_workers=self.num_workers)
 
         self.model.eval()
@@ -254,8 +263,6 @@ class SPGNN(BaseModel):
 
     @log_arguments
     def __init__(self, model_type = "contextpred",
-        map_location = "cuda:0",
-        num_workers = 4,
         batch_size = 32,
         epochs = 100,
         lr = 0.001,
@@ -277,9 +284,11 @@ class SPGNN(BaseModel):
 
         self.batch_size = batch_size
         self.epochs = epochs
-        self.num_workers = num_workers
-        self.map_location = map_location
-        self.device = torch.device(self.map_location)
+
+        self.num_workers = oce.CONFIG["NUM_WORKERS"]
+        self.map_location = oce.CONFIG["MAP_LOCATION"]
+        self.device = oce.CONFIG["DEVICE"]
+
         self.model = GNN_graphpred(num_layer,
             emb_dim,
             1,

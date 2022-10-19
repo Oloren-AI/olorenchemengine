@@ -9,10 +9,12 @@ from olorenchemengine.representations import BaseVecRepresentation, SMILESRepres
 from olorenchemengine.internal import download_public_file
 from .operations import WordVocab, TrfmSeq2seq, Seq2seqDataset
 
-from torch.utils.data import DataLoader
+try:
+    from torch.utils.data import DataLoader
+    import torch
+except ImportError:
+    oce.mock_imports(globals(), "DataLoader", "torch")
 
-import torch
-    
 class HondaSTRep(BaseVecRepresentation):
     """ HondaSTRep is an implementation of the molecular representation provided
     by Honda et al. in `SMILES Transformer: Pre-trained Molecular Fingerprint for Low Data Drug Discovery

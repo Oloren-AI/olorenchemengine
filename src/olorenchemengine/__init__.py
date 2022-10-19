@@ -1,5 +1,7 @@
+import contextlib
 from locale import D_FMT
 import sys
+import contextlib
 
 if sys.version_info[:2] >= (3, 8):
     # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
@@ -39,7 +41,6 @@ if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/")):
 import pandas as pd
 
 import json
-import torch
 
 
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".oce/CONFIG.json")
@@ -53,7 +54,6 @@ else:
 
 CONFIG = CONFIG_.copy()
 
-
 def update_config():
     """Update the configuration file.
 
@@ -62,8 +62,12 @@ def update_config():
 
     global CONFIG
     CONFIG = CONFIG_.copy()
-    CONFIG["DEVICE"] = torch.device(CONFIG["MAP_LOCATION"])
-    CONFIG["USE_CUDA"] = "cuda" in CONFIG["MAP_LOCATION"]
+
+    with contextlib.suppress(ImportError):
+        import torch
+        CONFIG["DEVICE"] = torch.device(CONFIG["MAP_LOCATION"])
+        CONFIG["USE_CUDA"] = "cuda" in CONFIG["MAP_LOCATION"]
+
     with open(CONFIG_PATH, "w+") as f:
         json.dump(CONFIG_, f)
 
@@ -110,11 +114,17 @@ from .benchmarks import *
 from .hyperparameters import *
 
 def ExampleDataset():
-    return BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
-        property_col = "pChEMBL Value") + RandomSplit()
+    if os.path.exists(path.join(path.expanduser("~"), f".oce/exampledataset.oce")):
+        return load(path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
+    else:
+        dataset =  BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
+            property_col = "pChEMBL Value") + RandomSplit()
+        save(dataset, path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
+        return dataset
 
 def BACEDataset():
     df = pd.read_csv(download_public_file("MoleculeNet/load_bace_regression.csv"))
+    df["split"] = df["split"].replace({"Train": "train", "Valid": "valid", "Test": "test"})
     return oce.BaseDataset(data = df.to_csv(), structure_col = "smiles", property_col = "pIC50")
 
 def test_oce():
