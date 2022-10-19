@@ -108,7 +108,7 @@ else:
         "USE_CUDA": False,
         "CDD_TOKEN": None,
         "VAULT_ID": None,
-        "NUM_WORKERS": 4,
+        "NUM_WORKERS": 0,
     }
     with open(CONFIG_PATH, "w+") as f:
         json.dump(CONFIG_, f)

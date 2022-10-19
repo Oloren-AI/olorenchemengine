@@ -930,7 +930,7 @@ def load(fname: str) -> BaseClass:
         oas_connector.authenticate()
         REMOTE_ID = generate_uuid()
         response = oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}" + f"/{REMOTE_ID}.oce"
+            f"{oas_connector.uid}/sessions/{_runtime.session_id}" + f"/{REMOTE_ID}.oce.delete"
         ).put(fname, oas_connector.uid_token)
         return RemoteObj(REMOTE_ID)
 

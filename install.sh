@@ -86,9 +86,11 @@ if [[ $* == *--docker* ]]; then
 else
     if [[ $* == *--dev* ]]; then
         SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-        python3.8 -m pip install -e $SCRIPT_DIR # install editable copy of the package for dev
+        python3.8 -m pip install -e $SCRIPT_DIR
+        python3.8 -m pip install -e "${SCRIPT_DIR}[full]"
     else
         python3.8 -m pip install olorenchemengine
+        python3.8 -m pip install olorenchemengine[full]
     fi
 fi
 
