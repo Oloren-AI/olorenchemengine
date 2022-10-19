@@ -27,9 +27,6 @@ class BaseLightningModule(BaseClass, LightningModule):
         input_dimensions (Tuple, optional): Tulpe describing the dimensions of the input data. Defaults to None.
     """
 
-    haspreprocess = False
-    hascollate_fn = False
-
     def __init__(self, optim: str = "adam", input_dimensions: Tuple = None):
         super().__init__()
         self.optim = optim
@@ -281,9 +278,6 @@ class BaseTorchGeometricModel(BaseModel):
         super().__init__(log=False, **kwargs)
 
     def preprocess(self, X, y, fit=False):
-        if self.network.haspreprocess:
-            X_ = self.network.preprocess(X, y)
-            return X_
         if y is None:
             y = [None] * len(X)
 
@@ -317,7 +311,7 @@ class BaseTorchGeometricModel(BaseModel):
 
         dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=8)
 
-        predictions = [x for x in self.trainer.predict(self.network, dataloader)]
+        predictions = self.trainer.predict(self.network, dataloader)
 
         predictions = np.concatenate([x.cpu().numpy() for x in predictions])
 
