@@ -25,7 +25,6 @@ _OPTIONAL_IMPORTS_FOR_OCE_ONLINE = [
     "torch_scatter",
     "torch_sparse",
     "torch_cluster",
-    "torch_spline_conv",
     "rdkit",
     "sklearn.metrics",
     "scipy",
