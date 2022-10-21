@@ -1,5 +1,3 @@
-from cmath import exp
-from tkinter import N
 
 import numpy as np
 import pandas as pd
@@ -8,7 +6,6 @@ from rdkit.DataStructs.cDataStructs import BulkTanimotoSimilarity
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import OneHotEncoder
 
 import olorenchemengine as oce
 
