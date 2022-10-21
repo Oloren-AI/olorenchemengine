@@ -1082,8 +1082,9 @@ class BaseErrorModel(BaseClass):
             y = np.array(y)
         elif method == "qbin":
             bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
-            X = np.array([np.mean(scores[bin_labels == i]) for i in range(max(bin_labels) + 1)])
-            y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(max(bin_labels) + 1)])
+            n_labels = int(max(bin_labels) + 1)
+            X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
+            y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(n_labels)])
         elif method == "roll":
             results = list(zip(scores, residuals))
             scores, residuals = zip(*sorted(results))
@@ -1098,9 +1099,9 @@ class BaseErrorModel(BaseClass):
         from scipy.optimize import curve_fit
 
         funcs = [
-            lambda x, a, b: a * np.exp(b * x),
-            lambda x, a, b: a * np.log(x) + b,
-            lambda x, a, b: a * x ** b,
+            lambda x, a, b, c: a * np.exp(b * x) + c,
+            lambda x, a, b, c: a * np.log(x + b) + c,
+            lambda x, a, b, c: a * x ** b + c,
             lambda x, a, b: a * x + b
         ]
         min_mse = None

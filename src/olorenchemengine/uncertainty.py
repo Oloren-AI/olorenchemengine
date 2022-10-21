@@ -17,6 +17,92 @@ from sklearn.preprocessing import OneHotEncoder
 from rdkit.DataStructs.cDataStructs import BulkTanimotoSimilarity
 from rdkit.Chem import AllChem
 
+class BaseEnsembleModel(BaseErrorModel):
+    """ BaseEnsembleModel is the base class for error models that estimate
+        uncertainty based on the variance of an ensemble of models.
+    """
+
+    @log_arguments
+    def __init__(self, ensemble_model = None, n_ensembles = 16):            
+        self.ensemble_model = ensemble_model
+        self.n_ensembles = n_ensembles
+
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+    ):
+        super().build(model, X, y)
+        if self.ensemble_model is None:
+            self.ensemble_model = self.model.copy()
+        self.ensembles = []
+    
+    def calculate(self, X, y_pred):
+        predictions = np.stack([model.predict(X) for model in tqdm(self.ensembles)])
+        return np.var(predictions, axis=0)
+
+    def _save(self) -> dict:
+        d = super()._save()
+        if hasattr(self, "ensembles"):
+            d.update({"ensembles": [model._save() for model in self.ensembles]})
+        return d
+
+    def _load(self, d) -> None:
+        super()._load(d)
+        if "ensembles" in d.keys():
+            self.ensembles = [model._load() for model in d["ensembles"]]
+    
+class BootstrapEnsemble(BaseEnsembleModel):
+    """ BootstrapEnsemble estimates uncertainty based on the variance of several
+        models trained on bootstrapped samples of the training data.
+    """
+    
+    @log_arguments
+    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25):
+        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles)
+        self.bootstrap_size = bootstrap_size
+
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+    ):
+        super().build(model, X, y)
+
+        from sklearn.model_selection import train_test_split
+        
+        for _ in tqdm(range(self.n_ensembles)):
+            X_train, X_test, y_train, y_test = train_test_split(
+                self.X_train, self.y_train, train_size=self.bootstrap_size
+            )
+            ensemble_model = self.ensemble_model.copy()
+            ensemble_model.fit(X_train, y_train)
+            self.ensembles.append(ensemble_model)
+
+class RandomForestEnsemble(BaseEnsembleModel):
+    """ RandomForestEnsemble estimates uncertainty based on the variance of several
+        random forest models initialized to different random states.
+    """
+    
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+        **kwargs
+    ):
+        super().build(model, X, y)
+        
+        for n in tqdm(range(self.n_ensembles)):
+            ensemble_model = RandomForestModel(
+                oce.MorganVecRepresentation(radius=2, nbits=2048), 
+                random_state=n, 
+                **kwargs
+            )
+            ensemble_model.fit(self.X_train, self.y_train)
+            self.ensembles.append(ensemble_model)
 
 class BaseFingerprintModel(BaseErrorModel):
     """ BaseFingerprintModel is the base class for error models that require the
@@ -76,7 +162,7 @@ class SDC(BaseFingerprintModel):
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             return np.sum(np.exp(-self.a * TD / (1 - TD)))
 
-        return np.array([sdc(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([sdc(smi) for smi in tqdm(X)])
 
 
 class TargetDistDC(SDC):
@@ -102,10 +188,13 @@ class TargetDistDC(SDC):
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             DC = np.exp(-self.a * TD / (1 - TD))
-            return np.sqrt(np.dot(DC, np.abs(self.y_train - pred)) / np.sum(DC))
+            error = np.abs(self.y_train - pred)
+            if np.sum(DC) == 0:
+                return np.sqrt(np.mean(error))
+            return np.sqrt(np.dot(DC, error) / np.sum(DC))
 
         X = np.array(X).flatten()
-        return np.array([dist(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
 
 class TrainDistDC(SDC):
     """ TrainDistDC is an error model that calculates the root-mean-square
@@ -131,9 +220,11 @@ class TrainDistDC(SDC):
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             DC = np.exp(-self.a * TD / (1 - TD))
-            return np.sqrt(np.dot(DC, residuals) / np.sum(DC) )
+            if np.sum(DC) == 0:
+                return np.sqrt(np.mean(residuals))
+            return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
 
-        return np.array([dist(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi) for smi in tqdm(X)])
 
 class KNNSimilarity(BaseFingerprintModel):
     """ NNSimilarity is an error model that calculates mean Tanimoto similarity
@@ -163,7 +254,7 @@ class KNNSimilarity(BaseFingerprintModel):
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             return np.mean(sorted(similarity)[-self.k:])
 
-        return np.array([mean_sim(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([mean_sim(smi) for smi in tqdm(X)])
 
 class TargetDistKNN(KNNSimilarity):
     """ TargetDistKNN is an error model that calculates the root-mean-square
@@ -188,12 +279,14 @@ class TargetDistKNN(KNNSimilarity):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            mae = np.abs(self.y_train - pred)
+            error = np.abs(self.y_train - pred)
             idxs = np.argsort(similarity)[-self.k:]
-            return np.sqrt(np.dot(similarity[idxs], mae[idxs]) / np.sum(similarity[idxs]))
+            if np.sum(similarity[idxs]) == 0:
+                return np.sqrt(np.mean(error[idxs]))
+            return np.sqrt(np.dot(similarity[idxs], error[idxs]) / np.sum(similarity[idxs]))
 
         X = np.array(X).flatten()
-        return np.array([dist(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
 
 class TrainDistKNN(KNNSimilarity):
     """ TrainDistKNN is an error model that calculates the root-mean-square
@@ -220,9 +313,11 @@ class TrainDistKNN(KNNSimilarity):
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             idxs = np.argsort(similarity)[-self.k:]
+            if np.sum(similarity[idxs]) == 0:
+                return np.sqrt(np.mean(residuals[idxs]))
             return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
 
-        return np.array([dist(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi) for smi in tqdm(X)])
 
 class Predicted(BaseErrorModel):
     """ Predicted is an error model that predicts error bars based on only the
