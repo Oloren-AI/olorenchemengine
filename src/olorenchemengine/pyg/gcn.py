@@ -34,7 +34,10 @@ class GINConv(MessagePassing):
 
     def forward(self, x, edge_index, edge_attr):
         edge_embedding = self.bond_encoder(edge_attr)
-        out = self.mlp((1 + self.eps) * x + self.propagate(edge_index, x=x, edge_attr=edge_embedding))
+        out = self.mlp(
+            (1 + self.eps) * x
+            + self.propagate(edge_index, x=x, edge_attr=edge_embedding)
+        )
 
         return out
 
@@ -67,9 +70,9 @@ class GCNConv(MessagePassing):
 
         norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
 
-        return self.propagate(edge_index, x=x, edge_attr=edge_embedding, norm=norm) + F.relu(
-            x + self.root_emb.weight
-        ) * 1.0 / deg.view(-1, 1)
+        return self.propagate(
+            edge_index, x=x, edge_attr=edge_embedding, norm=norm
+        ) + F.relu(x + self.root_emb.weight) * 1.0 / deg.view(-1, 1)
 
     def message(self, x_j, edge_attr, norm):
         return norm.view(-1, 1) * F.relu(x_j + edge_attr)
@@ -86,7 +89,13 @@ class GNN_node(torch.nn.Module):
     """
 
     def __init__(
-        self, num_layer, emb_dim, drop_ratio=0.5, JK="last", residual=False, gnn_type="gin",
+        self,
+        num_layer,
+        emb_dim,
+        drop_ratio=0.5,
+        JK="last",
+        residual=False,
+        gnn_type="gin",
     ):
         """
         emb_dim (int): node embedding dimensionality
@@ -165,7 +174,13 @@ class GNN_node_Virtualnode(torch.nn.Module):
     """
 
     def __init__(
-        self, num_layer, emb_dim, drop_ratio=0.5, JK="last", residual=False, gnn_type="gin",
+        self,
+        num_layer,
+        emb_dim,
+        drop_ratio=0.5,
+        JK="last",
+        residual=False,
+        gnn_type="gin",
     ):
         """
         emb_dim (int): node embedding dimensionality
@@ -254,7 +269,9 @@ class GNN_node_Virtualnode(torch.nn.Module):
             ### update the virtual nodes
             if layer < self.num_layer - 1:
                 ### add message from graph nodes to virtual nodes
-                virtualnode_embedding_temp = global_add_pool(h_list[layer], batch) + virtualnode_embedding
+                virtualnode_embedding_temp = (
+                    global_add_pool(h_list[layer], batch) + virtualnode_embedding
+                )
                 ### transform virtual nodes using MLP
 
                 if self.residual:
@@ -314,11 +331,21 @@ class GNN(torch.nn.Module):
         ### GNN to generate node embeddings
         if virtual_node:
             self.gnn_node = GNN_node_Virtualnode(
-                num_layer, emb_dim, JK=JK, drop_ratio=drop_ratio, residual=residual, gnn_type=gnn_type,
+                num_layer,
+                emb_dim,
+                JK=JK,
+                drop_ratio=drop_ratio,
+                residual=residual,
+                gnn_type=gnn_type,
             )
         else:
             self.gnn_node = GNN_node(
-                num_layer, emb_dim, JK=JK, drop_ratio=drop_ratio, residual=residual, gnn_type=gnn_type,
+                num_layer,
+                emb_dim,
+                JK=JK,
+                drop_ratio=drop_ratio,
+                residual=residual,
+                gnn_type=gnn_type,
             )
 
         ### Pooling function to generate whole-graph embeddings

@@ -1,14 +1,14 @@
 """ For creating splits on the data"""
 
+import itertools
+import random
 from abc import abstractmethod
 
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import QuantileTransformer
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
-import itertools
-import random
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import QuantileTransformer
 
 from .base_class import *
 from .dataset import *
@@ -45,8 +45,13 @@ class BaseSplitter(BaseDatasetTransform):
         pass
 
     def transform(self, dataset: BaseDataset, *args, **kwargs) -> BaseDataset:
-        train, val, test = self.split(dataset.data, *args,
-            structure_col=dataset.structure_col, date_col=dataset.date_col, **kwargs)
+        train, val, test = self.split(
+            dataset.data,
+            *args,
+            structure_col=dataset.structure_col,
+            date_col=dataset.date_col,
+            **kwargs
+        )
         train["split"] = "train"
         val["split"] = "valid"
         test["split"] = "test"
@@ -183,14 +188,17 @@ class DateSplitter(BaseSplitter):
         data[date_col] = pd.to_datetime(data[date_col])
         data = data.sort_values(by=date_col)
 
-        splits = [0] + [int(sum(self.split_proportions[:i+1])*len(data)) for i in range(len(self.split_proportions))]
+        splits = [0] + [
+            int(sum(self.split_proportions[: i + 1]) * len(data))
+            for i in range(len(self.split_proportions))
+        ]
 
         out = []
-        for i in range(len(splits)-1):
-            if splits[i] == splits[i+1]:
+        for i in range(len(splits) - 1):
+            if splits[i] == splits[i + 1]:
                 out.append(pd.DataFrame())
             else:
-                out.append(data.iloc[splits[i]:splits[i+1]])
+                out.append(data.iloc[splits[i] : splits[i + 1]])
         return out
 
 
@@ -223,7 +231,13 @@ class ScaffoldSplit(BaseSplitter):
     """
 
     @log_arguments
-    def __init__(self, scaffold_filter_threshold: int = 0, split_type="murcko", log=True, **kwargs):
+    def __init__(
+        self,
+        scaffold_filter_threshold: int = 0,
+        split_type="murcko",
+        log=True,
+        **kwargs
+    ):
         self.scaffold_filter_threshold = scaffold_filter_threshold
         self.split_type = split_type
         super().__init__(log=False, **kwargs)
@@ -280,6 +294,7 @@ class ScaffoldSplit(BaseSplitter):
         mtc = DescriptastorusDescriptor("morgan3counts").convert(filtered_scaffolds)
 
         from sklearn.cluster import KMeans
+
         cluster = KMeans(n_clusters=cluster_count).fit_predict(mtc)
 
         """This loops through the array of cluster labels. Checks if the train/val/test split is full, if not then adds the scaffold corresponding to cluster label.
@@ -289,9 +304,17 @@ class ScaffoldSplit(BaseSplitter):
             cluster = [2 if i == 1 else 0 for i in cluster]
         for i in range(len(cluster)):
             cluster_id = cluster[i]
-            if len(out[cluster_id].index) / data_size <= self.split_proportions[cluster_id]:
+            if (
+                len(out[cluster_id].index) / data_size
+                <= self.split_proportions[cluster_id]
+            ):
                 out[cluster_id] = pd.concat(
-                    [out[cluster_id], data.loc[data["murcko"] == filtered_scaffolds[i]]], ignore_index=True, sort=False
+                    [
+                        out[cluster_id],
+                        data.loc[data["murcko"] == filtered_scaffolds[i]],
+                    ],
+                    ignore_index=True,
+                    sort=False,
                 )
             else:
                 if cluster_count == 2 and cluster_id == 2:
@@ -325,18 +348,25 @@ class ScaffoldSplit(BaseSplitter):
         split_reached = [False] * 3
 
         if scaff_size == 0:
-            raise Exception("No scaffolds with enough molecules to meet filter threshold. Please lower filter threshold.")
+            raise Exception(
+                "No scaffolds with enough molecules to meet filter threshold. Please lower filter threshold."
+            )
 
-        '''
+        """
         Cycle through train/val/test sets.
         If split proportion is not met, append data with the next most common scaffold.
-        If all split proportions are met or scaffolds are fully cycled return split.'''
+        If all split proportions are met or scaffolds are fully cycled return split."""
         for i in itertools.cycle([0, 1, 2]):
             if self.split_proportions[i] == 0:
                 split_reached[i] = True
             elif len(out[i].index) / data_size <= self.split_proportions[i]:
                 out[i] = pd.concat(
-                    [out[i], data.loc[data["murcko"] == filtered_scaffolds[scaff_index]]], ignore_index=True, sort=False
+                    [
+                        out[i],
+                        data.loc[data["murcko"] == filtered_scaffolds[scaff_index]],
+                    ],
+                    ignore_index=True,
+                    sort=False,
                 )
                 scaff_index += 1
             else:
@@ -354,6 +384,7 @@ class ScaffoldSplit(BaseSplitter):
             return self._kmeans_murcko_split(data)
         else:
             return "Invalid split_type initializer."
+
 
 class dc_ScaffoldSplit(BaseSplitter):
     """
@@ -388,11 +419,21 @@ class dc_ScaffoldSplit(BaseSplitter):
         try:
             import deepchem as dc
         except:
-            print("Error, deepchem not installed. Please use ScaffoldSplit instead or install deepchem")
-        dc_dataset = dc.data.DiskDataset.from_numpy(X=data.index, ids=data[structure_col])
+            print(
+                "Error, deepchem not installed. Please use ScaffoldSplit instead or install deepchem"
+            )
+        dc_dataset = dc.data.DiskDataset.from_numpy(
+            X=data.index, ids=data[structure_col]
+        )
         scaffoldsplitter = dc.splits.ScaffoldSplitter()
-        train,valid,test = scaffoldsplitter.train_valid_test_split(dc_dataset, frac_train=self.split_proportions[0], frac_valid=self.split_proportions[1], frac_test=self.split_proportions[2])
+        train, valid, test = scaffoldsplitter.train_valid_test_split(
+            dc_dataset,
+            frac_train=self.split_proportions[0],
+            frac_valid=self.split_proportions[1],
+            frac_test=self.split_proportions[2],
+        )
         return data.loc[train.X], data.loc[valid.X], data.loc[test.X]
+
 
 class gg_ScaffoldSplit(BaseSplitter):
     """
@@ -424,18 +465,22 @@ class gg_ScaffoldSplit(BaseSplitter):
         super().__init__(log=False, **kwargs)
 
     def split(self, data: pd.DataFrame, *args, structure_col: str = "smiles", **kwargs):
-        return self.gg_split(data,
+        return self.gg_split(
+            data,
             frac_train=self.split_proportions[0],
             frac_valid=self.split_proportions[1],
             frac_test=self.split_proportions[2],
-            structure_col = structure_col)
+            structure_col=structure_col,
+        )
 
-    def gg_split(self,
-            dataset,
-            frac_train=None,
-            frac_valid=None,
-            frac_test=None,
-            structure_col = "smiles"):
+    def gg_split(
+        self,
+        dataset,
+        frac_train=None,
+        frac_valid=None,
+        frac_test=None,
+        structure_col="smiles",
+    ):
         """
         Args:
             dataset(InMemoryDataset): the dataset to split. Make sure each element in
@@ -451,7 +496,9 @@ class gg_ScaffoldSplit(BaseSplitter):
         # create dict of the form {scaffold_i: [idx1, idx....]}
         all_scaffolds = {}
         for i in range(N):
-            scaffold = self.generate_scaffold(dataset.iloc[i][structure_col], include_chirality=True)
+            scaffold = self.generate_scaffold(
+                dataset.iloc[i][structure_col], include_chirality=True
+            )
             if scaffold not in all_scaffolds:
                 all_scaffolds[scaffold] = [i]
             else:
@@ -460,8 +507,10 @@ class gg_ScaffoldSplit(BaseSplitter):
         # sort from largest to smallest sets
         all_scaffolds = {key: sorted(value) for key, value in all_scaffolds.items()}
         all_scaffold_sets = [
-            scaffold_set for (scaffold, scaffold_set) in sorted(
-                all_scaffolds.items(), key=lambda x: (len(x[1]), x[1][0]), reverse=True)
+            scaffold_set
+            for (scaffold, scaffold_set) in sorted(
+                all_scaffolds.items(), key=lambda x: (len(x[1]), x[1][0]), reverse=True
+            )
         ]
 
         # get train, valid test indices
@@ -513,8 +562,10 @@ class gg_ScaffoldSplit(BaseSplitter):
             the scaffold of the given smiles.
         """
         scaffold = MurckoScaffold.MurckoScaffoldSmiles(
-            smiles=smiles, includeChirality=include_chirality)
+            smiles=smiles, includeChirality=include_chirality
+        )
         return scaffold
+
 
 class PropertySplit(BaseSplitter):
     """Split molecules into train/val/test based on user-defined property.
@@ -544,7 +595,15 @@ class PropertySplit(BaseSplitter):
     """
 
     @log_arguments
-    def __init__(self, property_col, threshold=None, noise=0.1, categorical=False, log=True, **kwargs):
+    def __init__(
+        self,
+        property_col,
+        threshold=None,
+        noise=0.1,
+        categorical=False,
+        log=True,
+        **kwargs
+    ):
         self.property_col = property_col
         self.threshold = threshold
         self.noise = noise
@@ -562,9 +621,14 @@ class PropertySplit(BaseSplitter):
         """
         property = data[self.property_col]
 
-        data["prop_norm"] = QuantileTransformer(output_distribution="uniform").fit_transform(property)
+        data["prop_norm"] = QuantileTransformer(
+            output_distribution="uniform"
+        ).fit_transform(property)
         data["prop_norm"] = (
-            (data["prop_norm"] + [random.uniform(-noise, noise) for i in range(len(data))])
+            (
+                data["prop_norm"]
+                + [random.uniform(-noise, noise) for i in range(len(data))]
+            )
             .clip(lower=0, upper=1)
             .sample(frac=1)
         )
@@ -574,20 +638,33 @@ class PropertySplit(BaseSplitter):
         out.append(
             data.loc[
                 (data["prop_norm"] > self.split_proportions[0])
-                & (data["prop_norm"] <= self.split_proportions[0] + self.split_proportions[1])
+                & (
+                    data["prop_norm"]
+                    <= self.split_proportions[0] + self.split_proportions[1]
+                )
             ]
         )
-        out.append(data.loc[data["prop_norm"] > (self.split_proportions[0] + self.split_proportions[1])])
+        out.append(
+            data.loc[
+                data["prop_norm"]
+                > (self.split_proportions[0] + self.split_proportions[1])
+            ]
+        )
 
         if self.categorical:
-            thresh1 = np.percentile(data[self.property_col], self.split_proportions[0] * 10)
+            thresh1 = np.percentile(
+                data[self.property_col], self.split_proportions[0] * 10
+            )
             thresh2 = np.percentile(
-                data[self.property_col], (self.split_proportions[0] + self.split_proportions[1]) * 10
+                data[self.property_col],
+                (self.split_proportions[0] + self.split_proportions[1]) * 10,
             )
             for df in out:
                 df.loc[df[self.property_col] <= thresh1, self.property_col] = int(0)
                 df.loc[
-                    (df[self.property_col] > thresh1) & (data[self.property_col] <= thresh2), self.property_col
+                    (df[self.property_col] > thresh1)
+                    & (data[self.property_col] <= thresh2),
+                    self.property_col,
                 ] = int(1)
                 df.loc[df[self.property_col] > thresh2, self.property_col] = int(2)
 
@@ -601,12 +678,18 @@ class PropertySplit(BaseSplitter):
         data["prop_norm"] = transformer.transform(property.to_numpy().reshape(-1, 1))
 
         threshold_scaled = (
-            (transformer.transform(np.array([threshold]).reshape(1, -1)) - data["prop_norm"].min())
+            (
+                transformer.transform(np.array([threshold]).reshape(1, -1))
+                - data["prop_norm"].min()
+            )
             / (data["prop_norm"].max() - data["prop_norm"].min())
         )[0][0]
 
         data["prop_norm"] = (
-            (data["prop_norm"] + [random.uniform(-noise, noise) for i in range(len(data))])
+            (
+                data["prop_norm"]
+                + [random.uniform(-noise, noise) for i in range(len(data))]
+            )
             .clip(lower=0, upper=1)
             .sample(frac=1)
         )
@@ -617,7 +700,9 @@ class PropertySplit(BaseSplitter):
 
         if self.categorical:
             for df in out:
-                df[self.property_col] = np.where(df[self.property_col] <= self.threshold, int(0), int(1))
+                df[self.property_col] = np.where(
+                    df[self.property_col] <= self.threshold, int(0), int(1)
+                )
 
         data = data.drop("prop_norm", 1)
         return out
