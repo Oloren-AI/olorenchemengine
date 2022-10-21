@@ -56,6 +56,20 @@ class BaseEnsembleModel(BaseErrorModel):
 class BootstrapEnsemble(BaseEnsembleModel):
     """ BootstrapEnsemble estimates uncertainty based on the variance of several
         models trained on bootstrapped samples of the training data.
+
+        Parameters:
+            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
+            n_ensembles (int): Number of ensembles
+            bootstrap_size (float): Proportion of training data to train each ensemble model
+    
+    Example
+    ------------------------------
+    import olorenchemengine as oce
+
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.BootstrapEnsemble(n_ensembles = 10))
+    model.predict(test["Drug"], return_ci = True)
+    ------------------------------
     """
     
     @log_arguments
@@ -84,6 +98,19 @@ class BootstrapEnsemble(BaseEnsembleModel):
 class RandomForestEnsemble(BaseEnsembleModel):
     """ RandomForestEnsemble estimates uncertainty based on the variance of several
         random forest models initialized to different random states.
+
+        Parameters:
+            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
+            n_ensembles (int): Number of ensembles
+    
+    Example
+    ------------------------------
+    import olorenchemengine as oce
+
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestEnsemble(n_ensembles = 10))
+    model.predict(test["Drug"], return_ci = True)
+    ------------------------------
     """
     
     def build(
@@ -533,172 +560,71 @@ class ADAN(BaseErrorModel):
 
         return np.sqrt(y_mse).flatten()
 
-# class RandomForestErrorModel(BaseAggregateErrorModel):
-#     """ RandomForestErrorModel is an aggregate error model that predicts error
-#         bars based on an aggregate score determined by a random forest model
-#         trained on several BaseErrorModels.
+class AggregateErrorModel(BaseErrorModel):
+    """ AggregateErrorModel estimates uncertainty by aggregating ucertainty scores from
+        several different BaseErrorModels.
 
-#         Parameters:
-#             error_models (Union[BaseErrorModel, List[BaseErrorModel]]): a list
-#                 of error models whose scores will be features for the random
-#                 forest model
-
-#     Example
-#     ------------------------------
-#     import olorenchemengine as oce
-
-#     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-#     model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.KNNSimilarity()])
-#     model.predict(test["Drug"], return_ci = True)
-#     ------------------------------
-#     """
-
-#     def _train(self, scores, residuals):
-#         self.aggregate_model = RandomForestRegressor(**self.kwargs)
-#         self.aggregate_model.fit(scores, residuals)
-
-#     def _predict(self, scores, **kwargs):
-#         return self.aggregate_model.predict(scores, **kwargs)
-
-
-# class LinearRegressionErrorModel(BaseAggregateErrorModel):
-#     """ LinearRegressionErrorModel is an aggregate error model that predicts error
-#         bars based on a linear combination score from several BaseErrorModels.
-
-#         Parameters:
-#             error_models (Union[BaseErrorModel, List[BaseErrorModel]]): a list
-#                 of error models whose scores will be features for the random
-#                 forest model
-
-#     Example
-#     ------------------------------
-#     import olorenchemengine as oce
-
-#     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-#     model.fit_cv(train["Drug"], train["Y"], error_model = oce.LinearRegressionErrorModel([oce.SDC(), oce.KNNSimilarity()])
-#     model.predict(test["Drug"], return_ci = True)
-#     ------------------------------
-#     """
-
-#     def _train(self, scores, residuals):
-#         self.aggregate_model = LinearRegression(**self.kwargs)
-#         self.aggregate_model.fit(scores, residuals)
-
-#     def _predict(self, scores, **kwargs):
-#         return self.aggregate_model.predict(scores, **kwargs)
-
-
-# class BaseDomainApplicability(BaseClass):
-#     """ Depricated. See BaseErrorModel.
+        Parameters:
+            error_models (list of BaseErrorModel): list of error models to be aggregated
+            transformer (BaseTransformer): BaseTransformer used to aggregate uncertainty scores
     
-#     Base class for analyzing domain applicability of models and estimating
-#     prediction uncertainty.
+    Example
+    ------------------------------
+    import olorenchemengine as oce
 
-#     Parameters:
-#         model (BaseModel): trained model
-#         rep (BaseCompoundVecRepresentation): preprocessing representation
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit(train["Drug"], train["Y"])
+    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()], transformer = oce.FactorAnalysis())
+    error_model.build(model, train["Drug"], train["Y"])
+    error_model.fit(valid["Drug"], valid["Y"])
+    error_model.score(test["Drug"])
+    ------------------------------
+    """
 
-#     Methods:
-#         _fit: fits a method to a trained model and preprocessed training dataset, to be implemented internally by child classes
-#         fit: fits a method to a trained model and training dataset
-#         _test evaluates prediction uncertainty on a preprocessed testing dataset, to be implemented internally by child classes
-#         test: evaluates prediction uncertainty on a testing dataset
-#     """
+    @log_arguments
+    def __init__(self, error_models: List[BaseErrorModel], transformer: BaseTransformer):
+        if not isinstance(error_models, list):
+            raise TypeError("error_models must be a list")
+        self.error_models = error_models
+        self.transformer = transformer
 
-#     @log_arguments
-#     def __init__(self, model: BaseModel, rep: BaseCompoundVecRepresentation = None):
-#         self.model = model
-#         self.rep = rep
-#         self.results = None
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+    ):
+        for error_model in self.error_models:
+            error_model.build(model, X, y)
+        super().build(model, X, y)
 
-#     @abstractmethod
-#     def _fit(self, X, y, y_pred, **kwargs):
-#         """To be implemented by the child class; fits the method on the internally stored training dataset.
+    def fit(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y: Union[np.ndarray, list, pd.Series], **kwargs):
+        """Fits confidence scores to an external dataset
 
-#         Note: _fit shouldn"t be directly called by the user, rather it should be called indirectly via the fit method.
+        Args:
+            X (array-like): features, smiles
+            y (array-like): true values
+        """
+        y_pred = np.array(self.model.predict(X)).flatten()
+        scores = [error_model.calculate(X, y_pred) for error_model in self.error_models]
+        scores = np.transpose(np.stack(scores))
+        self.transformer.fit(scores)
 
-#         Parameters:
-#             X (np.ndarray): features, SMILES
-#             y (np.ndarray): values
-#             y_pred (np.ndarray): predicted values
-#         """
-#         pass
+        residuals = np.abs(np.array(y) - y_pred)
+        scores = self.transformer.transform(scores)
 
-#     def fit(self, dataset: BaseDataset, use_entire_dataset: bool = False, **kwargs):
-#         """Fits model uncertainty to a training dataset. Calls the _fit method on the provided dataset.
+        self._fit(residuals, scores, **kwargs)
 
-#         Parameters:
-#             dataset (BaseDataset): dataset used for fitting the method
-#             use_entire_dataset (bool): whether to use the entire dataset or only the training data
-#         """
-#         if use_entire_dataset:
-#             X = dataset.entire_dataset[0]
-#             y = np.array(dataset.entire_dataset[1])
-#         else:
-#             X = dataset.train_dataset[0]
-#             y = np.array(dataset.train_dataset[1])
+    def calculate(
+        self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y_pred: np.ndarray
+    ) -> np.ndarray:
+        """Computes aggregate error model score from inputs.
 
-#         y_pred = np.array(self.model.predict(X))
+        Args:
+            X: features, smiles
+            y_pred: predicted values
+        """
+        scores = [error_model.calculate(X, y_pred) for error_model in self.error_models]
+        scores = np.transpose(np.stack(scores))
 
-#         self._fit(X, y, y_pred, **kwargs)
-
-#     @abstractmethod
-#     def _test(self, X, y_pred, **kwargs):
-#         """To be implemented by the child class; tests the method on the provided preprocessed dataset.
-
-#         Note: _test shouldn"t be directly called by the user, rather it should be called indirectly via the test method.
-
-#         Parameters:
-#             X (np.ndarray): features, SMILES
-#             y_pred (np.ndarray): predicted values
-#         """
-#         pass
-
-#     def test(self, dataset: Union[BaseDataset, list, str], use_entire_dataset: bool = False, **kwargs):
-#         """Evaluates model uncertainty on a test dataset. Calls the _test method on the provided dataset.
-
-#         Parameters:
-#             dataset (BaseDataset, list, str): dataset being tested, sequence of SMILES
-#             use_entire_dataset (bool): whether to use the entire dataset or only the testing data
-#         """
-#         if isinstance(dataset, BaseDataset):
-#             if use_entire_dataset:
-#                 X = dataset.entire_dataset[0]
-#             else:
-#                 X = dataset.test_dataset[0]
-#         elif isinstance(dataset, list):
-#             X = dataset
-#         else:
-#             X = [dataset]
-
-#         y_pred = np.array(self.model.predict(X))
-
-#         return self._test(X, y_pred, **kwargs)
-
-#     def preprocess(self, X, y = None):
-#         """Preprocesses data into the appropriate representation.
-
-#         The preprocess for the model must return a np.ndarray, e.g. the model must use a
-#         BaseStructVecRepresentation or a representation must be passed
-
-#         Parameters:
-#             X (np.ndarray): features, SMILES
-#             y (np.ndarray): values
-
-#         Returns:
-#             X (np.ndarray): features, representation
-#         """
-#         if self.rep is None:
-#             X = self.model.preprocess(X, y)
-#         else:
-#             X = np.array(self.rep.convert(X))
-
-#         assert isinstance(X, np.ndarray), "The preprocess for the model must return a np.ndarray, e.g. the model must use a BaseCompoundVecRepresentation or a representation must be passed"
-
-#         return X
-
-#     def _save(self) -> dict:
-#         return super()._save()
-
-#     def _load(self, d: dict):
-#         return super()._load(d)
+        return self.transformer.transform(scores)
