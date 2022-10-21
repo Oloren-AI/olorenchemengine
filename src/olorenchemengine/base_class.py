@@ -368,6 +368,13 @@ class BaseModel(BaseClass):
         """
         return X
 
+    def visualize_parameters_ipynb(self):
+        from urllib.parse import quote
+        from IPython.display import IFrame, display
+
+        parameters = parameterize(self)
+        display(IFrame(f"https://oas.oloren.ai/jsonvis?json={quote(json.dumps(parameters))}", width=800, height=500))
+
     @abstractmethod
     def _fit(self, X_train, y_train: np.ndarray) -> None:
         """To be implemented by the child class; fits the model on the provided dataset given preprocessed features.
@@ -498,7 +505,7 @@ class BaseModel(BaseClass):
 
         self.fit(X_train, y_train)
 
-    def _unnormalize(self, Y): 
+    def _unnormalize(self, Y):
         if self.normalization == "zscore" and hasattr(self, "ymean") and hasattr(self, "ystd"):
             result = Y * self.ystd + self.ymean
         elif issubclass(type(self.normalization), BasePreprocessor):
@@ -875,12 +882,12 @@ class MakeMultiClassModel(BaseModel):
         predictions = (predictions.T / predictions.sum(axis=1)).T  # normalizes outputs between 0 and 1
 
         return predictions
-    
+
     def _save(self):
         d = super()._save()
         d.update({"classifiers": [saves(classifier) for classifier in self.classifiers],
                   "sorted_classes": self.sorted_classes})
-    
+
     def _load(self, d):
         super()._load(d)
         self.classifiers = [loads(classifier) for classifier in d["classifiers"]]
