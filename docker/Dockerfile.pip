@@ -1,0 +1,7 @@
+From python:3.8-alpine3.15
+RUN apk add --no-cache bash
+RUN apk add --no-cache curl
+RUN pip install --upgrade pip
+ARG COMMIT_SHA=unknown
+RUN bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)
+RUN python -c "import olorenchemengine as oce; oce.test_oce()"

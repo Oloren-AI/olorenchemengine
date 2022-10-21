@@ -34,4 +34,4 @@ RUN conda install python=3.8
 COPY install.sh install.sh
 RUN bash install.sh --docker --gpu
 COPY . .
-RUN pip install .
+RUN pip install "${PWD}[full]"
