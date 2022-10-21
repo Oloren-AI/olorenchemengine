@@ -44,7 +44,7 @@ _______________________________
 Installation
 _______________________________
 
-In a fresh Python 3.8 environment, you can install the package with the following command:
+In a fresh Python 3.8 environment, you can install the package with the following command, pasted into your terminal after activating your virtual environment:
 
 .. code-block:: bash
 
@@ -52,6 +52,8 @@ In a fresh Python 3.8 environment, you can install the package with the followin
 
 Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment. The reason why a fresh environment is preferred is because PyTorch Geometric/ PyTorch/ CUDA are very particular about versioning, which often are more muddled in existing environment.
 
+Here are some common error messages and solutions:
+https://oloren-ai.notion.site/Oloren-ChemEngine-Installation-FAQ-f2edec771a7f4350af5fdc361d494604
 _______________________________
 Docker
 _______________________________
