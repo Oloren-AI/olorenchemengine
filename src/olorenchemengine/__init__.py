@@ -104,6 +104,7 @@ from .ensemble import *
 from .gnn import *
 from .representations import *
 from .external import *
+from .beta import *
 from .splitters import *
 from .dataset import *
 from .interpret import *
