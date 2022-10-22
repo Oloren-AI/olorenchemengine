@@ -4,32 +4,27 @@ Here, we adapt its PyTorch Geometric implementation as in the `Github repository
 
 """
 
-from olorenchemengine.representations import AtomFeaturizer, BondFeaturizer, TorchGeometricGraph
-from olorenchemengine.base_class import BaseModel, log_arguments, QuantileTransformer
-
-from olorenchemengine.internal import mock_imports
-
-try:
-    from torch_geometric.loader import DataLoader
-    from torch_geometric.data import Data, Dataset
-    from torch_geometric.data.data import size_repr
-    from torch_geometric.nn import global_mean_pool
-    from torch_scatter import scatter_sum
-except ImportError:
-    mock_imports(globals(), "DataLoader", "Data", "Dataset", "size_repr", "global_mean_pool", "scatter_sum")
-
-
-try:
-    import torch
-    import torch.nn as nn
-    import torch.utils.data
-except ImportError:
-    mock_imports(globals(), "torch", "nn")
+import io
 
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.utils.data
 from rdkit import Chem
-import io
+from torch_geometric.data import Data, Dataset
+from torch_geometric.data.data import size_repr
+from torch_geometric.loader import DataLoader
+from torch_geometric.nn import global_mean_pool
+from torch_scatter import scatter_sum
 from tqdm import tqdm
+
+from olorenchemengine.base_class import BaseModel, QuantileTransformer, log_arguments
+from olorenchemengine.internal import mock_imports
+from olorenchemengine.representations import (
+    AtomFeaturizer,
+    BondFeaturizer,
+    TorchGeometricGraph,
+)
 
 
 class RevIndexedData(Data):
@@ -66,6 +61,7 @@ class RevIndexedData(Data):
             info = [size_repr(key, item, indent=2) for key, item in self]
             return "{}(\n{}\n)".format(cls, ",\n".join(info))
 
+
 class RevIndexedDataset(Dataset):
     def __init__(self, orig):
         super(RevIndexedDataset, self).__init__()
@@ -77,13 +73,15 @@ class RevIndexedDataset(Dataset):
     def __len__(self):
         return len(self.dataset)
 
+
 def onek_encoding_unk(value, choices):
     encoding = [0] * (len(choices) + 1)
     index = choices.index(value) if value in choices else -1
     encoding[index] = 1
     return encoding
 
-class ChemProp_AF (AtomFeaturizer):
+
+class ChemProp_AF(AtomFeaturizer):
     @property
     def length(self):
         return 151
@@ -91,7 +89,7 @@ class ChemProp_AF (AtomFeaturizer):
     def convert(self, atom: Chem.Atom) -> np.ndarray:
 
         ATOM_FEATURES = {
-            "atomic_num": list(range(1,119)),
+            "atomic_num": list(range(1, 119)),
             "degree": [0, 1, 2, 3, 4, 5],
             "formal_charge": [-1, -2, 1, 2, 0],
             "chiral_tag": [0, 1, 2, 3],
@@ -118,9 +116,10 @@ class ChemProp_AF (AtomFeaturizer):
         )  # scaled to about the same range as other features
         return np.array(features)
 
-class ChemProp_BF (BondFeaturizer):
+
+class ChemProp_BF(BondFeaturizer):
     @property
-    def length (self):
+    def length(self):
         return 14
 
     def convert(self, bond: Chem.Bond) -> np.ndarray:
@@ -140,10 +139,11 @@ class ChemProp_BF (BondFeaturizer):
             fbond += onek_encoding_unk(int(bond.GetStereo()), list(range(6)))
         return np.array(fbond)
 
-class ChemPropDataLoading (TorchGeometricGraph):
+
+class ChemPropDataLoading(TorchGeometricGraph):
     @log_arguments
     def __init__(self):
-        super().__init__(ChemProp_AF(), ChemProp_BF(), log = False)
+        super().__init__(ChemProp_AF(), ChemProp_BF(), log=False)
 
     def _convert(self, smiles, y=None, **kwargs):
         data = super()._convert(smiles, y=y, **kwargs)
@@ -161,15 +161,18 @@ def initialize_weights(model: nn.Module) -> None:
         else:
             nn.init.xavier_normal_(param)
 
+
 def directed_mp(message, edge_index, revedge_index):
     m = scatter_sum(message, edge_index[1], dim=0)
     m_all = m[edge_index[0]]
     m_rev = message[revedge_index]
     return m_all - m_rev
 
+
 def aggregate_at_nodes(num_nodes, message, edge_index):
     m = scatter_sum(message, edge_index[1], dim=0, dim_size=num_nodes)
     return m[torch.arange(num_nodes)]
+
 
 #### Key Message-Passing algorithm in the model ####
 class DMPNNEncoder(nn.Module):
@@ -210,6 +213,7 @@ class DMPNNEncoder(nn.Module):
         # readout: pyg global pooling
         return global_mean_pool(node_attr, batch)
 
+
 #### General ChemProp model training method, to be used with _fit in the ChemPropModel() class implementation. ####
 def train(config, loader, setting, device=torch.device("cpu")):
     criterion = config["loss"]
@@ -218,7 +222,7 @@ def train(config, loader, setting, device=torch.device("cpu")):
     scheduler = config["scheduler"]
 
     if setting == "classification":
-        criterion = nn.BCEWithLogitsLoss(reduction = "none")
+        criterion = nn.BCEWithLogitsLoss(reduction="none")
     else:
         criterion = nn.MSELoss()
 
@@ -229,14 +233,15 @@ def train(config, loader, setting, device=torch.device("cpu")):
 
         optimizer.zero_grad()
         out = model(batch)
-        loss = criterion(torch.squeeze(out,1), batch.y.float())
+        loss = criterion(torch.squeeze(out, 1), batch.y.float())
         loss.sum().backward()
 
         optimizer.step()
         scheduler.step()
 
+
 #### General ChemProp model prediction method, to be used with _predict in the ChemPropModel() class implementation. ####
-def predict(config, loader, setting = "classification", device=torch.device("cpu")):
+def predict(config, loader, setting="classification", device=torch.device("cpu")):
     model = config["model"]
 
     model = model.to(device)
@@ -253,6 +258,7 @@ def predict(config, loader, setting = "classification", device=torch.device("cpu
 
     predictions = np.concatenate([y.cpu().numpy() for y in y_pred])
     return predictions.flatten()
+
 
 class ChemPropModel(BaseModel):
     """ChemProp is the model presented in `Analyzing Learned Molecular Representations for Property Prediction <hhttps://doi.org/10.1021/acs.jcim.9b00237>` _.
@@ -277,15 +283,17 @@ class ChemPropModel(BaseModel):
     """
 
     @log_arguments
-    def __init__(self,
+    def __init__(
+        self,
         dropout_rate: float = 0.0,
         epochs: int = 3,
         batch_size: int = 50,
         lr: float = 1e-3,
         hidden_size: int = 300,
-        depth: int =3,
-        map_location = "cuda:0",
-         **kwargs):
+        depth: int = 3,
+        map_location="cuda:0",
+        **kwargs
+    ):
 
         self.representation = ChemPropDataLoading()
 
@@ -321,7 +329,7 @@ class ChemPropModel(BaseModel):
 
     def preprocess(self, X, y, **kwargs):
         if y is None:
-            y = [None]*len(X)
+            y = [None] * len(X)
         return self.representation.convert(X, ys=y)
 
     def _fit(self, X, y, **kwargs):
@@ -338,7 +346,9 @@ class ChemPropModel(BaseModel):
             "scheduler": self.scheduler,
         }
 
-        if (len(np.unique(y, return_counts=True)) > 2 and (((np.unique(y)).size / (y.size)) > 0.1)):
+        if len(np.unique(y, return_counts=True)) > 2 and (
+            ((np.unique(y)).size / (y.size)) > 0.1
+        ):
             self.setting = "regression"
 
         for epoch in range(self.epochs):

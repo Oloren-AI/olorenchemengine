@@ -1,35 +1,35 @@
 import math
 
 import torch
-from torch import nn
 import torch.nn.functional as F
-from torch.nn import Parameter
-from torch.nn import Linear, LayerNorm, ReLU
-
 import torch_sparse
-from torch_sparse import SparseTensor, matmul, fill_diag, sum as sparsesum, mul
-from torch_scatter import scatter
-from torch_scatter import scatter_add
-
-from torch_geometric.nn import MessagePassing, GCNConv
+from torch import nn
+from torch.nn import LayerNorm, Linear, Parameter, ReLU
+from torch_geometric.nn import (
+    GCNConv,
+    MessagePassing,
+    global_add_pool,
+    global_max_pool,
+    global_mean_pool,
+)
 from torch_geometric.utils import add_self_loops, degree, softmax
-from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_pool
-
 from torch_geometric.utils.num_nodes import maybe_num_nodes
+from torch_scatter import scatter, scatter_add
+from torch_sparse import SparseTensor, fill_diag, matmul, mul
+from torch_sparse import sum as sparsesum
 
-num_atom_type = 119 # including the extra mask tokens
+num_atom_type = 119  # including the extra mask tokens
 num_chirality_tag = 3
 
-num_bond_type = 5 # including aromatic and self-loop edge
-num_bond_direction = 3 
+num_bond_type = 5  # including aromatic and self-loop edge
+num_bond_direction = 3
+
 
 class GINEConv(MessagePassing):
     def __init__(self, emb_dim):
         super(GINEConv, self).__init__()
         self.mlp = nn.Sequential(
-            nn.Linear(emb_dim, 2*emb_dim), 
-            nn.ReLU(), 
-            nn.Linear(2*emb_dim, emb_dim)
+            nn.Linear(emb_dim, 2 * emb_dim), nn.ReLU(), nn.Linear(2 * emb_dim, emb_dim)
         )
         self.edge_embedding1 = nn.Embedding(num_bond_type, emb_dim)
         self.edge_embedding2 = nn.Embedding(num_bond_direction, emb_dim)
@@ -43,12 +43,13 @@ class GINEConv(MessagePassing):
 
         # add features corresponding to self-loop edges.
         self_loop_attr = torch.zeros(x.size(0), 2)
-        self_loop_attr[:,0] = 4 # bond type for self-loop edge
+        self_loop_attr[:, 0] = 4  # bond type for self-loop edge
         self_loop_attr = self_loop_attr.to(edge_attr.device).to(edge_attr.dtype)
         edge_attr = torch.cat((edge_attr, self_loop_attr), dim=0)
 
-        edge_embeddings = self.edge_embedding1(edge_attr[:,0]) + \
-            self.edge_embedding2(edge_attr[:,1])
+        edge_embeddings = self.edge_embedding1(edge_attr[:, 0]) + self.edge_embedding2(
+            edge_attr[:, 1]
+        )
 
         return self.propagate(edge_index, x=x, edge_attr=edge_embeddings)
 
@@ -69,9 +70,17 @@ class GINet(nn.Module):
     Output:
         node representations
     """
-    def __init__(self, 
-        task='classification', num_layer=5, emb_dim=300, feat_dim=512, 
-        drop_ratio=0, pool='mean', pred_n_layer=2, pred_act='softplus'
+
+    def __init__(
+        self,
+        task="classification",
+        num_layer=5,
+        emb_dim=300,
+        feat_dim=512,
+        drop_ratio=0,
+        pool="mean",
+        pred_n_layer=2,
+        pred_act="softplus",
     ):
         super(GINet, self).__init__()
         self.num_layer = num_layer
@@ -95,54 +104,52 @@ class GINet(nn.Module):
         for layer in range(num_layer):
             self.batch_norms.append(nn.BatchNorm1d(emb_dim))
 
-        if pool == 'mean':
+        if pool == "mean":
             self.pool = global_mean_pool
-        elif pool == 'max':
+        elif pool == "max":
             self.pool = global_max_pool
-        elif pool == 'add':
+        elif pool == "add":
             self.pool = global_add_pool
         self.feat_lin = nn.Linear(self.emb_dim, self.feat_dim)
 
-        if self.task == 'classification':
+        if self.task == "classification":
             out_dim = 1
-        elif self.task == 'regression':
+        elif self.task == "regression":
             out_dim = 1
-        
+
         self.pred_n_layer = max(1, pred_n_layer)
 
-        if pred_act == 'relu':
+        if pred_act == "relu":
             pred_head = [
-                nn.Linear(self.feat_dim, self.feat_dim//2), 
-                nn.ReLU(inplace=True)
+                nn.Linear(self.feat_dim, self.feat_dim // 2),
+                nn.ReLU(inplace=True),
             ]
             for _ in range(self.pred_n_layer - 1):
-                pred_head.extend([
-                    nn.Linear(self.feat_dim//2, self.feat_dim//2), 
-                    nn.ReLU(inplace=True),
-                ])
-            pred_head.append(nn.Linear(self.feat_dim//2, out_dim))
-        elif pred_act == 'softplus':
-            pred_head = [
-                nn.Linear(self.feat_dim, self.feat_dim//2), 
-                nn.Softplus()
-            ]
+                pred_head.extend(
+                    [
+                        nn.Linear(self.feat_dim // 2, self.feat_dim // 2),
+                        nn.ReLU(inplace=True),
+                    ]
+                )
+            pred_head.append(nn.Linear(self.feat_dim // 2, out_dim))
+        elif pred_act == "softplus":
+            pred_head = [nn.Linear(self.feat_dim, self.feat_dim // 2), nn.Softplus()]
             for _ in range(self.pred_n_layer - 1):
-                pred_head.extend([
-                    nn.Linear(self.feat_dim//2, self.feat_dim//2), 
-                    nn.Softplus()
-                ])
+                pred_head.extend(
+                    [nn.Linear(self.feat_dim // 2, self.feat_dim // 2), nn.Softplus()]
+                )
         else:
-            raise ValueError('Undefined activation function')
-        
-        pred_head.append(nn.Linear(self.feat_dim//2, out_dim))
+            raise ValueError("Undefined activation function")
+
+        pred_head.append(nn.Linear(self.feat_dim // 2, out_dim))
         self.pred_head = nn.Sequential(*pred_head)
 
     def forward(self, data):
         x = data.x
         edge_index = data.edge_index
         edge_attr = data.edge_attr
-        
-        h = self.x_embedding1(x[:,0]) + self.x_embedding2(x[:,1])
+
+        h = self.x_embedding1(x[:, 0]) + self.x_embedding2(x[:, 1])
 
         for layer in range(self.num_layer):
             h = self.gnns[layer](h, edge_index, edge_attr)
@@ -154,7 +161,7 @@ class GINet(nn.Module):
 
         h = self.pool(h, data.batch)
         h = self.feat_lin(h)
-        
+
         return h, self.pred_head(h)
 
     def load_my_state_dict(self, state_dict):
@@ -167,15 +174,16 @@ class GINet(nn.Module):
                 param = param.data
             own_state[name].copy_(param)
 
+
 def gcn_norm(edge_index, num_nodes=None):
     num_nodes = maybe_num_nodes(edge_index, num_nodes)
 
-    edge_weight = torch.ones((edge_index.size(1), ), device=edge_index.device)
+    edge_weight = torch.ones((edge_index.size(1),), device=edge_index.device)
 
     row, col = edge_index[0], edge_index[1]
     deg = scatter_add(edge_weight, col, dim=0, dim_size=num_nodes)
     deg_inv_sqrt = deg.pow_(-0.5)
-    deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float('inf'), 0)
+    deg_inv_sqrt.masked_fill_(deg_inv_sqrt == float("inf"), 0)
     return edge_index, deg_inv_sqrt[row] * edge_weight * deg_inv_sqrt[col]
 
 
@@ -208,11 +216,13 @@ class GCNConv(MessagePassing):
 
         # add features corresponding to self-loop edges.
         self_loop_attr = torch.zeros(x.size(0), 2)
-        self_loop_attr[:,0] = 4 #bond type for self-loop edge
+        self_loop_attr[:, 0] = 4  # bond type for self-loop edge
         self_loop_attr = self_loop_attr.to(edge_attr.device).to(edge_attr.dtype)
         edge_attr = torch.cat((edge_attr, self_loop_attr), dim=0)
-        
-        edge_embeddings = self.edge_embedding1(edge_attr[:,0]) + self.edge_embedding2(edge_attr[:,1])
+
+        edge_embeddings = self.edge_embedding1(edge_attr[:, 0]) + self.edge_embedding2(
+            edge_attr[:, 1]
+        )
 
         edge_index, __ = gcn_norm(edge_index)
 
@@ -235,7 +245,15 @@ class GCNConv(MessagePassing):
 
 
 class GCN(nn.Module):
-    def __init__(self, task='classification', num_layer=5, emb_dim=300, feat_dim=256, drop_ratio=0, pool='mean'):
+    def __init__(
+        self,
+        task="classification",
+        num_layer=5,
+        emb_dim=300,
+        feat_dim=256,
+        drop_ratio=0,
+        pool="mean",
+    ):
         super(GCN, self).__init__()
         self.num_layer = num_layer
         self.emb_dim = emb_dim
@@ -262,28 +280,28 @@ class GCN(nn.Module):
         for layer in range(num_layer):
             self.batch_norms.append(nn.BatchNorm1d(emb_dim))
 
-        if pool == 'mean':
+        if pool == "mean":
             self.pool = global_mean_pool
-        elif pool == 'add':
+        elif pool == "add":
             self.pool = global_add_pool
-        elif pool == 'max':
+        elif pool == "max":
             self.pool = global_max_pool
         else:
-            raise ValueError('Not defined pooling!')
-        
+            raise ValueError("Not defined pooling!")
+
         self.feat_lin = nn.Linear(self.emb_dim, self.feat_dim)
 
-        if self.task == 'classification':
+        if self.task == "classification":
             self.pred_head = nn.Sequential(
-                nn.Linear(self.feat_dim, self.feat_dim//2), 
+                nn.Linear(self.feat_dim, self.feat_dim // 2),
                 nn.Softplus(),
-                nn.Linear(self.feat_dim//2, 1)
+                nn.Linear(self.feat_dim // 2, 1),
             )
-        elif self.task == 'regression':
+        elif self.task == "regression":
             self.pred_head = nn.Sequential(
-                nn.Linear(self.feat_dim, self.feat_dim//2), 
+                nn.Linear(self.feat_dim, self.feat_dim // 2),
                 nn.Softplus(),
-                nn.Linear(self.feat_dim//2, 1)
+                nn.Linear(self.feat_dim // 2, 1),
             )
 
     def forward(self, data):
@@ -291,7 +309,7 @@ class GCN(nn.Module):
         edge_index = data.edge_index
         edge_attr = data.edge_attr
 
-        h = self.x_embedding1(x[:,0]) + self.x_embedding2(x[:,1])
+        h = self.x_embedding1(x[:, 0]) + self.x_embedding2(x[:, 1])
 
         for layer in range(self.num_layer):
             h = self.gnns[layer](h, edge_index, edge_attr)

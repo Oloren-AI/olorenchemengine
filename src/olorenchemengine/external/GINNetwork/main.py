@@ -6,13 +6,15 @@ Wrapping the GIN network family based on:
 """
 from olorenchemengine.base_class import log_arguments
 from olorenchemengine.gnn import BaseLightningModule
+
 from .operations import GINNetwork
 
+
 class GINModel(BaseLightningModule):
-    
+
     """
     GINModel class from `GINEPLUS GitHub repository <https://github.com/RBrossard/GINEPLUS>`.
-    
+
     Parameters:
         task_type (str): Type of task to perform. Options are 'regression' or 'classification'. This
             task_type will automatically be set by BaseTorchGeometricModel and usually
@@ -26,19 +28,32 @@ class GINModel(BaseLightningModule):
         conv_radius (int): Radius of convolution.
         optim (str): Optimizer to use. Options are 'adam'.
     """
+
     @log_arguments
-    def __init__(self, task_type = "classification", hidden: str = 100, lr: float = 0.001,
-                 layers=3, dropout=0.5, virtual_node=False,
-                 conv_radius=3, conv_type='gin+',optim="adam",**kwargs):
-        assert conv_type in ['gcn', 'gin', 'gin+', 'naivegin+']
+    def __init__(
+        self,
+        task_type="classification",
+        hidden: str = 100,
+        lr: float = 0.001,
+        layers=3,
+        dropout=0.5,
+        virtual_node=False,
+        conv_radius=3,
+        conv_type="gin+",
+        optim="adam",
+        **kwargs
+    ):
+        assert conv_type in ["gcn", "gin", "gin+", "naivegin+"]
         super().__init__(optim=optim)
 
         # Network
         out_dim = 1
-        self.network = GINNetwork(hidden=hidden,
-                                         out_dim=out_dim,
-                                         layers=layers,
-                                         dropout=dropout,
-                                         virtual_node=virtual_node,
-                                         k=conv_radius,
-                                         conv_type=conv_type)
+        self.network = GINNetwork(
+            hidden=hidden,
+            out_dim=out_dim,
+            layers=layers,
+            dropout=dropout,
+            virtual_node=virtual_node,
+            k=conv_radius,
+            conv_type=conv_type,
+        )

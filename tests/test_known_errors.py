@@ -1,11 +1,21 @@
-import pytest
-import olorenchemengine as oce
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
+import olorenchemengine as oce
 from olorenchemengine.internal import download_public_file
 
 __author__ = "Oloren AI"
 __copyright__ = "Oloren AI"
+
+
+def remote(func):
+    def wrapper(*args, **kwargs):
+        with oce.Remote("http://api.oloren.ai:5000") as remote:
+            func(*args, **kwargs)
+
+    return wrapper
+
 
 @pytest.fixture
 def example_data1():
@@ -13,29 +23,44 @@ def example_data1():
     df = pd.read_csv(file_path)
     return df
 
-#RuntimeError: Not compiled with CUDA support
+
+# RuntimeError: Not compiled with CUDA support
+
+
 def test_TorchGeometric(example_data1):
-    data = oce.RandomSplit(split_proportions=[0.8 ,0.0, 0.2]).split(example_data1)
+    data = oce.RandomSplit(split_proportions=[0.8, 0.0, 0.2]).split(example_data1)
     train, valid, test = data[0], data[1], data[2]
     s = "{'BC_class_name': 'BaseTorchGeometricModel', 'args': [{'BC_class_name': 'GINModel', 'args': [], 'kwargs': {'batch_size': 100, 'conv_radius': 3, 'conv_type': 'gin+', 'dataset': 'molpcba', 'dropout': 0.5, 'hidden': 100, 'layers': 3, 'lr': 0.001, 'optim': 'adam', 'task_type': 'classification', 'virtual_node': False}}], 'kwargs': {'auto_lr_find': True, 'batch_size': 16, 'epochs': 5, 'log': True, 'lr': 0.0001, 'pos_weight': 'balanced', 'preinitialized': False, 'representation': {'BC_class_name': 'TorchGeometricGraph', 'args': [], 'kwargs': {'atom_featurizer': {'BC_class_name': 'OGBAtomFeaturizer', 'args': [], 'kwargs': {}}, 'bond_featurizer': {'BC_class_name': 'OGBBondFeaturizer', 'args': [], 'kwargs': {}}}}}}"
-    s = s.replace("'", "\"").replace("True", "true").replace("False", "false").replace("None", "null")
-    model=(oce.create_BC(s))
+    s = (
+        s.replace("'", '"')
+        .replace("True", "true")
+        .replace("False", "false")
+        .replace("None", "null")
+    )
+    model = oce.create_BC(s)
 
-    model.fit(train['Smiles'], train['pChEMBL Value'])
-    preds=model.predict(test['Smiles'])
+    model.fit(train["Smiles"], train["pChEMBL Value"])
+    preds = model.predict(test["Smiles"])
 
-#TypeError: unsupported operand type(s) for +: 'Mol2Vec' and 'DescriptastorusDescriptor'
+
+# TypeError: unsupported operand type(s) for +: 'Mol2Vec' and 'DescriptastorusDescriptor'
+
+
 def test_ConcatMol2Vec():
-    oce.DescriptastorusDescriptor('morgan3counts') + oce.Mol2Vec()
-    oce.Mol2Vec() + oce.DescriptastorusDescriptor('morgan3counts')
+    oce.DescriptastorusDescriptor("morgan3counts") + oce.Mol2Vec()
+    oce.Mol2Vec() + oce.DescriptastorusDescriptor("morgan3counts")
 
-#ValueError: all the input arrays must have same number of dimensions, but the array at index 0 has 2 dimension(s) and the array at index 1 has 1 dimension(s)
+
+# ValueError: all the input arrays must have same number of dimensions, but the array at index 0 has 2 dimension(s) and the array at index 1 has 1 dimension(s)
+
+
 def test_ConcatMordred(example_data1):
-    rep = oce.DescriptastorusDescriptor('morgan3counts') + oce.MordredDescriptor()
-    rep.convert('C')
+    rep = oce.DescriptastorusDescriptor("morgan3counts") + oce.MordredDescriptor()
+    rep.convert("C")
 
     model = oce.RandomForestModel(representation=rep, n_estimators=10)
-    model.fit(example_data1['Smiles'], example_data1['pChEMBL Value'])
+    model.fit(example_data1["Smiles"], example_data1["pChEMBL Value"])
+
 
 '''
 Alternative code I found working taken from DeepChem
