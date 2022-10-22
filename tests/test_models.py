@@ -27,7 +27,6 @@ def example_data2():
     df = pd.read_csv(file_path)[:10]
     return train_test_split(df["Smiles"], df["pChEMBL Value"], test_size=0.33, random_state=42)
 
-
 @pytest.fixture
 def example_data3():
     file_path = download_public_file("sample-csvs/sample_data3.csv")
@@ -239,6 +238,10 @@ def test_smiles_transformer(example_data):
     model = RandomForestModel(HondaSTRep(), n_estimators=10,)
     train_predict_slf(model, example_data)
 
+def test_supergat(example_data):
+    from olorenchemengine.gnn import BaseTorchGeometricModel, SuperGATModel
+    model = BaseTorchGeometricModel(SuperGATModel(), epochs=1, batch_size=64)
+    train_predict_slf(model, example_data)
 
 @pytest.mark.parametrize("rep", [(rep) for rep in oce.BaseCompoundVecRepresentation.AllInstances()])
 def test_all_base_compound_vecs(example_data, rep):
