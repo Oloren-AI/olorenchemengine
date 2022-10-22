@@ -434,10 +434,16 @@ class SuperGATModel(BaseLightningModule):
 
         self.conv1 = SuperGATConv(dimensions[0], self.hidden_channels, heads=self.heads,
                                   dropout=self.dropout, attention_type=self.attention_type,
-                                  edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,)
+                                  edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,
+                                  negative_slope=self.negative_slope, add_self_loops=self.add_self_loops,
+                                  bias=self.bias, neg_sample_ratio=self.neg_sample_ratio,
+                                  edge_sample_ratio=self.edge_sample_ratio)
         self.conv2 = SuperGATConv(self.hidden_channels*self.heads, 1, heads=self.heads,
                                   concat=False, dropout=self.dropout, attention_type=self.attention_type,
-                                  edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,)
+                                  edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,
+                                  negative_slope=self.negative_slope, add_self_loops=self.add_self_loops,
+                                  bias=self.bias, neg_sample_ratio=self.neg_sample_ratio,
+                                  edge_sample_ratio=self.edge_sample_ratio)
 
     def forward(self, batch):
         import torch.nn.functional as F
@@ -453,9 +459,9 @@ class SuperGATModel(BaseLightningModule):
 
         del dtype
         
-        x = F.dropout(x, p=0.6, training=self.training)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         x = F.elu(self.conv1(x, edge_index))
-        x = F.dropout(x, p=0.6, training=self.training)
+        x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv2(x, edge_index)
         x = global_mean_pool(x, batch.batch)
         return F.log_softmax(x, dim=-1)
