@@ -1090,36 +1090,31 @@ class BaseErrorModel(BaseClass):
         scores = np.array(self.calculate(X, y_pred))
         self._fit(residuals, scores, **kwargs)
 
-    def fit_cv(
-        self,
-        n_splits: int = 10,
-        test_size_range: Union[tuple, list] = (0.05, 0.5),
-        **kwargs,
-    ):
+    def fit_cv(self, n_splits: int = 5, **kwargs):
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
-            n_splits (int): number of cross validations
-            test_size_range (tuple or list): range of test split proportions
+            n_splits (int): Number of cross validation splits, default 5
         """
+        from sklearn.model_selection import KFold
+        from sklearn.calibration import calibration_curve
+
         residuals = None
         scores = None
-        splits = np.linspace(*test_size_range, n_splits)
+        kf = KFold(n_splits=n_splits)
 
-        from sklearn.model_selection import train_test_split
-
-        for test_size in splits:
-            print("cross validating with split={}".format(np.round(test_size, 3)))
-            X_train, X_test, y_train, y_test = train_test_split(
-                self.X_train, self.y_train, test_size=test_size, random_state=0
-            )
+        for train_index, test_index in kf.split(X):
+            X_train, X_test = self.X_train[train_index], self.X_train[test_index]
+            y_train, y_test = self.y_train[train_index], self.y_train[test_index]
             model = self.model.copy()
             model.fit(X_train, y_train)
+
             y_pred_test = np.array(model.predict(X_test)).flatten()
+            pred_error = np.abs(y_test - y_pred_test)
             if residuals is None:
-                residuals = np.abs(y_test - y_pred_test)
+                residuals = pred_error
             else:
-                residuals = np.concatenate((residuals, np.abs(y_test - y_pred_test)))
+                residuals = np.concatenate((residuals, pred_error))
 
             em = type(self)(*self.args, **self.kwargs)
             em.build(model, X_train, y_train)
@@ -1135,7 +1130,7 @@ class BaseErrorModel(BaseClass):
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        quantile: float = 0.8,
+        quantile: float = 0.95,
         method: str = "roll",
         window: int = 100,
         bins: int = 10,
@@ -1167,15 +1162,9 @@ class BaseErrorModel(BaseClass):
             y = np.array(y)
         elif method == "qbin":
             bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
-            X = np.array(
-                [np.mean(scores[bin_labels == i]) for i in range(max(bin_labels) + 1)]
-            )
-            y = np.array(
-                [
-                    pd.Series(residuals[bin_labels == i]).quantile(quantile)
-                    for i in range(max(bin_labels) + 1)
-                ]
-            )
+            n_labels = int(max(bin_labels) + 1)
+            X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
+            y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(n_labels)])
         elif method == "roll":
             results = list(zip(scores, residuals))
             scores, residuals = zip(*sorted(results))
@@ -1190,10 +1179,10 @@ class BaseErrorModel(BaseClass):
         from scipy.optimize import curve_fit
 
         funcs = [
-            lambda x, a, b: a * np.exp(b * x),
-            lambda x, a, b: a * np.log(x) + b,
-            lambda x, a, b: a * x**b,
-            lambda x, a, b: a * x + b,
+            lambda x, a, b, c: a * np.exp(b * x) + c,
+            lambda x, a, b, c: a * np.log(x + b) + c,
+            lambda x, a, b, c: a * x ** b + c,
+            lambda x, a, b: a * x + b
         ]
         min_mse = None
         for func in funcs:
@@ -1211,9 +1200,10 @@ class BaseErrorModel(BaseClass):
                 opt_popt = popt
                 min_mse = mse
         X_min, X_max = np.min(X), np.max(X)
-        self.reg = np.vectorize(
-            lambda x: opt_func(max(min(x, X_max), X_min), *opt_popt)
-        )
+        if opt_func(X_min, *opt_popt) < opt_func(X_max, *opt_popt):
+            self.reg = np.vectorize(lambda x: opt_func(max(x, X_min), *opt_popt))
+        else:
+            self.reg = np.vectorize(lambda x: opt_func(min(x, X_max), *opt_popt))
 
         plt.xlabel(self.__class__.__name__)
         plt.ylabel("Absolute Error")
@@ -1311,155 +1301,3 @@ class BaseErrorModel(BaseClass):
                 min_per_bin=min_per_bin,
                 filename=filename,
             )
-
-
-class BaseAggregateErrorModel(BaseErrorModel):
-    """Base class for aggregate error models.
-
-    Parameters:
-        error_models (BaseErrorModel or list of BaseErrorModel): list of error models to be aggregated
-    """
-
-    @log_arguments
-    def __init__(
-        self, error_models: Union[BaseErrorModel, List[BaseErrorModel]], **kwargs
-    ):
-        if not isinstance(error_models, list):
-            error_models = [error_models]
-        self.error_models = error_models
-        self.kwargs = kwargs
-
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-    ):
-        for error_model in self.error_models:
-            error_model.build(model, X, y)
-        super().build(model, X, y)
-
-    def train(
-        self,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-    ):
-        """Trains the aggregate model to a validation dataset.
-
-        Args:
-            X (array-like): features, smiles
-            y (array-like): true values
-        """
-        y_pred = np.array(self.model.predict(X)).flatten()
-        residuals = np.abs(np.array(y) - y_pred)
-
-        scores = np.transpose(
-            np.stack([self.get_scores(em, X, y_pred) for em in self.error_models])
-        )
-        self._train(scores, residuals)
-
-    def train_cv(
-        self, n_splits: int = 9, test_size_range: Union[tuple, list] = (0.1, 0.9)
-    ):
-        """Trains the aggregate model to the training dataset via cross validation.
-
-        Args:
-            n_splits (int): number of cross validations
-            test_size_range (tuple or list): range of test split proportions
-        """
-        residuals = None
-        scores = None
-        splits = np.linspace(*test_size_range, n_splits)
-
-        from sklearn.model_selection import train_test_split
-
-        for test_size in splits:
-            print("cross validating with split={}".format(np.round(test_size, 3)))
-            X_train, X_test, y_train, y_test = train_test_split(
-                self.X_train, self.y_train, test_size=test_size, random_state=0
-            )
-            model = self.model.copy()
-            model.fit(X_train, y_train)
-            y_pred_test = np.array(model.predict(X_test)).flatten()
-            if residuals is None:
-                residuals = np.abs(y_test - y_pred_test)
-            else:
-                residuals = np.concatenate((residuals, np.abs(y_test - y_pred_test)))
-
-            new_scores = []
-            for error_model in self.error_models:
-                em = type(error_model)(*error_model.args, **error_model.kwargs)
-                em.build(model, X_train, y_train)
-                new_scores.append(self.get_scores(em, X_test, y_pred_test))
-            new_scores = np.transpose(np.stack(new_scores))
-            if scores is None:
-                scores = new_scores
-            else:
-                scores = np.concatenate((scores, new_scores))
-
-        self._train(scores, residuals)
-
-    def calculate(
-        self,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y_pred: np.ndarray,
-        **kwargs,
-    ) -> np.ndarray:
-        """Computes aggregate error model score from inputs.
-
-        Args:
-            X: features, smiles
-            y_pred: predicted values
-        """
-        assert hasattr(self, "aggregate_model"), "aggregate model not yet trained"
-
-        scores = [self.get_scores(em, X, y_pred) for em in self.error_models]
-        scores = np.transpose(np.stack(scores))
-        return self._predict(scores, **kwargs)
-
-    def get_scores(
-        self,
-        em: BaseErrorModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y_pred: np.ndarray,
-    ) -> np.ndarray:
-        """Gets confidence scores from a model, inputs, and keyword arguments.
-
-        Args:
-            em (BaseErrorModel): error model
-            X: features, smiles
-            y_pred: predicted values
-        """
-        return em.calculate(X, y_pred)
-
-    @abstractmethod
-    def _train(self, scores: np.ndarray, residuals: np.ndarray, **kwargs):
-        """To be implemented by the child class; trains the aggregate model based on residuals
-        and confidence scores and assigns the trained model to `self.aggregate_model`.
-
-        Args:
-            scores (np.ndarray): confidence scores
-            residuals (np.ndarray): residuals
-        """
-        pass
-
-    @abstractmethod
-    def _predict(self, scores: np.ndarray, **kwargs) -> np.ndarray:
-        """To be implemented by the child class; predicts from the aggregate model based on
-        confdience scores.
-
-        Args:
-            scores (np.ndarray): confidence scores
-        """
-        pass
-
-    def _save(self) -> dict:
-        d = super()._save()
-        if hasattr(self, "aggregate_model"):
-            d.update({"aggregate_model": saves(self.aggregate_model)})
-        return d
-
-    def _load(self, d) -> None:
-        super()._load(d)
-        if "aggregate_model" in d.keys():
-            self.aggregate_model = loads(d["aggregate_model"])

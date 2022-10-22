@@ -166,6 +166,7 @@ class RandomForestModel(BaseSKLearnModel):
         class_weight=None,
         bootstrap=True,
         n_estimators=100,
+        random_state=None,
         **kwargs
     ):
         if not class_weight is None:
@@ -180,8 +181,9 @@ class RandomForestModel(BaseSKLearnModel):
             max_features=max_features,
             min_samples_split=4,
             min_samples_leaf=4,
-            max_depth=max_depth,
+            max_depth = max_depth,
             n_jobs=-1,
+            random_state=random_state
         )
         classifier = RandomForestClassifier(
             max_features=max_features,
@@ -189,6 +191,7 @@ class RandomForestModel(BaseSKLearnModel):
             min_samples_leaf=4,
             n_estimators=n_estimators,
             n_jobs=-1,
+            random_state=random_state,
             criterion=criterion,
             bootstrap=bootstrap,
             max_depth=max_depth,

@@ -14,6 +14,92 @@ from .basics import *
 from .dataset import *
 from .representations import *
 
+class BaseEnsembleModel(BaseErrorModel):
+    """ BaseEnsembleModel is the base class for error models that estimate
+        uncertainty based on the variance of an ensemble of models.
+    """
+
+    @log_arguments
+    def __init__(self, ensemble_model = None, n_ensembles = 16):            
+        self.ensemble_model = ensemble_model
+        self.n_ensembles = n_ensembles
+
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+    ):
+        super().build(model, X, y)
+        if self.ensemble_model is None:
+            self.ensemble_model = self.model.copy()
+        self.ensembles = []
+    
+    def calculate(self, X, y_pred):
+        predictions = np.stack([model.predict(X) for model in tqdm(self.ensembles)])
+        return np.var(predictions, axis=0)
+
+    def _save(self) -> dict:
+        d = super()._save()
+        if hasattr(self, "ensembles"):
+            d.update({"ensembles": [model._save() for model in self.ensembles]})
+        return d
+
+    def _load(self, d) -> None:
+        super()._load(d)
+        if "ensembles" in d.keys():
+            self.ensembles = [model._load() for model in d["ensembles"]]
+    
+class BootstrapEnsemble(BaseEnsembleModel):
+    """ BootstrapEnsemble estimates uncertainty based on the variance of several
+        models trained on bootstrapped samples of the training data.
+    """
+    
+    @log_arguments
+    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25):
+        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles)
+        self.bootstrap_size = bootstrap_size
+
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+    ):
+        super().build(model, X, y)
+
+        from sklearn.model_selection import train_test_split
+        
+        for _ in tqdm(range(self.n_ensembles)):
+            X_train, X_test, y_train, y_test = train_test_split(
+                self.X_train, self.y_train, train_size=self.bootstrap_size
+            )
+            ensemble_model = self.ensemble_model.copy()
+            ensemble_model.fit(X_train, y_train)
+            self.ensembles.append(ensemble_model)
+
+class RandomForestEnsemble(BaseEnsembleModel):
+    """ RandomForestEnsemble estimates uncertainty based on the variance of several
+        random forest models initialized to different random states.
+    """
+    
+    def build(
+        self,
+        model: BaseModel,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+        **kwargs
+    ):
+        super().build(model, X, y)
+        
+        for n in tqdm(range(self.n_ensembles)):
+            ensemble_model = RandomForestModel(
+                oce.MorganVecRepresentation(radius=2, nbits=2048), 
+                random_state=n, 
+                **kwargs
+            )
+            ensemble_model.fit(self.X_train, self.y_train)
+            self.ensembles.append(ensemble_model)
 
 class BaseFingerprintModel(BaseErrorModel):
     """BaseFingerprintModel is the base class for error models that require the
@@ -75,7 +161,7 @@ class SDC(BaseFingerprintModel):
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             return np.sum(np.exp(-self.a * TD / (1 - TD)))
 
-        return np.array([sdc(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([sdc(smi) for smi in tqdm(X)])
 
 
 class TargetDistDC(SDC):
@@ -102,10 +188,13 @@ class TargetDistDC(SDC):
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             DC = np.exp(-self.a * TD / (1 - TD))
-            return np.sqrt(np.dot(DC, np.abs(self.y_train - pred)) / np.sum(DC))
+            error = np.abs(self.y_train - pred)
+            if np.sum(DC) == 0:
+                return np.sqrt(np.mean(error))
+            return np.sqrt(np.dot(DC, error) / np.sum(DC))
 
         X = np.array(X).flatten()
-        return np.array([dist(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
 
 
 class TrainDistDC(SDC):
@@ -134,9 +223,11 @@ class TrainDistDC(SDC):
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             DC = np.exp(-self.a * TD / (1 - TD))
+            if np.sum(DC) == 0:
+                return np.sqrt(np.mean(residuals))
             return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
 
-        return np.array([dist(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi) for smi in tqdm(X)])
 
 
 class KNNSimilarity(BaseFingerprintModel):
@@ -168,7 +259,7 @@ class KNNSimilarity(BaseFingerprintModel):
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             return np.mean(sorted(similarity)[-self.k :])
 
-        return np.array([mean_sim(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([mean_sim(smi) for smi in tqdm(X)])
 
 
 class TargetDistKNN(KNNSimilarity):
@@ -195,14 +286,14 @@ class TargetDistKNN(KNNSimilarity):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            mae = np.abs(self.y_train - pred)
-            idxs = np.argsort(similarity)[-self.k :]
-            return np.sqrt(
-                np.dot(similarity[idxs], mae[idxs]) / np.sum(similarity[idxs])
-            )
+            error = np.abs(self.y_train - pred)
+            idxs = np.argsort(similarity)[-self.k:]
+            if np.sum(similarity[idxs]) == 0:
+                return np.sqrt(np.mean(error[idxs]))
+            return np.sqrt(np.dot(similarity[idxs], error[idxs]) / np.sum(similarity[idxs]))
 
         X = np.array(X).flatten()
-        return np.array([dist(smi, y_pred[i]) for i, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
 
 
 class TrainDistKNN(KNNSimilarity):
@@ -231,12 +322,12 @@ class TrainDistKNN(KNNSimilarity):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            idxs = np.argsort(similarity)[-self.k :]
-            return np.sqrt(
-                np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs])
-            )
+            idxs = np.argsort(similarity)[-self.k:]
+            if np.sum(similarity[idxs]) == 0:
+                return np.sqrt(np.mean(residuals[idxs]))
+            return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
 
-        return np.array([dist(smi) for _, smi in tqdm(np.ndenumerate(X))])
+        return np.array([dist(smi) for smi in tqdm(X)])
 
 
 class Predicted(BaseErrorModel):
@@ -467,181 +558,3 @@ class ADAN(BaseErrorModel):
         y_mse = np.mean(y_sqerr[indices[:, n_drop:]], axis=1).astype(float)
 
         return np.sqrt(y_mse).flatten()
-
-
-class RandomForestErrorModel(BaseAggregateErrorModel):
-    """RandomForestErrorModel is an aggregate error model that predicts error
-        bars based on an aggregate score determined by a random forest model
-        trained on several BaseErrorModels.
-
-        Parameters:
-            error_models (Union[BaseErrorModel, List[BaseErrorModel]]): a list
-                of error models whose scores will be features for the random
-                forest model
-
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.KNNSimilarity()])
-    model.predict(test["Drug"], return_ci = True)
-    ------------------------------
-    """
-
-    def _train(self, scores, residuals):
-        self.aggregate_model = RandomForestRegressor(**self.kwargs)
-        self.aggregate_model.fit(scores, residuals)
-
-    def _predict(self, scores, **kwargs):
-        return self.aggregate_model.predict(scores, **kwargs)
-
-
-class LinearRegressionErrorModel(BaseAggregateErrorModel):
-    """LinearRegressionErrorModel is an aggregate error model that predicts error
-        bars based on a linear combination score from several BaseErrorModels.
-
-        Parameters:
-            error_models (Union[BaseErrorModel, List[BaseErrorModel]]): a list
-                of error models whose scores will be features for the random
-                forest model
-
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.LinearRegressionErrorModel([oce.SDC(), oce.KNNSimilarity()])
-    model.predict(test["Drug"], return_ci = True)
-    ------------------------------
-    """
-
-    def _train(self, scores, residuals):
-        self.aggregate_model = LinearRegression(**self.kwargs)
-        self.aggregate_model.fit(scores, residuals)
-
-    def _predict(self, scores, **kwargs):
-        return self.aggregate_model.predict(scores, **kwargs)
-
-
-class BaseDomainApplicability(BaseClass):
-    """Depricated. See BaseErrorModel.
-
-    Base class for analyzing domain applicability of models and estimating
-    prediction uncertainty.
-
-    Parameters:
-        model (BaseModel): trained model
-        rep (BaseCompoundVecRepresentation): preprocessing representation
-
-    Methods:
-        _fit: fits a method to a trained model and preprocessed training dataset, to be implemented internally by child classes
-        fit: fits a method to a trained model and training dataset
-        _test evaluates prediction uncertainty on a preprocessed testing dataset, to be implemented internally by child classes
-        test: evaluates prediction uncertainty on a testing dataset
-    """
-
-    @log_arguments
-    def __init__(self, model: BaseModel, rep: BaseCompoundVecRepresentation = None):
-        self.model = model
-        self.rep = rep
-        self.results = None
-
-    @abstractmethod
-    def _fit(self, X, y, y_pred, **kwargs):
-        """To be implemented by the child class; fits the method on the internally stored training dataset.
-
-        Note: _fit shouldn"t be directly called by the user, rather it should be called indirectly via the fit method.
-
-        Parameters:
-            X (np.ndarray): features, SMILES
-            y (np.ndarray): values
-            y_pred (np.ndarray): predicted values
-        """
-        pass
-
-    def fit(self, dataset: BaseDataset, use_entire_dataset: bool = False, **kwargs):
-        """Fits model uncertainty to a training dataset. Calls the _fit method on the provided dataset.
-
-        Parameters:
-            dataset (BaseDataset): dataset used for fitting the method
-            use_entire_dataset (bool): whether to use the entire dataset or only the training data
-        """
-        if use_entire_dataset:
-            X = dataset.entire_dataset[0]
-            y = np.array(dataset.entire_dataset[1])
-        else:
-            X = dataset.train_dataset[0]
-            y = np.array(dataset.train_dataset[1])
-
-        y_pred = np.array(self.model.predict(X))
-
-        self._fit(X, y, y_pred, **kwargs)
-
-    @abstractmethod
-    def _test(self, X, y_pred, **kwargs):
-        """To be implemented by the child class; tests the method on the provided preprocessed dataset.
-
-        Note: _test shouldn"t be directly called by the user, rather it should be called indirectly via the test method.
-
-        Parameters:
-            X (np.ndarray): features, SMILES
-            y_pred (np.ndarray): predicted values
-        """
-        pass
-
-    def test(
-        self,
-        dataset: Union[BaseDataset, list, str],
-        use_entire_dataset: bool = False,
-        **kwargs
-    ):
-        """Evaluates model uncertainty on a test dataset. Calls the _test method on the provided dataset.
-
-        Parameters:
-            dataset (BaseDataset, list, str): dataset being tested, sequence of SMILES
-            use_entire_dataset (bool): whether to use the entire dataset or only the testing data
-        """
-        if isinstance(dataset, BaseDataset):
-            if use_entire_dataset:
-                X = dataset.entire_dataset[0]
-            else:
-                X = dataset.test_dataset[0]
-        elif isinstance(dataset, list):
-            X = dataset
-        else:
-            X = [dataset]
-
-        y_pred = np.array(self.model.predict(X))
-
-        return self._test(X, y_pred, **kwargs)
-
-    def preprocess(self, X, y=None):
-        """Preprocesses data into the appropriate representation.
-
-        The preprocess for the model must return a np.ndarray, e.g. the model must use a
-        BaseStructVecRepresentation or a representation must be passed
-
-        Parameters:
-            X (np.ndarray): features, SMILES
-            y (np.ndarray): values
-
-        Returns:
-            X (np.ndarray): features, representation
-        """
-        if self.rep is None:
-            X = self.model.preprocess(X, y)
-        else:
-            X = np.array(self.rep.convert(X))
-
-        assert isinstance(
-            X, np.ndarray
-        ), "The preprocess for the model must return a np.ndarray, e.g. the model must use a BaseCompoundVecRepresentation or a representation must be passed"
-
-        return X
-
-    def _save(self) -> dict:
-        return super()._save()
-
-    def _load(self, d: dict):
-        return super()._load(d)
