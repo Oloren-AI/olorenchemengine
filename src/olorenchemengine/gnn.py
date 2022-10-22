@@ -436,14 +436,12 @@ class SuperGATModel(BaseLightningModule):
                                   dropout=self.dropout, attention_type=self.attention_type,
                                   edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,
                                   negative_slope=self.negative_slope, add_self_loops=self.add_self_loops,
-                                  bias=self.bias, neg_sample_ratio=self.neg_sample_ratio,
-                                  edge_sample_ratio=self.edge_sample_ratio)
+                                  bias=self.bias, neg_sample_ratio=self.neg_sample_ratio)
         self.conv2 = SuperGATConv(self.hidden_channels*self.heads, 1, heads=self.heads,
                                   concat=False, dropout=self.dropout, attention_type=self.attention_type,
                                   edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,
                                   negative_slope=self.negative_slope, add_self_loops=self.add_self_loops,
-                                  bias=self.bias, neg_sample_ratio=self.neg_sample_ratio,
-                                  edge_sample_ratio=self.edge_sample_ratio)
+                                  bias=self.bias, neg_sample_ratio=self.neg_sample_ratio)
 
     def forward(self, batch):
         import torch.nn.functional as F
