@@ -357,6 +357,7 @@ class TLFromCheckpoint(BaseLightningModule):
         lr: float = 1e-4,
         optim: str = "adam",
         reset: bool = False,
+        **kwargs
     ):
         self.lr = lr
         super().__init__(optim=optim)
@@ -387,7 +388,7 @@ class TLFromCheckpoint(BaseLightningModule):
         )
         self.network = nn.Sequential(OrderedDict([("A", self.A), ("B", self.B)]))
 
-class SuperGATModel(BaseLightningModule):
+class SuperGATModel1(BaseLightningModule):
 
     """ SuperGAT is a network
 

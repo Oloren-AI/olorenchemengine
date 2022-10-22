@@ -29,6 +29,12 @@ def example_data3():
     df = pd.read_csv(file_path)
     return df
 
+@pytest.fixture
+def example_data4():
+    file_path = download_public_file("sample-csvs/sample_data4.csv")
+    df = pd.read_csv(file_path)
+    return df
+
 def test_run_random(example_data3):
     splitter = oce.RandomSplit(split_proportions=[0.8, 0.1, 0.1])
     for i in splitter.split(example_data3):
@@ -42,9 +48,9 @@ Test passes with split_proportions = [0.8, 0.0, 0.2].
 Test fails with split_proportions = [0.8, 0.1, 0.1]: "ValueError: The test_size = 1 should be greater or equal to the number of classes = 2"
 Test fails with split_proportions = [0.8, 0.2, 0.0]: "ValueError: train_size=1.0 should be either positive and smaller than the number of samples 10 or a float in the (0, 1) range"
 '''
-def test_run_stratified(example_data3):
-    splitter = oce.StratifiedSplitter(split_proportions=[0.8, 0.1, 0.1], value_col='pChEMBL Value')
-    for i in splitter.split(example_data3):
+def test_run_stratified(example_data4):
+    splitter = oce.StratifiedSplitter(split_proportions=[0.8, 0.1, 0.1], value_col='p_np')
+    for i in splitter.split(example_data4):
         assert(isinstance(i, pd.DataFrame))
         assert(len(i) > 0)
 
@@ -104,12 +110,12 @@ def test_split_props_random(example_data3):
 '''For the [0.8, 0.0, 0.2] case, it is found that the validation split has samples in it despite 0 split setting.
 Test won't show this as there is still the run error from the first test case [0.8, 0.1, 0.1], described in test_run_stratified.
 '''
-def test_split_props_stratified(example_data3):
+def test_split_props_stratified(example_data4):
     split_proportions = [0.8, 0.1, 0.1]
 
-    splitter = oce.StratifiedSplitter(split_proportions=split_proportions, value_col='pChEMBL Value')
-    split = splitter.split(example_data3)
-    total_samples = len(example_data3)
+    splitter = oce.StratifiedSplitter(split_proportions=split_proportions, value_col='p_np')
+    split = splitter.split(example_data4, structure_col = "smiles")
+    total_samples = len(example_data4)
 
     for i in range(3):
         actual_split_prop = len(split[i]) / total_samples
@@ -117,7 +123,7 @@ def test_split_props_stratified(example_data3):
 
     split_proportions_TT = [0.8, 0.0, 0.2]
 
-    splitter = oce.StratifiedSplitter(split_proportions=split_proportions_TT, value_col='pChEMBL Value')
+    splitter = oce.StratifiedSplitter(split_proportions=split_proportions_TT, value_col='p_np')
     split = splitter.split(example_data3)
 
     for i in range(3):
@@ -150,12 +156,12 @@ def test_split_props_scaffold_murcko(example_data3):
         else:
             assert(abs(actual_split_prop - split_proportions_TT[i]) < 0.05)
 
-def test_split_props_scaffold_kmeans_murcko(example_data3):
+def test_split_props_scaffold_kmeans_murcko(example_data4):
     split_proportions = [0.33, 0.33, 0.33]
 
     splitter = oce.ScaffoldSplit(scaffold_filter_threshold=1, split_type='kmeans_murcko', split_proportions=split_proportions)
-    split = splitter.split(example_data3)
-    total_samples = len(example_data3)
+    split = splitter.split(example_data4, structure_col = "smiles")
+    total_samples = len(example_data4)
 
     for i in range(3):
         actual_split_prop = len(split[i]) / total_samples
@@ -164,7 +170,7 @@ def test_split_props_scaffold_kmeans_murcko(example_data3):
     split_proportions_TT = [0.7, 0.0, 0.3]
 
     splitter = oce.ScaffoldSplit(scaffold_filter_threshold=1, split_type='kmeans_murcko', split_proportions=split_proportions_TT)
-    split = splitter.split(example_data3)
+    split = splitter.split(example_data4, structure_col = "smiles")
 
     for i in range(3):
         actual_split_prop = len(split[i]) / total_samples
