@@ -1,7 +1,6 @@
 import contextlib
-from locale import D_FMT
 import sys
-import contextlib
+from locale import D_FMT
 
 if sys.version_info[:2] >= (3, 8):
     # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
@@ -17,6 +16,65 @@ except PackageNotFoundError:  # pragma: no cover
     __version__ = "unknown"
 finally:
     del version, PackageNotFoundError
+
+
+_OPTIONAL_IMPORTS_FOR_OCE_ONLINE = [
+    "sklearn",
+    "torch",
+    "torch_geometric",
+    "torch_scatter",
+    "torch_sparse",
+    "torch_cluster",
+    "rdkit",
+    "sklearn.metrics",
+    "scipy",
+    "scipy.stats",
+    "joblib",
+    "sklearn.model_selection",
+    "tqdm",
+    "sklearn.preprocessing",
+    "rdkit.Chem",
+    "torch.nn",
+    "torch_geometric.nn",
+    "torch_geometric.data",
+    "torch.optim",
+    "torch_geometric.utils",
+    "torch.nn.functional",
+    "torch_geometric.nn.inits",
+    "rdkit.DataStructs",
+    "rdkit.DataStructs.cDataStructs",
+    "rdkit.Chem.AtomPairs",
+    "rdkit.Chem.AtomPairs.Sheridan",
+    "rdkit.Chem.Pharm2D",
+    "torch_geometric.loader",
+    "torch_geometric.data.data",
+    "torch.utils",
+    "torch.utils.data",
+    "torch.autograd",
+    "rdkit.Chem.rdchem",
+    "pytorch_lightning",
+    "rdkit.Chem.Scaffolds",
+    "PIL",
+    "selfies",
+    "sklearn.cross_decomposition",
+    "sklearn.decomposition",
+    "sklearn.neighbors",
+    "sklearn.manifold",
+    "hyperopt",
+    "hyperopt.pyll",
+]
+
+_mocked_imports = []
+
+for imp in _OPTIONAL_IMPORTS_FOR_OCE_ONLINE:
+    try:
+        __import__(imp)
+    except ImportError:
+        import sys
+        from unittest.mock import MagicMock
+
+        sys.modules[imp] = MagicMock()
+        _mocked_imports.append(imp)
 
 from rdkit import RDLogger
 
@@ -38,21 +96,27 @@ if not path.exists(path.join(path.expanduser("~"), f".oce/cache/")):
 if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/")):
     os.mkdir(path.join(path.expanduser("~"), f".oce/cache/vecrep/"))
 
-import pandas as pd
-
 import json
 
+import pandas as pd
 
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".oce/CONFIG.json")
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH) as f:
         CONFIG_ = json.load(f)
 else:
-    CONFIG_ = {"MAP_LOCATION": "cpu", "USE_CUDA": False, "CDD_TOKEN": None, "VAULT_ID": None, "NUM_WORKERS": 4}
+    CONFIG_ = {
+        "MAP_LOCATION": "cpu",
+        "USE_CUDA": False,
+        "CDD_TOKEN": None,
+        "VAULT_ID": None,
+        "NUM_WORKERS": 0,
+    }
     with open(CONFIG_PATH, "w+") as f:
         json.dump(CONFIG_, f)
 
 CONFIG = CONFIG_.copy()
+
 
 def update_config():
     """Update the configuration file.
@@ -65,6 +129,7 @@ def update_config():
 
     with contextlib.suppress(ImportError):
         import torch
+
         CONFIG["DEVICE"] = torch.device(CONFIG["MAP_LOCATION"])
         CONFIG["USE_CUDA"] = "cuda" in CONFIG["MAP_LOCATION"]
 
@@ -95,37 +160,51 @@ def remove_config_param(param):
 
 update_config()
 
+
 def ExampleDataFrame():
-    return pd.read_csv("gs://oloren-public-data/sample-csvs/sample_data3.csv")
+    return pd.read_csv(
+        "https://storage.googleapis.com/oloren-public-data/sample-csvs/sample_data3.csv"
+    )
+
 
 from .base_class import *
 from .basics import *
-from .ensemble import *
-from .gnn import *
-from .representations import *
-from .external import *
-from .splitters import *
+from .benchmarks import *
 from .dataset import *
+from .ensemble import *
+from .external import *
+from .gnn import *
+from .hyperparameters import *
+from .internal import *
 from .interpret import *
 from .manager import *
-from .visualizations import *
+from .representations import *
+from .splitters import *
 from .uncertainty import *
-from .benchmarks import *
-from .hyperparameters import *
+from .visualizations import *
+
 
 def ExampleDataset():
-    if os.path.exists(path.join(path.expanduser("~"), f".oce/exampledataset.oce")):
-        return load(path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
-    else:
-        dataset =  BaseDataset(data = ExampleDataFrame().to_csv(), structure_col = "Smiles",
-            property_col = "pChEMBL Value") + RandomSplit()
-        save(dataset, path.join(path.expanduser("~"), f".oce/exampledataset.oce"))
-        return dataset
+    dataset = (
+        BaseDataset(
+            data=ExampleDataFrame().to_csv(),
+            structure_col="Smiles",
+            property_col="pChEMBL Value",
+        )
+        + RandomSplit()
+    )
+    return dataset
+
 
 def BACEDataset():
     df = pd.read_csv(download_public_file("MoleculeNet/load_bace_regression.csv"))
-    df["split"] = df["split"].replace({"Train": "train", "Valid": "valid", "Test": "test"})
-    return oce.BaseDataset(data = df.to_csv(), structure_col = "smiles", property_col = "pIC50")
+    df["split"] = df["split"].replace(
+        {"Train": "train", "Valid": "valid", "Test": "test"}
+    )
+    return oce.BaseDataset(
+        data=df.to_csv(), structure_col="smiles", property_col="pIC50"
+    )
+
 
 def test_oce():
     """Convenience function to test all functions of the oce package."""
@@ -134,8 +213,12 @@ def test_oce():
 
     model = BaseBoosting(
         [
-            RandomForestModel(DescriptastorusDescriptor("rdkit2dnormalized"), n_estimators=1),
-            BaseTorchGeometricModel(TLFromCheckpoint("default"), batch_size=8, epochs=1, preinitialized=True),
+            RandomForestModel(
+                DescriptastorusDescriptor("rdkit2dnormalized"), n_estimators=1
+            ),
+            BaseTorchGeometricModel(
+                TLFromCheckpoint("default"), batch_size=8, epochs=1, preinitialized=True
+            ),
             RandomForestModel(OlorenCheckpoint("default"), n_estimators=1),
         ]
     )
@@ -146,3 +229,49 @@ def test_oce():
     _ = load("model.oce")
     os.remove("model.oce")
 
+online_session = None
+
+def MISSING_DEPENDENCIES():
+    if len(_mocked_imports) == 0:
+        print("No missing dependencies.")
+        return _mocked_imports
+    else:
+        print(textwrap.fill(f"Missing dependencies: {', '.join([x for x in _mocked_imports if '.' not in x])}.", 120))
+        print("\nTo install OCE with all dependencies, run:")
+        print("     bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)")
+
+if len(_mocked_imports) > 0:
+    import textwrap
+    message = f"Some missing imports detected: {(','.join(_mocked_imports)[:30])}..." + \
+    f"Automatically triggering online mode, where all OCE code is compiled locally and sent to AWS for execution." + \
+    f"If you would like to use OCE online mode with private data or hosted on your own infrastructure, email." + \
+    f" contact@oloren.ai for enterprise offerings." + \
+    f"To exit online mode, run oce.online_session.__exit__()"
+
+    message = f"""
+Some missing imports detected: {(','.join(_mocked_imports)[:30])}...
+Automatically triggering online mode, where all OCE code is compiled locally
+and sent to AWS for execution. If you would like to use OCE online mode with private
+data or hosted on your own infrastructure, email contact@oloren.ai for enterprise
+offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
+""".replace("\n", " ")
+
+    message = f"""
+        To complete installation of Oloren ChemEngine, either:
+            (1) Run oce.online() to use the demonstration package, Oloren ChemEngine Online,
+            (2) Install the missing dependencies, instructions can be found oce.MISSING_DEPENDENCIES(), or
+            (3) Email contact@oloren.ai with subject "Oloren ChemEngine Enterprise", for a secure privately hosted
+                Server version.
+
+        Oloren ChemEngine online is the public, dependency-free version of OCE, which compiles OCE code locally for fast,
+        parallelized, remote execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
+        CONFIDENTAIL DATA, and is only intended for demonstration purposes. The securely privately hosted Server version is
+        called Oloren ChemEngine Enterprise.\n"""
+
+    # print(textwrap.fill(textwrap.dedent(message).replace("\n", " ").replace("    (", "\n     ("), 80))
+    print(textwrap.dedent(message))
+
+def online():
+    global online_session
+    online_session = Remote("https://aws.chemengine.org")
+    online_session.__enter__()

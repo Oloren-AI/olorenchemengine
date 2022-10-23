@@ -1,26 +1,46 @@
 """ Machine learning algorithms for use with molecular vector representations and features from experimental data.
 """
 
-from tempfile import NamedTemporaryFile
-import joblib
 import io
+import json
+from tempfile import NamedTemporaryFile
+
+import joblib
+import numpy as np
+import pandas as pd
+import scipy
+from pandas.api.types import is_numeric_dtype
+from rdkit import Chem
 from sklearn.model_selection import RandomizedSearchCV
 
 import olorenchemengine as oce
-from olorenchemengine.representations import BaseCompoundVecRepresentation, BaseVecRepresentation
+from olorenchemengine.representations import (
+    BaseCompoundVecRepresentation,
+    BaseVecRepresentation,
+)
+
 from .base_class import *
-from rdkit import Chem
 
-import pandas as pd
-import numpy as np
-import scipy
-import json
+try:
+    from pytorch_lightning import LightningModule
 
-from pandas.api.types import is_numeric_dtype
+    lm_imports = (LightningModule, BaseClass)
+except:
+    lm_imports = (BaseClass,)
 
-class RandomizedSearchCVModel(RandomizedSearchCV, BaseEstimator):
+if isinstance(RandomizedSearchCV, MagicMock):
+    rscvmodel_extends = (BaseEstimator,)
+else:
+    rscvmodel_extends = (
+        RandomizedSearchCV,
+        BaseEstimator,
+    )
+
+
+class RandomizedSearchCVModel(*rscvmodel_extends):
 
     """Wrapper class for RandomizedSearchCV"""
+
     def __init__(self, *args, **kwargs):
         self.obj = None
         super().__init__(*args, **kwargs)
@@ -33,6 +53,7 @@ class RandomizedSearchCVModel(RandomizedSearchCV, BaseEstimator):
         if self.obj is None:
             raise ValueError("Model not fitted")
         return self.obj.predict(*args, **kwargs)
+
 
 class RandomForestRegressor(BaseEstimator):
 
@@ -65,9 +86,9 @@ class SVC(BaseEstimator):
 
     @log_arguments
     def __init__(self, *args, **kwargs):
-        from sklearn.svm import SVC
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
+        from sklearn.svm import SVC
 
         self.obj = make_pipeline(StandardScaler(), SVC(*args, **kwargs))
 
@@ -78,11 +99,12 @@ class SVR(BaseEstimator):
 
     @log_arguments
     def __init__(self, *args, **kwargs):
-        from sklearn.svm import SVR
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
+        from sklearn.svm import SVR
 
         self.obj = make_pipeline(StandardScaler(), SVR(*args, **kwargs))
+
 
 class KBestLinearRegression(BaseEstimator):
 
@@ -90,9 +112,9 @@ class KBestLinearRegression(BaseEstimator):
 
     @log_arguments
     def __init__(self, k=1, *args, **lwargs):
-        from sklearn.pipeline import Pipeline
-        from sklearn.linear_model import LinearRegression
         from sklearn.feature_selection import SelectKBest, mutual_info_regression
+        from sklearn.linear_model import LinearRegression
+        from sklearn.pipeline import Pipeline
 
         self.obj = Pipeline(
             [
@@ -100,6 +122,7 @@ class KBestLinearRegression(BaseEstimator):
                 ("LR", LinearRegression()),
             ]
         )
+
 
 class LogisticRegression(BaseEstimator):
 
@@ -111,8 +134,9 @@ class LogisticRegression(BaseEstimator):
 
         self.obj = LogisticRegression(*args, **kwargs)
 
+
 class RandomForestModel(BaseSKLearnModel):
-    """ Random forest model
+    """Random forest model
 
         Parameters:
             n_estimators (int): The number of trees in the forest.
@@ -147,10 +171,13 @@ class RandomForestModel(BaseSKLearnModel):
     ):
         if not class_weight is None:
             try:
-                class_weight = {int(k):float(v) for k,v in json.loads(class_weight).items()}
+                class_weight = {
+                    int(k): float(v) for k, v in json.loads(class_weight).items()
+                }
             except:
-                 class_weight = None
-        regressor = RandomForestRegressor(n_estimators = n_estimators,
+                class_weight = None
+        regressor = RandomForestRegressor(
+            n_estimators=n_estimators,
             max_features=max_features,
             min_samples_split=4,
             min_samples_leaf=4,
@@ -172,8 +199,9 @@ class RandomForestModel(BaseSKLearnModel):
         )
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
 
+
 class AutoRandomForestModel(BaseSKLearnModel, BaseObject):
-    """ RandomForestModel where parameters have automatically tuned hyperparameters
+    """RandomForestModel where parameters have automatically tuned hyperparameters
 
         Parameters:
             representation (str): The representation to use for the model.
@@ -196,10 +224,9 @@ class AutoRandomForestModel(BaseSKLearnModel, BaseObject):
     def __init__(
         self, representation, n_iter=100, scoring=None, verbose=2, cv=5, **kwargs
     ):
-        from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-        regressor = self.autofit(
-            RandomForestRegressor(), n_iter, cv, scoring, verbose
-        )
+        from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+        regressor = self.autofit(RandomForestRegressor(), n_iter, cv, scoring, verbose)
         classifier = self.autofit(
             RandomForestClassifier(), n_iter, cv, scoring, verbose
         )
@@ -218,7 +245,7 @@ class AutoRandomForestModel(BaseSKLearnModel, BaseObject):
 
         Returns:
             model (sklearn model): The tuned model
-    """
+        """
 
         params = {
             "n_estimators": [50, 100, 200, 500, 1000],
@@ -238,6 +265,8 @@ class AutoRandomForestModel(BaseSKLearnModel, BaseObject):
             scoring=scoring,
             verbose=verbose,
         )
+
+
 class BaseMLPClassifier(BaseEstimator):
 
     """Wrapper for sklearn MLP"""
@@ -247,6 +276,7 @@ class BaseMLPClassifier(BaseEstimator):
         from sklearn.neural_network import MLPClassifier
 
         self.obj = MLPClassifier(*args, **kwargs)
+
 
 class BaseMLPRegressor(BaseEstimator):
 
@@ -258,8 +288,9 @@ class BaseMLPRegressor(BaseEstimator):
 
         self.obj = MLPRegressor(*args, **kwargs)
 
+
 class SklearnMLP(BaseSKLearnModel):
-    """ MLP Model based on sklearn implementation
+    """MLP Model based on sklearn implementation
 
         Parameters:
             representation (BaseVecRepresentation): The representation to use for the model.
@@ -282,48 +313,66 @@ class SklearnMLP(BaseSKLearnModel):
     model.predict(test['Drug'])
     ------------------------------
     """
+
     @log_arguments
-    def __init__(self, representation,
-        hidden_layer_sizes=[100], activation="relu", solver="adam",
-        alpha=0.0001, batch_size=32, learning_rate="constant",
-        learning_rate_init=0.001, power_t=0.5, max_iter=200, log=True, **kwargs):
+    def __init__(
+        self,
+        representation,
+        hidden_layer_sizes=[100],
+        activation="relu",
+        solver="adam",
+        alpha=0.0001,
+        batch_size=32,
+        learning_rate="constant",
+        learning_rate_init=0.001,
+        power_t=0.5,
+        max_iter=200,
+        log=True,
+        **kwargs
+    ):
 
         regressor = BaseMLPRegressor(
-            hidden_layer_sizes=hidden_layer_sizes, activation=activation, learning_rate=learning_rate,
-            solver=solver, alpha=alpha, batch_size=batch_size, learning_rate_init=learning_rate_init,
-            power_t=power_t, max_iter=max_iter)
+            hidden_layer_sizes=hidden_layer_sizes,
+            activation=activation,
+            learning_rate=learning_rate,
+            solver=solver,
+            alpha=alpha,
+            batch_size=batch_size,
+            learning_rate_init=learning_rate_init,
+            power_t=power_t,
+            max_iter=max_iter,
+        )
         classifier = BaseMLPClassifier(
-            hidden_layer_sizes=hidden_layer_sizes, activation=activation, learning_rate=learning_rate,
-            solver=solver, alpha=alpha, batch_size=batch_size, learning_rate_init=learning_rate_init,
-            power_t=power_t, max_iter=max_iter)
+            hidden_layer_sizes=hidden_layer_sizes,
+            activation=activation,
+            learning_rate=learning_rate,
+            solver=solver,
+            alpha=alpha,
+            batch_size=batch_size,
+            learning_rate_init=learning_rate_init,
+            power_t=power_t,
+            max_iter=max_iter,
+        )
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
 
-try:
-    import pytorch_lightning as pl
-except ImportError:
-    oce.mock_imports(globals(), "pl")
 
-try:
-    import torch.nn as nn
-    import torch
-except ImportError:
-    oce.mock_imports(globals(), "nn", "torch")
+import pytorch_lightning as pl
+import torch
+import torch.nn as nn
+
 
 class plMLP(pl.LightningModule):
-
     def __init__(self, hidden_layer_sizes, norm_layer, activation_layer, setting):
         super().__init__()
         hidden_layer_sizes = hidden_layer_sizes + [1]
         layers = []
-        for i in range(len(hidden_layer_sizes)-1):
-            layers.append(nn.Linear(hidden_layer_sizes[i], hidden_layer_sizes[i+1]))
-            if not activation_layer is None and i < len(hidden_layer_sizes)-2:
+        for i in range(len(hidden_layer_sizes) - 1):
+            layers.append(nn.Linear(hidden_layer_sizes[i], hidden_layer_sizes[i + 1]))
+            if not activation_layer is None and i < len(hidden_layer_sizes) - 2:
                 layers.append(activation_layer())
-            if not norm_layer is None and i < len(hidden_layer_sizes)-2:
+            if not norm_layer is None and i < len(hidden_layer_sizes) - 2:
                 layers.append(norm_layer())
-        self.layers = nn.Sequential(
-          *layers
-        )
+        self.layers = nn.Sequential(*layers)
         if setting == "classification":
             self.layers.append(nn.Sigmoid())
             self.loss = nn.CrossEntropyLoss()
@@ -338,15 +387,16 @@ class plMLP(pl.LightningModule):
         x = x.view(x.size(0), -1)
         y_hat = self.layers(x)
         loss = self.loss(y_hat, y)
-        self.log('train_loss', loss)
+        self.log("train_loss", loss)
         return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-4)
         return optimizer
 
+
 class TorchMLP(BaseModel):
-    """ MLP Model based on torch implementation
+    """MLP Model based on torch implementation
 
         Parameters:
             representation (BaseVecRepresentation): The representation to use for the model.
@@ -366,12 +416,20 @@ class TorchMLP(BaseModel):
     """
 
     @log_arguments
-    def __init__(self, representation, hidden_layer_sizes=[100],
-            norm_layer: str = None, activation_layer: str = None, dropout: float = 0.0,
-            log=True, **kwargs):
+    def __init__(
+        self,
+        representation,
+        hidden_layer_sizes=[100],
+        norm_layer: str = None,
+        activation_layer: str = None,
+        dropout: float = 0.0,
+        log=True,
+        **kwargs
+    ):
         self.representation = representation
         self.hidden_layer_sizes = hidden_layer_sizes
         import torch.nn as nn
+
         if activation_layer == "leakyrelu":
             self.activation_layer = nn.LeakyReLU
         elif activation_layer == "relu":
@@ -391,6 +449,7 @@ class TorchMLP(BaseModel):
             self.norm_layer = None
 
         self.dropout = dropout
+
         super().__init__(representation, log=False)
 
     def preprocess(self, X, y, fit=False):
@@ -404,20 +463,28 @@ class TorchMLP(BaseModel):
         import torch
         import torch.nn as nn
 
-        self.network = plMLP(hidden_layer_sizes=[len(X[0])] + self.hidden_layer_sizes,
+        self.network = plMLP(
+            hidden_layer_sizes=[len(X[0])] + self.hidden_layer_sizes,
             norm_layer=self.norm_layer,
             activation_layer=self.activation_layer,
-            setting = self.setting)
+            setting=self.setting,
+        )
 
-        from torch.utils.data import TensorDataset, DataLoader
+        from torch.utils.data import DataLoader, TensorDataset
+
         y = np.array(y.tolist())
         device = torch.device(oce.CONFIG["MAP_LOCATION"])
-        dataset = TensorDataset(torch.from_numpy(X).float().to(device), torch.from_numpy(y).float().to(device))
+        dataset = TensorDataset(
+            torch.from_numpy(X).float().to(device),
+            torch.from_numpy(y).float().to(device),
+        )
         loader = DataLoader(dataset, batch_size=32)
 
         self.trainer = pl.Trainer(
             accelerator="auto",
-            devices=1 if torch.cuda.is_available() else None,  # limiting got iPython runs
+            devices=1
+            if torch.cuda.is_available()
+            else None,  # limiting got iPython runs
             max_epochs=10,
         )
 
@@ -425,29 +492,39 @@ class TorchMLP(BaseModel):
 
     def _predict(self, X):
         import torch
+
         # from torch.utils.data import TensorDataset, DataLoader
         device = torch.device(oce.CONFIG["MAP_LOCATION"])
         # dataset = TensorDataset(torch.from_numpy(X).float().to(device))
         # loader = DataLoader(dataset, batch_size=1)
         # return self.trainer.predict(self.network, loader)
         self.network.to(device)
-        return self.network(torch.from_numpy(X).float().to(device)).detach().cpu().numpy()
+        return (
+            self.network(torch.from_numpy(X).float().to(device)).detach().cpu().numpy()
+        )
 
     def _save(self) -> str:
         d = super()._save()
+        if not hasattr(self, "network"):
+            return d
         buffer = io.BytesIO()
         import torch
+
         torch.save(self.network, buffer)
         d.update({"save": buffer.getvalue()})
         return d
 
     def _load(self, d):
         super()._load(d)
+        if not "save" in d:
+            return
         import torch
+
         self.network = torch.load(io.BytesIO(d["save"]))
 
+
 class XGBoostModel(BaseSKLearnModel, BaseObject):
-    """ XGBoost model
+    """XGBoost model
 
         Parameters:
             representation (str): The representation to use for the model
@@ -468,23 +545,43 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
 
     @log_arguments
     def __init__(
-        self, representation, n_estimators=2000, max_depth=7, subsample=0.5,max_leaves=5,
-            learning_rate=0.05, colsample_bytree=0.8, **kwargs
+        self,
+        representation,
+        n_estimators=2000,
+        max_depth=7,
+        subsample=0.5,
+        max_leaves=5,
+        learning_rate=0.05,
+        colsample_bytree=0.8,
+        **kwargs
     ):
-        from xgboost import XGBRegressor, XGBClassifier
+        from xgboost import XGBClassifier, XGBRegressor
 
-        regressor = XGBRegressor(tree_method="gpu_hist", n_estimators=n_estimators,
-            max_depth=max_depth, max_leaves=max_leaves, learning_rate=learning_rate,
-            subsample=subsample, colsample_bytree=colsample_bytree)
+        regressor = XGBRegressor(
+            tree_method="gpu_hist",
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            max_leaves=max_leaves,
+            learning_rate=learning_rate,
+            subsample=subsample,
+            colsample_bytree=colsample_bytree,
+        )
 
-        classifier = XGBClassifier(tree_method="gpu_hist", n_estimators=n_estimators,
-            max_depth=max_depth, max_leaves=max_leaves, learning_rate=learning_rate,
-            subsample=subsample, colsample_bytree=colsample_bytree)
+        classifier = XGBClassifier(
+            tree_method="gpu_hist",
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            max_leaves=max_leaves,
+            learning_rate=learning_rate,
+            subsample=subsample,
+            colsample_bytree=colsample_bytree,
+        )
 
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
 
+
 class ZWK_XGBoostModel(BaseSKLearnModel, BaseObject):
-    """ XGBoost model from https://github.com/smu-tao-group/ADMET_XGBoost
+    """XGBoost model from https://github.com/smu-tao-group/ADMET_XGBoost
 
         Parameters:
             representation (str): The representation to use for the model.
@@ -507,15 +604,16 @@ class ZWK_XGBoostModel(BaseSKLearnModel, BaseObject):
     def __init__(
         self, representation, n_iter=100, scoring=None, verbose=2, cv=5, **kwargs
     ):
-        from xgboost import XGBRegressor, XGBClassifier
+        from xgboost import XGBClassifier, XGBRegressor
 
-        if scoring == 'spearman':
+        if scoring == "spearman":
             from scipy.stats import spearmanr
             from sklearn.metrics import make_scorer
+
             def spearman_loss_func(y_true, y_pred):
-                """spearman metric
-                """
+                """spearman metric"""
                 return spearmanr(y_true, y_pred)[0]
+
             spearman = make_scorer(spearman_loss_func)
             scoring = spearman
 
@@ -563,9 +661,10 @@ class ZWK_XGBoostModel(BaseSKLearnModel, BaseObject):
             verbose=verbose,
         )
 
+
 class SupportVectorMachine(BaseSKLearnModel):
 
-    """ Support vector machine
+    """Support vector machine
 
         Parameters:
             representations (str): The representation to use for the model.
@@ -640,7 +739,7 @@ class KNeighborsClassifier(BaseEstimator):
 
 class KNN(BaseSKLearnModel):
 
-    """ KNN model
+    """KNN model
 
         Parameters:
             representations (str): The representation to use for the model.
@@ -664,7 +763,7 @@ class KNN(BaseSKLearnModel):
 
 class MLP(BaseSKLearnModel):
 
-    """ MLP model
+    """MLP model
 
         Parameters:
             representation (BaseVecRepresentation): The representation to use for the model.
@@ -684,13 +783,14 @@ class MLP(BaseSKLearnModel):
     model.fit(train['Drug'], train['Y'])
     model.predict(test['Drug'])
     ------------------------------
-     """
+    """
 
-    def preprocess(self, X, y, fit = False):
+    def preprocess(self, X, y, fit=False):
         if self.representation is None:
             return np.array(X)
         else:
-            return np.array(self.representation.convert(X, fit = fit))
+            return np.array(self.representation.convert(X, fit=fit))
+
     # specify parameters
     @log_arguments
     def __init__(
@@ -805,7 +905,7 @@ class GuessingRegression(BaseModel):
             self.reg = None
         super().__init__(log=False, **kwargs)
 
-    def preprocess(self, X, y, fit = False):
+    def preprocess(self, X, y, fit=False):
         """This method is used to preprocess the data before training.
 
         Parameters:
@@ -843,8 +943,8 @@ class GuessingRegression(BaseModel):
                     t0 = trans[0](df2["x"])
                     t1 = trans[1](df2["y"])
                     A, B, r, p, se = scipy.stats.linregress(t0, t1)
-                    if r ** 2 > r2max:
-                        r2max = r ** 2
+                    if r**2 > r2max:
+                        r2max = r**2
                         best = trans[3]
                         self.state[c] = (i, A, B, r2max)
                 print(c)
@@ -881,14 +981,14 @@ class GuessingRegression(BaseModel):
 
 class FeaturesClassification(BaseModel):
 
-    """ FeaturesClassification uses machine learning models to classify features
-        based on their experimental data
+    """FeaturesClassification uses machine learning models to classify features
+    based on their experimental data
 
-        Attributes:
-            obj (sklearn.base.BaseEstimator): Machine learning model to use.
+    Attributes:
+        obj (sklearn.base.BaseEstimator): Machine learning model to use.
 
-        Parameters:
-            config (str): Configuration to use for the model."""
+    Parameters:
+        config (str): Configuration to use for the model."""
 
     @log_arguments
     def __init__(self, config="lineardiscriminant"):

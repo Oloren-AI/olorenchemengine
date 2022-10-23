@@ -5,16 +5,17 @@ visualizations, or model selections.
 """
 
 from olorenchemengine.base_class import *
-from olorenchemengine.representations import *
 from olorenchemengine.dataset import *
-from olorenchemengine.uncertainty import *
-from olorenchemengine.interpret import *
 from olorenchemengine.internal import *
+from olorenchemengine.interpret import *
 from olorenchemengine.manager import *
+from olorenchemengine.representations import *
+from olorenchemengine.uncertainty import *
 from olorenchemengine.visualizations import *
 
+
 class VisualizationModelManager_Bar(BaseVisualization):
-    """ Visualize the database of a model manager in a bar plot, with the model
+    """Visualize the database of a model manager in a bar plot, with the model
     parameters and name displayed on hover
 
     Parameters:
@@ -23,7 +24,7 @@ class VisualizationModelManager_Bar(BaseVisualization):
     """
 
     @log_arguments
-    def __init__(self, mm: BaseModelManager, top = 5, log=True, **kwargs):
+    def __init__(self, mm: BaseModelManager, top=5, log=True, **kwargs):
         self.df = mm.get_model_database()
         self.metrics = mm.metrics
         self.mm = mm
@@ -35,7 +36,7 @@ class VisualizationModelManager_Bar(BaseVisualization):
     def JS_NAME(self) -> str:
         return "ModelManagerBar"
 
-    def get_data(self, metric = None) -> dict:
+    def get_data(self, metric=None) -> dict:
         """
         Get the data for the visualization
 
@@ -45,11 +46,16 @@ class VisualizationModelManager_Bar(BaseVisualization):
         Returns:
             dict: The data for the visualization
         """
-        df2 = self.df.sort_values(by=metric, ascending=(True if self.mm.metric_direction[metric] == "lower" else False))
-        df2 = df2.iloc[:self.top]
-        d =  df2.to_dict("l")
+        df2 = self.df.sort_values(
+            by=metric,
+            ascending=(True if self.mm.metric_direction[metric] == "lower" else False),
+        )
+        df2 = df2.iloc[: self.top]
+        d = df2.to_dict("l")
         if not metric is None:
-            assert metric in self.metrics, f"Designated metric, {metric}, not in model manager metrics: {self.metrics}"
+            assert (
+                metric in self.metrics
+            ), f"Designated metric, {metric}, not in model manager metrics: {self.metrics}"
             d["metric"] = metric
         else:
             d["metric"] = self.metrics[0]
@@ -70,10 +76,13 @@ class VisualizationModelManager_Bar(BaseVisualization):
             str: The html code for the visualization
         """
         d = self.get_data(metric)
-        return self.render_ipynb_from_dict(d, *args, print_html_js=print_html_js, **kwargs)
+        return self.render_ipynb_from_dict(
+            d, *args, print_html_js=print_html_js, **kwargs
+        )
+
 
 class ModelOverTime(CompoundScatterPlot):
-    """ Visualizes the performance of a given model architecture over a length of time.
+    """Visualizes the performance of a given model architecture over a length of time.
 
     This visualization will use a date split and for each date i, will train a model
     on the data on dates 1, ..., i-1, evaluating on date i. Note, any existing splits
@@ -85,8 +94,17 @@ class ModelOverTime(CompoundScatterPlot):
     """
 
     @log_arguments
-    def __init__(self, dataset: BaseDataset, model: BaseModel, *args, log=True,
-        title="Model Performance over Time", yaxis_title="Error", xaxis_title="Date", **kwargs):
+    def __init__(
+        self,
+        dataset: BaseDataset,
+        model: BaseModel,
+        *args,
+        log=True,
+        title="Model Performance over Time",
+        yaxis_title="Error",
+        xaxis_title="Date",
+        **kwargs,
+    ):
         self.dataset = dataset
         self.model = model
         self.title = title
@@ -96,16 +114,25 @@ class ModelOverTime(CompoundScatterPlot):
         self.dataset.data = self.dataset.data.sort_values(by=[self.dataset.date_col])
         self.dates = self.dataset.data[self.dataset.date_col].unique()
         results = pd.DataFrame()
-        for i in tqdm(range(len(self.dates)-1)):
+        for i in tqdm(range(len(self.dates) - 1)):
             # try:
             train_date = self.dates[i]
-            test_date = self.dates[i+1]
-            train = self.dataset.data[self.dataset.data[self.dataset.date_col] <= train_date]
+            test_date = self.dates[i + 1]
+            train = self.dataset.data[
+                self.dataset.data[self.dataset.date_col] <= train_date
+            ]
             train["split"] = "train"
-            test = self.dataset.data[self.dataset.data[self.dataset.date_col] == test_date]
+            test = self.dataset.data[
+                self.dataset.data[self.dataset.date_col] == test_date
+            ]
             test["split"] = "test"
             DATA = pd.concat([train, test])
-            dataset = (oce.BaseDataset(data = DATA.to_csv(), structure_col="SMILES", property_col = "log AUC") + oce.CleanStructures())
+            dataset = (
+                oce.BaseDataset(
+                    data=DATA.to_csv(), structure_col="SMILES", property_col="log AUC"
+                )
+                + oce.CleanStructures()
+            )
             print(f"Train size is {len(train)} and test size is {len(test)}")
             self.model.fit(*dataset.train_dataset)
 
@@ -115,10 +142,15 @@ class ModelOverTime(CompoundScatterPlot):
             results = pd.concat([results, test_set])
 
             if self.model.setting == "regression":
-                results["Error (|Predicted - True|)"] = np.abs(results["pred"] - results[self.dataset.property_col])
+                results["Error (|Predicted - True|)"] = np.abs(
+                    results["pred"] - results[self.dataset.property_col]
+                )
                 self.yaxis_title = "Error (|Predicted - True|)"
             elif self.model.setting == "classification":
-                results["Error (p or 1-p)"] = np.abs(results[self.dataset.property_col]+(-2*results[self.dataset.property_col]+1)*results["pred"])
+                results["Error (p or 1-p)"] = np.abs(
+                    results[self.dataset.property_col]
+                    + (-2 * results[self.dataset.property_col] + 1) * results["pred"]
+                )
                 self.yaxis_title = "Error (p or 1-p)"
 
         results["X"] = results[self.dataset.date_col]
@@ -129,23 +161,38 @@ class ModelOverTime(CompoundScatterPlot):
             results["Y"] = results["Error (p or 1-p)"]
             self.yaxis_title = yaxis_title
         results["SMILES"] = results[self.dataset.structure_col]
-        super().__init__(*args,df = results, xaxis_type="date",
-            title=title, xaxis_title=self.xaxis_title, yaxis_title=self.yaxis_title, log=False, **kwargs)
+        super().__init__(
+            *args,
+            df=results,
+            xaxis_type="date",
+            title=title,
+            xaxis_title=self.xaxis_title,
+            yaxis_title=self.yaxis_title,
+            log=False,
+            **kwargs,
+        )
 
     def get_data(self):
         d = super().get_data()
         window = 10
         quantile = 0.80
-        results = list(zip(pd.to_datetime(self.df["X"]).apply(lambda x: x.timestamp()), self.df["Y"]))
+        results = list(
+            zip(
+                pd.to_datetime(self.df["X"]).apply(lambda x: x.timestamp()),
+                self.df["Y"],
+            )
+        )
         scores, residuals = zip(*sorted(results))
         X = pd.Series(scores).rolling(window).mean()
         y = pd.Series(residuals).rolling(window).quantile(quantile)
         X = np.array(X[~np.isnan(X)])
         y = np.array(y[~np.isnan(y)])
 
-        d["trace_update"] = {'x':self.df["X"].tolist(),
-            'y': y.tolist(),
-            'mode': 'markers',
-            'type': 'scatter',
-            'marker': {'color': 'red'}}
+        d["trace_update"] = {
+            "x": self.df["X"].tolist(),
+            "y": y.tolist(),
+            "mode": "markers",
+            "type": "scatter",
+            "marker": {"color": "red"},
+        }
         return d

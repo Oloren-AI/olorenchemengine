@@ -1,5 +1,13 @@
 #!/bin/bash
 
+GPU=0
+if  nvidia-smi 2>/dev/null | grep -q "Driver Version"; then
+    GPU=1
+fi
+if [[ $* == *--gpu* ]]; then
+    GPU=1
+fi
+
 if [[ $(python -c "import sys, os; print(os.path.exists(os.path.join(sys.prefix, 'conda-meta')))") = *True* ]]; then
     echo "Detected conda environment, using conda commands going forward..."
     CONDA=1
@@ -16,11 +24,12 @@ else
     fi
 fi
 
+
 # Check if pytorch is installed
 if ! python -c "import torch; print(torch.__version__)" 2>/dev/null | grep -q "1.11.0" ; then
     echo "Pytorch 1.11.0 (required for torch geometric) not found, installing..."
 
-    if  nvidia-smi 2>/dev/null | grep -q "Driver Version"; then
+    if [ $GPU == 1 ]; then
         echo "Detected NVIDIA GPU and Drivers, installing CUDA enabled PyTorch with:"
         if [ $CONDA == 1 ]; then
             echo ">> conda install pytorch==1.11.0 cudatoolkit=11.3 -c pytorch"
@@ -72,13 +81,16 @@ fi
 
 
 if [[ $* == *--docker* ]]; then
+        python3.8 -m pip install olorenchemengine
     echo "Docker argument passed, skipping installing chemengine package."
 else
     if [[ $* == *--dev* ]]; then
         SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-        python3.8 -m pip install -e $SCRIPT_DIR # install editable copy of the package for dev
+        python3.8 -m pip install -e $SCRIPT_DIR
+        python3.8 -m pip install -e "${SCRIPT_DIR}[full]"
     else
         python3.8 -m pip install olorenchemengine
+        python3.8 -m pip install olorenchemengine[full]
     fi
 fi
 

@@ -587,9 +587,7 @@ def make_colorscale(colors, scale=None):
 
     # validate minimum colors length of 2
     if len(colors) < 2:
-        raise Exception(
-            "You must input a list of colors that has at least two colors."
-        )
+        raise Exception("You must input a list of colors that has at least two colors.")
 
     if scale is None:
         scale_incr = 1.0 / (len(colors) - 1)
@@ -597,9 +595,7 @@ def make_colorscale(colors, scale=None):
 
     else:
         if len(colors) != len(scale):
-            raise Exception(
-                "The length of colors and scale must be the same."
-            )
+            raise Exception("The length of colors and scale must be the same.")
 
         validate_scale_values(scale)
 
