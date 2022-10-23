@@ -561,7 +561,10 @@ class BaseRemoteSymbol:
         return iter(_runtime.get_iterable(self.REMOTE_ID))
 
     def __repr__(self):
-        return _runtime.get_obj_repr(self.REMOTE_ID)
+        if hasattr(self, "REMOTE_ID"):
+            return _runtime.get_obj_repr(self.REMOTE_ID)
+        else:
+            return  object.__repr__(self)
 
     def _upload_remote(self):
         try:

@@ -229,6 +229,7 @@ def test_oce():
     _ = load("model.oce")
     os.remove("model.oce")
 
+global online_session
 online_session = None
 
 def MISSING_DEPENDENCIES():

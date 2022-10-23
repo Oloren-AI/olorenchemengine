@@ -375,7 +375,7 @@ class TLFromCheckpoint(BaseLightningModule):
         state_dict = OrderedDict(
             [
                 (k.replace("model.", ""), v)
-                for k, v in torch.load(path, map_location=map_location)[
+                for k, v in torch.load(path, map_location=oce.CONFIG["MAP_LOCATION"])[
                     "state_dict"
                 ].items()
             ]
