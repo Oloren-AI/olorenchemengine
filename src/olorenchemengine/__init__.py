@@ -178,6 +178,7 @@ from .hyperparameters import *
 from .internal import *
 from .interpret import *
 from .manager import *
+from .reduction import *
 from .representations import *
 from .splitters import *
 from .uncertainty import *
