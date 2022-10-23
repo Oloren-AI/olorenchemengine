@@ -947,6 +947,49 @@ class BaseSKLearnModel(BaseModel):
             self.regression_model._load(d["model"])
             self.model = self.regression_model
 
+class BaseReduction(BaseClass):
+    """
+    BaseReduction for applying dimensionality reduction on high-dimensional data
+
+    Parameters:
+        n_components (int): the number of components to keep
+
+    Methods:
+        fit: fit the model with input data
+        fit_transform: fit the model with and apply dimensionality reduction to input data
+        transform: apply dimensionality reduction to input data
+    """
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def fit(self, X):
+        pass
+    
+    @abstractmethod
+    def fit_transform(self, X):
+        pass
+
+    @abstractmethod
+    def transform(self, X):
+        pass
+    
+
+class BaseSKLearnReduction(BaseReduction):
+    """
+    Base class for creating sklearn dimensionality reduction
+
+    """
+    def fit(self, X):
+        return self.obj.fit(X)
+    
+    def fit_transform(self, X):
+        return self.obj.fit_transform(X)
+
+    def transform(self, X):
+        return self.obj.transform(X)
+
+    
 class BaseErrorModel(BaseClass):
     """Base class for error models.
 

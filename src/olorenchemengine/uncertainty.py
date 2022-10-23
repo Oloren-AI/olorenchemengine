@@ -1,3 +1,6 @@
+""" Techniques for quantifying uncertainty and estimating confidence intervals for all oce models.
+"""
+
 from cmath import exp
 from tkinter import N
 import olorenchemengine as oce
@@ -10,10 +13,6 @@ from .basics import *
 import pandas as pd
 import numpy as np
 
-from sklearn.cross_decomposition import PLSRegression
-from sklearn.decomposition import PCA
-from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import OneHotEncoder
 from rdkit.DataStructs.cDataStructs import BulkTanimotoSimilarity
 from rdkit.Chem import AllChem
 
@@ -409,11 +408,15 @@ class ADAN(BaseErrorModel):
         max_components = min(100, min(self.X_train.shape))
 
         if dim_reduction == "pls":
+            from sklearn.cross_decomposition import PLSRegression
+
             self.reduction = PLSRegression(n_components = max_components)
             self.reduction.fit(self.X_train, self.y_train)
             x_var = np.var(self.reduction.x_scores_, axis=0)
             x_var /= np.sum(x_var)
         elif dim_reduction == "pca":
+            from sklearn.decomposition import PCA
+
             self.reduction = PCA(n_components = max_components)
             self.reduction.fit(self.X_train, self.y_train)
             x_var = self.reduction.explained_variance_ratio_
@@ -430,6 +433,8 @@ class ADAN(BaseErrorModel):
         self.Xp_train = self.reduction.transform(self.X_train)[:, :self.n_components]
         self.Xp_mean = np.mean(self.Xp_train, axis=0)
         self.y_mean = np.mean(self.y_train)
+
+        from sklearn.neighbors import NearestNeighbors
 
         nbrs = NearestNeighbors(n_neighbors = 2).fit(self.Xp_train)
         distances, indices = nbrs.kneighbors(self.Xp_train)
@@ -566,7 +571,7 @@ class AggregateErrorModel(BaseErrorModel):
 
         Parameters:
             error_models (list of BaseErrorModel): list of error models to be aggregated
-            transformer (BaseTransformer): BaseTransformer used to aggregate uncertainty scores
+            reduction (BaseReduction): reduction method used to aggregate uncertainty scores
     
     Example
     ------------------------------
@@ -574,7 +579,7 @@ class AggregateErrorModel(BaseErrorModel):
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit(train["Drug"], train["Y"])
-    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()], transformer = oce.FactorAnalysis())
+    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()], reduction = oce.FactorAnalysis())
     error_model.build(model, train["Drug"], train["Y"])
     error_model.fit(valid["Drug"], valid["Y"])
     error_model.score(test["Drug"])
@@ -582,11 +587,11 @@ class AggregateErrorModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, error_models: List[BaseErrorModel], transformer: BaseTransformer):
+    def __init__(self, error_models: List[BaseErrorModel], reduction: BaseReduction):
         if not isinstance(error_models, list):
             raise TypeError("error_models must be a list")
         self.error_models = error_models
-        self.transformer = transformer
+        self.reduction = reduction
 
     def build(
         self,
@@ -608,10 +613,10 @@ class AggregateErrorModel(BaseErrorModel):
         y_pred = np.array(self.model.predict(X)).flatten()
         scores = [error_model.calculate(X, y_pred) for error_model in self.error_models]
         scores = np.transpose(np.stack(scores))
-        self.transformer.fit(scores)
+        self.reduction.fit(scores)
 
         residuals = np.abs(np.array(y) - y_pred)
-        scores = self.transformer.transform(scores)
+        scores = self.reduction.transform(scores)
 
         self._fit(residuals, scores, **kwargs)
 
@@ -627,4 +632,4 @@ class AggregateErrorModel(BaseErrorModel):
         scores = [error_model.calculate(X, y_pred) for error_model in self.error_models]
         scores = np.transpose(np.stack(scores))
 
-        return self.transformer.transform(scores)
+        return self.reduction.transform(scores)
