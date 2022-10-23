@@ -612,8 +612,6 @@ class BaseRemoteSymbol:
         return self.REMOTE_CHILDREN[key]
 
     def __call__(self, *args, **kwargs):
-        # TODO: move logic from init to here, then return baseremotesymbol only if return type is none
-
         remote_id = generate_uuid()
         out = _runtime.add_instruction(
             {

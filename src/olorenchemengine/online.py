@@ -128,37 +128,3 @@ class RemoteObject:
             return self.REMOTE_SESSION.run_method(
                 self.REMOTE_PARENT, self.REMOTE_BC_KEY.split(".")[-1], args, kwargs
             )
-            # parameterized_kwargs = {parameterize_remote(k): parameterize_remote(v) for k, v in kwargs.items()}
-            # print(f"Calling function {self.REMOTE_BC_KEY.split('.')[-1]} with: args: {[parameterize_remote(a) for a in args]}, kwargs: {parameterized_kwargs} on {parameterize_remote(self.REMOTE_PARENT)}" )
-            # return self # TODO: handle calling a function (like train)
-
-    # def __iter__(self):
-    #     return iter([0, 1])
-
-
-# TODO: track operators on RemoteObjects
-
-# We are basically making a Python "Compiler" that compiles down to a JSON dictionary - but we can use python
-# in the compiler lol
-
-
-if __name__ == "__main__":
-    # oce = RemoteSession()
-    # dataset = oce.ExampleDataset()
-    # dataset.shabalaba
-
-    import olorenchemengine as oce
-
-    print(dir(oce))
-
-    # sub_model1 = oce.RandomForestModel(oce.DescriptastorusDescriptor("rdkit2dnormalized"), n_estimators=1000)
-    # model = oce.ensemble.BaseBoosting([
-    #         sub_model1,
-    #         oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000)])
-    # model.fit(dataset.train_dataset)
-    # oce.save(model, "model.oce")
-
-    # CONSTRUCT model FROM JSON_PARAMS
-    # CONSTRUCT dataset FROM JSON_PARAMS
-    # CONSTRUCT train_dataset FROM dataset.train_dataset
-    # RUN fit on model with train_dataset

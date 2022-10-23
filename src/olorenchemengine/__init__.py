@@ -272,7 +272,7 @@ offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
     # print(textwrap.fill(textwrap.dedent(message).replace("\n", " ").replace("    (", "\n     ("), 80))
     print(textwrap.dedent(message))
 
-def online():
+def online(session_url="https://aws.chemengine.org"):
     global online_session
-    online_session = Remote("https://aws.chemengine.org")
+    online_session = Remote(session_url)
     online_session.__enter__()
