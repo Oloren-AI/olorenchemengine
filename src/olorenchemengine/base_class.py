@@ -1241,11 +1241,8 @@ class BaseErrorModel(BaseClass):
                 opt_func = func
                 opt_popt = popt
                 min_mse = mse
-        X_min, X_max = np.min(X), np.max(X)
-        if opt_func(X_min, *opt_popt) < opt_func(X_max, *opt_popt):
-            self.reg = np.vectorize(lambda x: opt_func(max(x, X_min), *opt_popt))
-        else:
-            self.reg = np.vectorize(lambda x: opt_func(min(x, X_max), *opt_popt))
+        floor, ceil = np.min(residuals), np.max(residuals)
+        self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), ceil), floor))
 
         sorted_scores = np.sort(scores)
         plt.xlabel(self.__class__.__name__)
