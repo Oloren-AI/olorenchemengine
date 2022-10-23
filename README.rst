@@ -38,6 +38,43 @@ It's that simple! And it's just as simple to train a graph neural network, gener
 visualizations, and create error models. More information on features and
 capabilities is available in our documentation at `docs.oloren.ai <https://docs.oloren.ai>`_.
 
+-------------------------------
+Getting Started with oce
+-------------------------------
+_______________________________
+Installation
+_______________________________
+
+In a fresh Python 3.8 environment, you can install the package with the following command, pasted into your terminal after activating your virtual environment:
+
+.. code-block:: bash
+
+    bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)
+
+Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment. The reason why a fresh environment is preferred is because PyTorch Geometric/ PyTorch/ CUDA are very particular about versioning, which often are more muddled in existing environment.
+
+Here are some common error messages and solutions:
+https://oloren-ai.notion.site/Oloren-ChemEngine-Installation-FAQ-f2edec771a7f4350af5fdc361d494604
+
+_______________________________
+Docker
+_______________________________
+
+Alternatively, you can also run OCE from one of our docker images. After cloning the repo, just run:
+
+.. code-block:: bash
+
+    docker build -t oce:latest -f docker/Dockerfile.gpu . # build the docker image
+    docker run -it -v ~/.oce:/root/.oce oce:latest python # run the docker image
+
+Replace ".gpu" with ".cpu" in the docker path if you want to run the project in a dockerized environment.
+
+_______________________________
+Basic Usage
+_______________________________
+We have an examples folder, which we'd highly reccomend you checkout--1A and 1B
+in particular--the rest of the examples can be purused when the topics come up.
+
 _______________________________
 Notice
 _______________________________
@@ -86,45 +123,9 @@ and their interactions, most prominently
     * ``BaseRepresentation``, a base class for all molecular representations
     * ``BaseVisualization``, a base class for all types of visualizations and analyses
 
-This abstraction system is provided free of charge by Oloren AI in the internals.
-
 -------------------------------
-Getting Started with oce
--------------------------------
-_______________________________
-Installation
-_______________________________
-
-In a fresh Python 3.8 environment, you can install the package with the following command:
-
-.. code-block:: bash
-
-    bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)
-
-Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment. The reason why a fresh environment is preferred is because PyTorch Geometric/ PyTorch/ CUDA are very particular about versioning, which often are more muddled in existing environment.
-
-_______________________________
-Docker
-_______________________________
-
-Alternatively, you can also run OCE from one of our docker images. After cloning the repo, just run:
-
-.. code-block:: bash
-
-    docker build -t oce:latest -f docker/Dockerfile.gpu . # build the docker image
-    docker run -it -v ~/.oce:/root/.oce oce:latest python # run the docker image
-
-Replace ".gpu" with ".cpu" in the docker path if you want to run the project in a dockerized environment.
-
-_______________________________
-Basic Usage
-_______________________________
-We have an examples folder, which we'd highly reccomend you checkout--1A and 1B
-in particular--the rest of the examples can be purused when the topics come up.
-
-_______________________________
 Contributing
-_______________________________
+-------------------------------
 First, thank you for contributing to OCE! To install OCE in editable/development mode, simply clone the repository and run:
 
 .. code-block:: bash

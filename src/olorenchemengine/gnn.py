@@ -233,7 +233,7 @@ class BaseTorchGeometricModel(BaseModel):
     """BaseTorchGeometricModel is a base class for models in the PyTorch Geometric framework.
 
     Parameters:
-        network (nn.Module): The network to be used for the model.
+        network (BaseLightningModule): The network to be used for the model.
         representation (BaseRepresentation, optional): The representation to be used for the model.
             Note that the representation must be compatible with the network,
             so the default, TorchGeometricGraph() is highly reccomended
@@ -341,7 +341,7 @@ from collections import OrderedDict
 
 class TLFromCheckpoint(BaseLightningModule):
 
-    """TLFromCheckpoint is a base class for transfer-learning from an OlorenVec PyTorch-lightning checkpoint.
+    """ TLFromCheckpoint is a class for transfer-learning from an OlorenVec PyTorch-lightning checkpoint.
 
     Parameters:
         model_path (str, option): The path to the PyTorch-lightning checkpoint. Ise
@@ -357,12 +357,12 @@ class TLFromCheckpoint(BaseLightningModule):
     def __init__(
         self,
         model_path,
-        map_location: str = "cuda:0",
         num_tasks: int = 2048,
         dropout: float = 0.1,
         lr: float = 1e-4,
         optim: str = "adam",
         reset: bool = False,
+        **kwargs
     ):
         self.lr = lr
         super().__init__(optim=optim)
@@ -372,14 +372,10 @@ class TLFromCheckpoint(BaseLightningModule):
         else:
             path = model_path
 
-        if not torch.cuda.is_available():
-            map_location = torch.device("cpu")
-            logging.warn("Overriding map_location to cpu as no GPUs are available.")
-
         state_dict = OrderedDict(
             [
                 (k.replace("model.", ""), v)
-                for k, v in torch.load(path, map_location=map_location)[
+                for k, v in torch.load(path, map_location=oce.CONFIG["MAP_LOCATION"])[
                     "state_dict"
                 ].items()
             ]

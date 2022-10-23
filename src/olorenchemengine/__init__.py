@@ -1,6 +1,5 @@
 import contextlib
 import sys
-from locale import D_FMT
 
 if sys.version_info[:2] >= (3, 8):
     # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
@@ -169,6 +168,7 @@ def ExampleDataFrame():
 
 from .base_class import *
 from .basics import *
+from .beta import *
 from .benchmarks import *
 from .dataset import *
 from .ensemble import *
@@ -229,6 +229,7 @@ def test_oce():
     _ = load("model.oce")
     os.remove("model.oce")
 
+global online_session
 online_session = None
 
 def MISSING_DEPENDENCIES():

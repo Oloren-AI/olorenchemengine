@@ -691,8 +691,6 @@ class BaseModel(BaseClass):
                     *self.error_model.args, **self.error_model.kwargs
                 )
                 error_model.build(model, X_train, y_train)
-                if isinstance(error_model, BaseAggregateErrorModel):
-                    error_model.train_cv()
                 new_scores = error_model.calculate(X_test, y_pred_test)
                 if scores is None:
                     pred = y_pred_test
