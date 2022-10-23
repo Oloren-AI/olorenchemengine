@@ -760,6 +760,8 @@ class BaseModel(BaseClass):
 
         import joblib
 
+        import joblib
+
         dataset_hash = joblib.hash(X) + joblib.hash(y)
 
         y_pred = self.predict(X)
@@ -1015,7 +1017,49 @@ class BaseSKLearnModel(BaseModel):
             self.regression_model._load(d["model"])
             self.model = self.regression_model
 
+class BaseReduction(BaseClass):
+    """
+    BaseReduction for applying dimensionality reduction on high-dimensional data
 
+    Parameters:
+        n_components (int): the number of components to keep
+
+    Methods:
+        fit: fit the model with input data
+        fit_transform: fit the model with and apply dimensionality reduction to input data
+        transform: apply dimensionality reduction to input data
+    """
+    def __init__(self):
+        pass
+
+    @abstractmethod
+    def fit(self, X):
+        pass
+    
+    @abstractmethod
+    def fit_transform(self, X):
+        pass
+
+    @abstractmethod
+    def transform(self, X):
+        pass
+    
+
+class BaseSKLearnReduction(BaseReduction):
+    """
+    Base class for creating sklearn dimensionality reduction
+
+    """
+    def fit(self, X):
+        return self.obj.fit(X)
+    
+    def fit_transform(self, X):
+        return self.obj.fit_transform(X)
+
+    def transform(self, X):
+        return self.obj.transform(X)
+
+    
 class BaseErrorModel(BaseClass):
     """Base class for error models.
 
@@ -1084,8 +1128,8 @@ class BaseErrorModel(BaseClass):
         """
         y_pred = np.array(self.model.predict(X)).flatten()
         residuals = np.abs(np.array(y) - y_pred)
-
         scores = np.array(self.calculate(X, y_pred))
+
         self._fit(residuals, scores, **kwargs)
 
     def fit_cv(self, n_splits: int = 5, **kwargs):
@@ -1197,16 +1241,12 @@ class BaseErrorModel(BaseClass):
                 opt_func = func
                 opt_popt = popt
                 min_mse = mse
-        X_min, X_max = np.min(X), np.max(X)
-        if opt_func(X_min, *opt_popt) < opt_func(X_max, *opt_popt):
-            self.reg = np.vectorize(lambda x: opt_func(max(x, X_min), *opt_popt))
-        else:
-            self.reg = np.vectorize(lambda x: opt_func(min(x, X_max), *opt_popt))
+        floor, ceil = np.min(residuals), np.max(residuals)
+        self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), ceil), floor))
 
+        sorted_scores = np.sort(scores)
         plt.xlabel(self.__class__.__name__)
         plt.ylabel("Absolute Error")
-        sorted_scores = np.sort(scores)
-
         plt.scatter(scores, residuals, c="black", alpha=0.2)
         plt.scatter(X, y, c="blue")
         plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
