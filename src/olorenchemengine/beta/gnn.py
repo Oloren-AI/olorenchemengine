@@ -1,7 +1,8 @@
 import olorenchemengine as oce
 from olorenchemengine.internal import *
+from olorenchemengine.gnn import *
 
-class SuperGATModel_beta(oce.BaseLightningModule):
+class SuperGATModel_beta(BaseLightningModule):
 
     """ SuperGAT is a network
 

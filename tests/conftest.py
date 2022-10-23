@@ -13,25 +13,7 @@ import pytest
 
 import olorenchemengine as oce
 
-# def pytest_configure(config):
-#     config.addinivalue_line(
-#         "markers",
-#         "no_profiling: mark test to not use sql profiling"
-#     )
-
-# @pytest.fixture(scope="session", autouse=True)
-# def cleanup(request):
-#     """Cleanup a testing directory once we are finished."""
-#     remote = oce.Remote("http://api.oloren.ai:5000")
-#     print("Opening remote")
-#     remote.__enter__()
-#     def close_remote():
-#         print("Closing remote")
-#         remote.__exit__(None, None, None)
-#     request.addfinalizer(close_remote)
-
-
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=False)
 def run_around_tests():
     with oce.Remote("http://api.oloren.ai:5000") as remote:
         yield

@@ -4,17 +4,8 @@ __author__ = "Oloren AI"
 __copyright__ = "Oloren AI"
 
 
-def remote(func):
-    def wrapper(*args, **kwargs):
-        with oce.Remote("http://api.oloren.ai:5000") as remote:
-            func(*args, **kwargs)
-
-    return wrapper
-
-
 def test_main():
     oce.test_oce()
-
 
 def test_config():
     assert isinstance(oce.CONFIG, dict)
