@@ -36,5 +36,5 @@ def test_0():
     model = oce.RandomForestModel(
         oce.DescriptastorusDescriptor("morgan3counts"), n_estimators=1000
     )
-    _ = model.fit_cv(*dataset.train_dataset, error_model=oce.kNNwRMSD1())
+    _ = model.fit_cv(*dataset.train_dataset, error_model=oce.TrainDistKNN())
     oce.save(model, "vis-model.oce")

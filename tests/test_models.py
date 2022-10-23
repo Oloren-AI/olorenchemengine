@@ -340,8 +340,9 @@ def test_smiles_transformer(example_data):
     train_predict_slf(model, example_data)
 
 def test_supergat(example_data):
-    from olorenchemengine.gnn import BaseTorchGeometricModel, SuperGATModel
-    model = BaseTorchGeometricModel(SuperGATModel(), epochs=1, batch_size=64)
+    from olorenchemengine.gnn import BaseTorchGeometricModel
+    from olorenchemengine.beta import SuperGATModel_beta
+    model = BaseTorchGeometricModel(SuperGATModel_beta(), epochs=1, batch_size=64)
     train_predict_slf(model, example_data)
 
 # @pytest.mark.parametrize("rep", [(rep) for rep in oce.BaseCompoundVecRepresentation.AllInstances()])
