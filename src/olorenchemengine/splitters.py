@@ -143,13 +143,16 @@ class StratifiedSplitter(BaseSplitter):
     def split(self, data, *args, **kwargs):
         out = []
         for i in range(len(self.split_proportions) - 1):
-            train, remaining = train_test_split(
-                data,
-                train_size=np.sum([self.split_proportions[j] for j in range(i + 1)]),
-                stratify=data[self.value_col],
-            )
-            out.append(train)
-            data = remaining
+            if self.split_proportions[i] == 0:
+                out.append(pd.DataFrame(columns=data.columns))
+            else:
+                train, remaining = train_test_split(
+                    data,
+                    train_size=self.split_proportions[i]/np.sum([self.split_proportions[j] for j in range(i, len(self.split_proportions))]),
+                    stratify=data[self.value_col],
+                )
+                out.append(train)
+                data = remaining
         out.append(data)
 
         return out
@@ -250,8 +253,11 @@ class ScaffoldSplit(BaseSplitter):
         Returns:
             (string): string representation of molecule's scaffold
         """
-        mol = Chem.MolFromSmiles(smiles)
-        scaffold = MurckoScaffold.MurckoScaffoldSmiles(mol=mol, includeChirality=False)
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            scaffold = MurckoScaffold.MurckoScaffoldSmiles(mol=mol, includeChirality=False)
+        except:
+            assert False, "Could not generate scaffold for molecule: {}, please clean dataset".format(smiles)
         return scaffold
 
     def _generate_scaffold_column(self, data, structure_col):

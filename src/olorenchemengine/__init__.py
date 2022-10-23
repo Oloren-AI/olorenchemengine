@@ -168,6 +168,7 @@ def ExampleDataFrame():
 
 from .base_class import *
 from .basics import *
+from .beta import *
 from .benchmarks import *
 from .dataset import *
 from .ensemble import *
