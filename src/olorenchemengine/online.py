@@ -2,21 +2,21 @@ def _is_object(key):
     return key.split(".")[-1][0].isupper()
 
 
-class RemoteSession:
+class WorkflowSession:
     def __init__(self):
         pass
 
     def construct(self, object):
-        if issubclass(type(object), RemoteObject):
-            if hasattr(object, "REMOTE_ID"):  # object already constructed
+        if issubclass(type(object), WorkflowObject):
+            if hasattr(object, "WORKFLOW_ID"):  # object already constructed
                 return object
-            if _is_object(object.REMOTE_BC_KEY):
-                object.REMOTE_ID = generate_random_uuid()
-                print(f"CONSTRUCT {object.REMOTE_ID} => {parameterize_remote(object)}")
+            if _is_object(object.WORKFLOW_BC_KEY):
+                object.WORKFLOW_ID = generate_random_uuid()
+                print(f"CONSTRUCT {object.WORKFLOW_ID} => {parameterize_workflow(object)}")
                 return object
             else:
                 return self.get_attribute(
-                    object.REMOTE_PARENT, object.REMOTE_BC_KEY.split(".")[-1]
+                    object.WORKFLOW_PARENT, object.WORKFLOW_BC_KEY.split(".")[-1]
                 )
         elif (
             object is None
@@ -33,22 +33,22 @@ class RemoteSession:
         args = [self.construct(arg) for arg in args]
         kwargs = {k: self.construct(v) for k, v in kwargs.items()}
         print(
-            f"RUN {object.REMOTE_ID}.{method_name} with args = {args}, and kwargs = {kwargs}"
+            f"RUN {object.WORKFLOW_ID}.{method_name} with args = {args}, and kwargs = {kwargs}"
         )
 
     def get_attribute(self, object, attribute_name):
         object = self.construct(object)
-        object.attribute_name.REMOTE_ID = generate_random_uuid()
+        object.attribute_name.WORKFLOW_ID = generate_random_uuid()
         print(
-            f"GET_ATTR {object.REMOTE_ID}.{attribute_name} => {object.attribute_name.REMOTE_ID}"
+            f"GET_ATTR {object.WORKFLOW_ID}.{attribute_name} => {object.attribute_name.WORKFLOW_ID}"
         )
-        return object.attribute_name.REMOTE_ID
+        return object.attribute_name.WORKFLOW_ID
 
     def __getattribute__(self, key):
         EXCLUDED_WORDS = ["run_method", "construct", "get_attribute"]
         if key in EXCLUDED_WORDS:
             return object.__getattribute__(self, key)
-        return RemoteObject(key, None, self)
+        return WorkflowObject(key, None, self)
 
 
 def generate_random_uuid():
@@ -57,20 +57,20 @@ def generate_random_uuid():
     return str(uuid.uuid4())
 
 
-def parameterize_remote(object):
-    if issubclass(type(object), RemoteObject):
+def parameterize_workflow(object):
+    if issubclass(type(object), WorkflowObject):
         if not hasattr(object, "args") or not hasattr(object, "kwargs"):
-            print("Warning: RemoteObject has no args or kwargs")
-            print(f"Object is {object.REMOTE_BC_KEY}")
+            print("Warning: WorkflowObject has no args or kwargs")
+            print(f"Object is {object.WORKFLOW_BC_KEY}")
         return {
             **(
-                {"BC_remote_id": object.REMOTE_ID}
-                if hasattr(object, "REMOTE_ID")
+                {"BC_workflow_id": object.WORKFLOW_ID}
+                if hasattr(object, "WORKFLOW_ID")
                 else {}
             ),
-            **{"BC_class_name": object.REMOTE_BC_KEY.split(".")[-1]},
-            **{"args": [parameterize_remote(arg) for arg in object.args]},
-            **{"kwargs": {k: parameterize_remote(v) for k, v in object.kwargs.items()}},
+            **{"BC_class_name": object.WORKFLOW_BC_KEY.split(".")[-1]},
+            **{"args": [parameterize_workflow(arg) for arg in object.args]},
+            **{"kwargs": {k: parameterize_workflow(v) for k, v in object.kwargs.items()}},
         }
     elif (
         object is None
@@ -80,24 +80,24 @@ def parameterize_remote(object):
     ):
         return object
     elif issubclass(type(object), list):
-        return [parameterize_remote(x) for x in object]
+        return [parameterize_workflow(x) for x in object]
     else:
         raise ValueError(f"Cannot parameterize {object} of type {type(object)}")
 
 
-class RemoteObject:
+class WorkflowObject:
     def __init__(self, key, parent) -> None:
-        self.REMOTE_BC_KEY = key
-        self.REMOTE_PARENT = parent
-        self.REMOTE_CHILDREN = {}
+        self.WORKFLOW_BC_KEY = key
+        self.WORKFLOW_PARENT = parent
+        self.WORKFLOW_CHILDREN = {}
 
     def __getattribute__(self, key):
         EXCLUDED_WORDS = [
-            "REMOTE_BC_KEY",
-            "REMOTE_SESSION",
-            "REMOTE_PARENT",
-            "REMOTE_ID",
-            "REMOTE_CHILDREN",
+            "WORKFLOW_BC_KEY",
+            "WORKFLOW_SESSION",
+            "WORKFLOW_PARENT",
+            "WORKFLOW_ID",
+            "WORKFLOW_CHILDREN",
             "args",
             "kwargs",
             "shabalaba",
@@ -106,25 +106,25 @@ class RemoteObject:
         try:
             return object.__getattribute__(self, key)
         except AttributeError:
-            if key in self.REMOTE_CHILDREN:
-                return self.REMOTE_CHILDREN[key]
+            if key in self.WORKFLOW_CHILDREN:
+                return self.WORKFLOW_CHILDREN[key]
             else:
-                self.REMOTE_CHILDREN[key] = RemoteObject(
-                    self.REMOTE_BC_KEY + "." + key, self, self.REMOTE_SESSION
+                self.WORKFLOW_CHILDREN[key] = WorkflowObject(
+                    self.WORKFLOW_BC_KEY + "." + key, self, self.WORKFLOW_SESSION
                 )
-                return self.REMOTE_CHILDREN[key]
+                return self.WORKFLOW_CHILDREN[key]
 
     def __repr__(self) -> str:
         if hasattr(self, "args") or hasattr(self, "kwargs"):
-            return parameterize_remote(self)
-        return "RemoteObject(" + self.REMOTE_BC_KEY + ")"
+            return parameterize_workflow(self)
+        return "WorkflowObject(" + self.WORKFLOW_BC_KEY + ")"
 
     def __call__(self, *args, **kwargs):
-        if self.REMOTE_BC_KEY.split(".")[-1][0].isupper():  # instantiating an object
+        if self.WORKFLOW_BC_KEY.split(".")[-1][0].isupper():  # instantiating an object
             self.args = args
             self.kwargs = kwargs
             return self
         else:
-            return self.REMOTE_SESSION.run_method(
-                self.REMOTE_PARENT, self.REMOTE_BC_KEY.split(".")[-1], args, kwargs
+            return self.WORKFLOW_SESSION.run_method(
+                self.WORKFLOW_PARENT, self.WORKFLOW_BC_KEY.split(".")[-1], args, kwargs
             )

@@ -15,5 +15,5 @@ import olorenchemengine as oce
 
 @pytest.fixture(autouse=False)
 def run_around_tests():
-    with oce.Remote("http://api.oloren.ai:5000") as remote:
+    with oce.Workflow("http://api.oloren.ai:5000") as workflow:
         yield

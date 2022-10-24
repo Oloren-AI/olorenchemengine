@@ -240,20 +240,20 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
             return func(self, *args, **kwargs)
         import uuid
 
-        REMOTE_ID = str(uuid.uuid4())
+        WORKFLOW_ID = str(uuid.uuid4())
 
-        if "BaseRemoteSymbol" in str(type(self)):
-            self.REMOTE_ID = REMOTE_ID
+        if "BaseWorkflowSymbol" in str(type(self)):
+            self.WORKFLOW_ID = WORKFLOW_ID
             return func(self, *args, **kwargs)
 
         _runtime.add_instruction(
             {
                 "type": "CREATE",
-                "REMOTE_ID": REMOTE_ID,
+                "WORKFLOW_ID": WORKFLOW_ID,
                 "parameters": parameterize(self),
             }
         )
-        self.REMOTE_ID = REMOTE_ID
+        self.WORKFLOW_ID = WORKFLOW_ID
 
     wrapper.__wrapped__ = func
 
@@ -284,17 +284,17 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
-class _RemoteRuntime:
+class _WorkflowRuntime:
     def __init__(self) -> None:
-        self.reset_remote()
+        self.reset_workflow()
 
-    def get_remote_obj(self, remote_id):
+    def get_workflow_obj(self, workflow_id):
         if self.runner is None:
             raise NotImplementedError(
-                "Not yet implemented remote object retrieval locally"
+                "Not yet implemented workflow object retrieval locally"
             )
         else:
-            return self.runner.get_remote_obj(remote_id)
+            return self.runner.get_workflow_obj(workflow_id)
 
     def add_instruction(self, instruction):
 
@@ -305,14 +305,14 @@ class _RemoteRuntime:
             if x is not None and isinstance(x, str):
                 return json.loads(x)
 
-    def get_iterable(self, remote_id):
-        self.instruction_buffer.append({"type": "ITER", "REMOTE_ID": remote_id})
+    def get_iterable(self, workflow_id):
+        self.instruction_buffer.append({"type": "ITER", "WORKFLOW_ID": workflow_id})
         return [
-            BaseRemoteSymbol.from_rid(rid) for rid in self.send_instructions_blocking()
+            BaseWorkflowSymbol.from_rid(rid) for rid in self.send_instructions_blocking()
         ]
 
-    def get_obj_repr(self, remote_id):
-        self.instruction_buffer.append({"type": "REPR", "REMOTE_ID": remote_id})
+    def get_obj_repr(self, workflow_id):
+        self.instruction_buffer.append({"type": "REPR", "WORKFLOW_ID": workflow_id})
         return self.send_instructions_blocking()
 
     def send_instructions_blocking(self):
@@ -333,7 +333,7 @@ class _RemoteRuntime:
         eid = execution.id
 
         response = requests.post(
-            f"{self.remote_url}/firestore/run_remote/",
+            f"{self.workflow_url}/firestore/run_workflow/",
             params={
                 "eid": eid,
                 "uid": oas_connector.authenticate(),
@@ -346,7 +346,7 @@ class _RemoteRuntime:
 
         if response.status_code != 200:
             self.instruction_buffer = []
-            raise ValueError(f"Error code on post to {self.remote_url} {response.status_code} - {response.text}. Length of instruction buffer: {len(json.dumps(self.instruction_buffer))}")
+            raise ValueError(f"Error code on post to {self.workflow_url} {response.status_code} - {response.text}. Length of instruction buffer: {len(json.dumps(self.instruction_buffer))}")
 
         response = response.json()
 
@@ -372,16 +372,16 @@ class _RemoteRuntime:
         listener.close()
 
         if execution["status"] == "Error":
-            print(f"Remote Call: {self.instruction_buffer}\nResulted in Traceback:")
+            print(f"Workflow Call: {self.instruction_buffer}\nResulted in Traceback:")
             print(execution["traceback"])
             oas_connector.logging_db.collection("executions").document(eid).delete()
             self.instruction_buffer = []
-            raise ValueError("Remote call resulted in error")
+            raise ValueError("Workflow call resulted in error")
 
         elif execution["status"] == "Finished":
             if len(execution["stdout"].strip()) > 0:
                 print(
-                    "\n".join([f"REMOTE: {x}" for x in execution["stdout"].split("\n")])
+                    "\n".join([f"WORKFLOW: {x}" for x in execution["stdout"].split("\n")])
                 )
             oas_connector.logging_db.collection("executions").document(eid).delete()
             self.instruction_buffer = []
@@ -393,24 +393,24 @@ class _RemoteRuntime:
     def is_local(self):
         return self.runtime == "local"
 
-    def start_remote(self, session_id, debug, remote_url):
-        self.runtime = "remote"
+    def start_workflow(self, session_id, debug, workflow_url):
+        self.runtime = "workflow"
         self.instruction_buffer = []
         self.session_id = session_id
         self.runner = None
         self.debug = debug
-        self.remote_url = remote_url
+        self.workflow_url = workflow_url
 
-    def reset_remote(self):
+    def reset_workflow(self):
         self.runtime = "local"
         self.instruction_buffer = []
         self.session_id = None
         self.runner = None
         self.debug = False
-        self.remote_url = None
+        self.workflow_url = None
 
 
-_runtime = _RemoteRuntime()  # internal runtime object
+_runtime = _WorkflowRuntime()  # internal runtime object
 
 
 def set_runner(runner):
@@ -421,20 +421,20 @@ def get_runtime():
     return _runtime
 
 
-class Remote(object):
-    def __init__(self, remote_url, session_id=None, keep_alive=False, debug=False):
+class Workflow(object):
+    def __init__(self, workflow_url, session_id=None, keep_alive=False, debug=False):
         self.keep_alive = keep_alive
         self.session_id = session_id
         self.debug = debug
-        self.remote_url = remote_url
+        self.workflow_url = workflow_url
 
     def __enter__(self):
         self.session_id = generate_uuid()
-        _runtime.start_remote(self.session_id, self.debug, self.remote_url)
+        _runtime.start_workflow(self.session_id, self.debug, self.workflow_url)
         return self.session_id
 
     def __exit__(self, type, value, traceback):
-        _runtime.reset_remote()
+        _runtime.reset_workflow()
         if not self.keep_alive:
             import google
 
@@ -458,7 +458,7 @@ class Remote(object):
                             import logging
 
                             logging.warning(
-                                f"Unable to delete remote object {rid} from session {self.session_id}"
+                                f"Unable to delete workflow object {rid} from session {self.session_id}"
                             )
                     oas_connector.logging_db.collection("sessions").document(
                         self.session_id
@@ -472,7 +472,7 @@ def pretty_args_kwargs(args, kwargs):
 
 
 def _paremetrize_if_necessary(obj):
-    if isinstance(obj, BaseRemoteSymbol):
+    if isinstance(obj, BaseWorkflowSymbol):
         return parameterize(obj)
     elif isinstance(obj, pd.Series):
         return list(obj)
@@ -506,70 +506,70 @@ def _truncate_json(json_obj, max_length=40):
         return json_obj
 
 
-class BaseRemoteSymbol:
+class BaseWorkflowSymbol:
     @log_arguments
     def __init__(
-        self, REMOTE_SYMBOL_NAME, REMOTE_PARENT, args=None, kwargs=None
+        self, WORKFLOW_SYMBOL_NAME, WORKFLOW_PARENT, args=None, kwargs=None
     ) -> None:
         if _runtime.is_local:
-            raise RuntimeError("Cannot instantiate RemoteObject in local _runtime")
+            raise RuntimeError("Cannot instantiate WorkflowObject in local _runtime")
 
         if args is not None:
             self.args = args
         if kwargs is not None:
             self.kwargs = kwargs
 
-        self.REMOTE_SYMBOL_NAME = REMOTE_SYMBOL_NAME
-        self.REMOTE_PARENT = REMOTE_PARENT
-        self.REMOTE_CHILDREN = {}
+        self.WORKFLOW_SYMBOL_NAME = WORKFLOW_SYMBOL_NAME
+        self.WORKFLOW_PARENT = WORKFLOW_PARENT
+        self.WORKFLOW_CHILDREN = {}
 
-        if REMOTE_SYMBOL_NAME == "CALL":
+        if WORKFLOW_SYMBOL_NAME == "CALL":
             out = _runtime.add_instruction(
                 {
                     "type": "CALL",
-                    "PARENT_REMOTE_ID": self.REMOTE_PARENT.REMOTE_ID,
-                    "REMOTE_ID": self.REMOTE_ID,
+                    "PARENT_WORKFLOW_ID": self.WORKFLOW_PARENT.WORKFLOW_ID,
+                    "WORKFLOW_ID": self.WORKFLOW_ID,
                     "ARGUMENTS": parametrize_args_kwargs(args, kwargs),
                 }
             )
 
-            if self.REMOTE_PARENT.REMOTE_SYMBOL_NAME == "render_ipynb":
+            if self.WORKFLOW_PARENT.WORKFLOW_SYMBOL_NAME == "render_ipynb":
                 from IPython.display import IFrame, display
 
                 display(IFrame(out, width=800, height=600))
 
         else:
-            if not hasattr(self.REMOTE_PARENT, "REMOTE_ID"):
-                self.REMOTE_PARENT._upload_remote()
+            if not hasattr(self.WORKFLOW_PARENT, "WORKFLOW_ID"):
+                self.WORKFLOW_PARENT._upload_workflow()
 
             _runtime.add_instruction(
                 {
                     "type": "SYMBOL",
-                    "PARENT_REMOTE_ID": self.REMOTE_PARENT.REMOTE_ID,
-                    "SYMBOL_NAME": self.REMOTE_SYMBOL_NAME,
-                    "REMOTE_ID": self.REMOTE_ID,
+                    "PARENT_WORKFLOW_ID": self.WORKFLOW_PARENT.WORKFLOW_ID,
+                    "SYMBOL_NAME": self.WORKFLOW_SYMBOL_NAME,
+                    "WORKFLOW_ID": self.WORKFLOW_ID,
                 }
             )
 
     @classmethod
     def from_rid(cls, rid):
         x = object.__new__(cls)
-        x.REMOTE_ID = rid
+        x.WORKFLOW_ID = rid
         return x
 
     def __iter__(self):
-        return iter(_runtime.get_iterable(self.REMOTE_ID))
+        return iter(_runtime.get_iterable(self.WORKFLOW_ID))
 
     def __repr__(self):
-        if hasattr(self, "REMOTE_ID"):
-            return _runtime.get_obj_repr(self.REMOTE_ID)
+        if hasattr(self, "WORKFLOW_ID"):
+            return _runtime.get_obj_repr(self.WORKFLOW_ID)
         else:
             return  object.__repr__(self)
 
-    def _upload_remote(self):
+    def _upload_workflow(self):
         try:
             oas_connector.authenticate()
-            REMOTE_ID = generate_uuid()
+            WORKFLOW_ID = generate_uuid()
 
             r = _runtime.runtime
             _runtime.runtime = "local"
@@ -579,7 +579,7 @@ class BaseRemoteSymbol:
                 tmp.flush()
                 response = oas_connector.storage.child(
                     f"{oas_connector.uid}/sessions/{_runtime.session_id}"
-                    + f"/{REMOTE_ID}.oce"
+                    + f"/{WORKFLOW_ID}.oce"
                 ).put(tmp.name, oas_connector.uid_token)
         except:
             import sys
@@ -589,48 +589,48 @@ class BaseRemoteSymbol:
             sys.exit(0)
 
         _runtime.runtime = r
-        object.__setattr__(self, "REMOTE_ID", REMOTE_ID)
+        object.__setattr__(self, "WORKFLOW_ID", WORKFLOW_ID)
 
-        return REMOTE_ID
+        return WORKFLOW_ID
 
     def __getattribute__(self, key):
-        if _runtime.is_local or key == "_upload_remote":
+        if _runtime.is_local or key == "_upload_workflow":
             return object.__getattribute__(self, key)
         if "ipython_canary_method_should_not_exist" in key:
             return {}
         if (
-            key.startswith("REMOTE")
+            key.startswith("WORKFLOW")
             or key.startswith("__")
             or key in ["args", "kwargs"]
         ):
             return object.__getattribute__(self, key)
 
-        if not hasattr(self, "REMOTE_CHILDREN") or key not in self.REMOTE_CHILDREN:
-            if not hasattr(self, "REMOTE_CHILDREN"):
-                self.REMOTE_CHILDREN = {}
-            self.REMOTE_CHILDREN[key] = BaseRemoteSymbol(key, self)
-        return self.REMOTE_CHILDREN[key]
+        if not hasattr(self, "WORKFLOW_CHILDREN") or key not in self.WORKFLOW_CHILDREN:
+            if not hasattr(self, "WORKFLOW_CHILDREN"):
+                self.WORKFLOW_CHILDREN = {}
+            self.WORKFLOW_CHILDREN[key] = BaseWorkflowSymbol(key, self)
+        return self.WORKFLOW_CHILDREN[key]
 
     def __call__(self, *args, **kwargs):
-        remote_id = generate_uuid()
+        workflow_id = generate_uuid()
         out = _runtime.add_instruction(
             {
                 "type": "CALL",
-                "PARENT_REMOTE_ID": self.REMOTE_ID,
-                "REMOTE_ID": remote_id,
+                "PARENT_WORKFLOW_ID": self.WORKFLOW_ID,
+                "WORKFLOW_ID": workflow_id,
                 "ARGUMENTS": parametrize_args_kwargs(args, kwargs),
             }
         )
 
-        if self.REMOTE_SYMBOL_NAME == "render_ipynb":
+        if self.WORKFLOW_SYMBOL_NAME == "render_ipynb":
             from IPython.display import IFrame, display
 
             display(IFrame(out, width=800, height=600))
 
-        return out if out is not None else RemoteObj(remote_id)
+        return out if out is not None else WorkflowObj(workflow_id)
 
 
-class BaseClass(BaseRemoteSymbol):
+class BaseClass(BaseWorkflowSymbol):
     """BaseClass is the base class for all models.
 
     All classes in Oloren ChemEngine should inherit from BaseClass to enable for universal saving and loading of both
@@ -699,11 +699,11 @@ class BaseClass(BaseRemoteSymbol):
         return obj_copy
 
 
-class RemoteObj(BaseRemoteSymbol):
-    """Dummy object to represent remote objects."""
+class WorkflowObj(BaseWorkflowSymbol):
+    """Dummy object to represent workflow objects."""
 
-    def __init__(self, remote_id):
-        self.REMOTE_ID = remote_id
+    def __init__(self, workflow_id):
+        self.WORKFLOW_ID = workflow_id
 
 
 def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
@@ -721,10 +721,10 @@ def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
         dict: dictionary of parameters necessary to instantiate the object.
     """
     if issubclass(type(object), BaseClass) or (
-        issubclass(type(object), BaseRemoteSymbol) and hasattr(object, "REMOTE_ID")
+        issubclass(type(object), BaseWorkflowSymbol) and hasattr(object, "WORKFLOW_ID")
     ):
-        if hasattr(object, "REMOTE_ID"):
-            return {"REMOTE_ID": object.REMOTE_ID}
+        if hasattr(object, "WORKFLOW_ID"):
+            return {"WORKFLOW_ID": object.WORKFLOW_ID}
         return {
             **{"BC_class_name": type(object).__name__},
             **{"args": [parameterize(arg) for arg in object.args]},
@@ -825,14 +825,14 @@ def create_BC(d: dict) -> BaseClass:
         )
         d = json.loads(d)
 
-    if "REMOTE_ID" in d.keys():
-        return _runtime.get_remote_obj(d["REMOTE_ID"])
+    if "WORKFLOW_ID" in d.keys():
+        return _runtime.get_workflow_obj(d["WORKFLOW_ID"])
 
     args = []
     if "args" in d.keys():
         for arg in d["args"]:
             if isinstance(arg, dict) and (
-                "BC_class_name" in arg.keys() or "REMOTE_ID" in arg.keys()
+                "BC_class_name" in arg.keys() or "WORKFLOW_ID" in arg.keys()
             ):
                 args.append(create_BC(arg))
             else:
@@ -840,7 +840,7 @@ def create_BC(d: dict) -> BaseClass:
                     arg = [
                         create_BC(x)
                         if isinstance(x, dict)
-                        and ("BC_class_name" in x.keys() or "REMOTE_ID" in x.keys())
+                        and ("BC_class_name" in x.keys() or "WORKFLOW_ID" in x.keys())
                         else x
                         for x in arg
                     ]
@@ -850,7 +850,7 @@ def create_BC(d: dict) -> BaseClass:
     if "kwargs" in d.keys():
         for k, v in d["kwargs"].items():
             if isinstance(v, dict) and (
-                "BC_class_name" in v.keys() or "REMOTE_ID" in v.keys()
+                "BC_class_name" in v.keys() or "WORKFLOW_ID" in v.keys()
             ):
                 kwargs[k] = create_BC(v)
             else:
@@ -902,11 +902,11 @@ def save(model: BaseClass, fname: str):
         fname (str): the file name to save the model to
     """
 
-    if hasattr(model, "REMOTE_ID"):
+    if hasattr(model, "WORKFLOW_ID"):
 
-        REMOTE_ID = model.REMOTE_ID
+        WORKFLOW_ID = model.WORKFLOW_ID
         oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}/{REMOTE_ID}.oce.delete"
+            f"{oas_connector.uid}/sessions/{_runtime.session_id}/{WORKFLOW_ID}.oce.delete"
         ).download("", fname, token=oas_connector.authenticate())
     else:
         save_dict = saves(model)
@@ -929,11 +929,11 @@ def load(fname: str) -> BaseClass:
         return loads(d)
     else:
         oas_connector.authenticate()
-        REMOTE_ID = generate_uuid()
+        WORKFLOW_ID = generate_uuid()
         response = oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}" + f"/{REMOTE_ID}.oce.delete"
+            f"{oas_connector.uid}/sessions/{_runtime.session_id}" + f"/{WORKFLOW_ID}.oce.delete"
         ).put(fname, oas_connector.uid_token)
-        return RemoteObj(REMOTE_ID)
+        return WorkflowObj(WORKFLOW_ID)
 
 
 def pretty_params(base: Union[BaseClass, dict]) -> dict:
