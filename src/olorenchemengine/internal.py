@@ -14,7 +14,6 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-import pyrebase  # Default pyrebase is pyrebase3 which won't work. Need to install pyrebase4 (pip install pyrebase4)
 from google.cloud.firestore import Client
 from google.oauth2.credentials import Credentials
 
@@ -122,17 +121,42 @@ class OASConnector:
             "appId": "1:602366687071:web:f35531f7142084b86a28ea",
             "measurementId": "G-MVNK4DPQ60",
         }
+        import pyrebase
         self.firebase = pyrebase.initialize_app(config)
 
         # self.auth = self.firebase.auth()
         # response = self.auth.refresh(response["refreshToken"])
 
         self.storage = self.firebase.storage()
+        self.requests = requests.Session()
+
         self.logging_db = Client("oloren-ai", creds)
         self.uid = response["uid"]
         self.uid_token = response["idToken"]
 
         return self.uid_token
+
+    def download_remote_obj(self, object_path, output_path):
+        from urllib.parse import quote
+        if object_path.startswith('/'):
+            object_path = object_path[1:]
+        url = "{0}/o/{1}?alt=media&token={2}".format(self.storage_bucket, quote(object_path, safe=''), self.uid_token)
+
+        headers = {"Authorization": "Firebase " + self.uid_token}
+        r = self.requests.get(url, stream=True, headers=headers)
+        if r.status_code != 200:
+            raise FileNotFoundError(f"Could not download file from GCS: {object_path}")
+        with open(output_path, 'wb') as f:
+            for chunk in r:
+                f.write(chunk)
+
+    def delete_remote_obj(self, object_path):
+        request_ref = self.storage_bucket + "/o?name={0}".format(object_path)
+        headers = {"Authorization": "Firebase " + self.uid_token}
+        response = self.requests.delete(request_ref, headers=headers)
+        if not response.status_code == 200:
+            import logging
+            logging.warning(f"Could not delete {object_path} from Cloud Storage")
 
     def upload_vis(self, visualization):
         self.authenticate()
@@ -449,17 +473,7 @@ class Remote(object):
                 )
                 if doc is not None:
                     for rid in doc["objects"]:
-                        try:
-                            oas_connector.storage.delete(
-                                f"{oas_connector.uid}/sessions/{self.session_id}/{rid}.oce",
-                                oas_connector.uid_token,
-                            )
-                        except:
-                            import logging
-
-                            logging.warning(
-                                f"Unable to delete remote object {rid} from session {self.session_id}"
-                            )
+                        oas_connector.delete_remote_obj(f"{oas_connector.uid}/sessions/{self.session_id}/{rid}.oce")
                     oas_connector.logging_db.collection("sessions").document(
                         self.session_id
                     ).delete()
@@ -905,9 +919,8 @@ def save(model: BaseClass, fname: str):
     if hasattr(model, "REMOTE_ID"):
 
         REMOTE_ID = model.REMOTE_ID
-        oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}/{REMOTE_ID}.oce.delete"
-        ).download("", fname, token=oas_connector.authenticate())
+        oas_connector.download_remote_obj(f"{oas_connector.uid}/sessions/{_runtime.session_id}/{REMOTE_ID}.oce.delete",
+        fname)
     else:
         save_dict = saves(model)
         with open(fname, "wb+") as f:
