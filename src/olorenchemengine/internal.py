@@ -239,14 +239,16 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
             self.kwargs = {k: v for k, v in kwargs.items() if k not in ignored_kwargs}
 
             WORKFLOW_ID = generate_uuid()
-
-            _runtime.add_instruction(
-                {
-                    "type": "CREATE",
-                    "WORKFLOW_ID": WORKFLOW_ID,
-                    "parameters": parameterize_workflow(self),
-                }
-            )
+            
+            if issubclass(type(self), BaseClass):
+                _runtime.add_instruction(
+                    {
+                        "type": "CREATE",
+                        "WORKFLOW_ID": WORKFLOW_ID,
+                        "parameters": parameterize_workflow(self),
+                    }
+                )
+                
             self.WORKFLOW_ID = WORKFLOW_ID
         
         if _runtime.is_local:
@@ -294,7 +296,6 @@ class _WorkflowRuntime:
             return self.runner.get_workflow_obj(workflow_id)
 
     def add_instruction(self, instruction):
-        print(instruction)
         self.instruction_buffer.append(instruction)
 
         if instruction["type"] == "CALL" and not self.is_local:
@@ -504,6 +505,7 @@ def _truncate_json(json_obj, max_length=40):
 
 
 class BaseWorkflowSymbol:
+    
     @log_arguments
     def __init__(
         self, WORKFLOW_SYMBOL_NAME, WORKFLOW_PARENT, args=None, kwargs=None
@@ -726,7 +728,7 @@ def parameterize_workflow(object: object) -> dict:
     """
     if isinstance(object, BaseWorkflowSymbol):
         if hasattr(object, "WORKFLOW_ID"):
-            return object.WORKFLOW_ID
+            return {"WORKFLOW_ID":object.WORKFLOW_ID}
         else:
             return {
                 **{"BC_class_name": type(object).__name__},
