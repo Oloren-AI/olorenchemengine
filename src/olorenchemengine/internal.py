@@ -8,6 +8,7 @@ import pickle
 import subprocess
 import sys
 import tempfile
+import inspect
 from abc import ABC, abstractmethod
 from typing import Callable, Union
 from unittest.mock import MagicMock
@@ -236,24 +237,20 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
                     kwargs[k] = v
             self.args = args
             self.kwargs = {k: v for k, v in kwargs.items() if k not in ignored_kwargs}
+
+            WORKFLOW_ID = generate_uuid()
+
+            _runtime.add_instruction(
+                {
+                    "type": "CREATE",
+                    "WORKFLOW_ID": WORKFLOW_ID,
+                    "parameters": parameterize_workflow(self),
+                }
+            )
+            self.WORKFLOW_ID = WORKFLOW_ID
+        
         if _runtime.is_local:
             return func(self, *args, **kwargs)
-        import uuid
-
-        WORKFLOW_ID = str(uuid.uuid4())
-
-        if "BaseWorkflowSymbol" in str(type(self)):
-            self.WORKFLOW_ID = WORKFLOW_ID
-            return func(self, *args, **kwargs)
-
-        _runtime.add_instruction(
-            {
-                "type": "CREATE",
-                "WORKFLOW_ID": WORKFLOW_ID,
-                "parameters": parameterize(self),
-            }
-        )
-        self.WORKFLOW_ID = WORKFLOW_ID
 
     wrapper.__wrapped__ = func
 
@@ -297,10 +294,10 @@ class _WorkflowRuntime:
             return self.runner.get_workflow_obj(workflow_id)
 
     def add_instruction(self, instruction):
-
+        print(instruction)
         self.instruction_buffer.append(instruction)
 
-        if instruction["type"] == "CALL":
+        if instruction["type"] == "CALL" and not self.is_local:
             x = self.send_instructions_blocking()
             if x is not None and isinstance(x, str):
                 return json.loads(x)
@@ -511,8 +508,6 @@ class BaseWorkflowSymbol:
     def __init__(
         self, WORKFLOW_SYMBOL_NAME, WORKFLOW_PARENT, args=None, kwargs=None
     ) -> None:
-        if _runtime.is_local:
-            raise RuntimeError("Cannot instantiate WorkflowObject in local _runtime")
 
         if args is not None:
             self.args = args
@@ -558,10 +553,13 @@ class BaseWorkflowSymbol:
         return x
 
     def __iter__(self):
-        return iter(_runtime.get_iterable(self.WORKFLOW_ID))
+        if _runtime.is_local:
+            return self.__iter__()
+        else:
+            return iter(_runtime.get_iterable(self.WORKFLOW_ID))
 
     def __repr__(self):
-        if hasattr(self, "WORKFLOW_ID"):
+        if not _runtime.is_local:
             return _runtime.get_obj_repr(self.WORKFLOW_ID)
         else:
             return  object.__repr__(self)
@@ -593,9 +591,18 @@ class BaseWorkflowSymbol:
 
         return WORKFLOW_ID
 
-    def __getattribute__(self, key):
-        if _runtime.is_local or key == "_upload_workflow":
+    def __getattribute__(self, key, force = False):
+        if force:
             return object.__getattribute__(self, key)
+        
+        if _runtime.is_local:
+            out = object.__getattribute__(self, key)
+            if not inspect.ismethod(out):
+                return out
+            
+        if key == "_upload_workflow":
+            return object.__getattribute__(self, key)
+        
         if "ipython_canary_method_should_not_exist" in key:
             return {}
         if (
@@ -609,6 +616,7 @@ class BaseWorkflowSymbol:
             if not hasattr(self, "WORKFLOW_CHILDREN"):
                 self.WORKFLOW_CHILDREN = {}
             self.WORKFLOW_CHILDREN[key] = BaseWorkflowSymbol(key, self)
+        
         return self.WORKFLOW_CHILDREN[key]
 
     def __call__(self, *args, **kwargs):
@@ -626,8 +634,10 @@ class BaseWorkflowSymbol:
             from IPython.display import IFrame, display
 
             display(IFrame(out, width=800, height=600))
-
-        return out if out is not None else WorkflowObj(workflow_id)
+        if _runtime.is_local:
+            return self.WORKFLOW_PARENT.__getattribute__(self.WORKFLOW_SYMBOL_NAME, force = True)(*args, **kwargs)
+        else:
+            return out if out is not None else WorkflowObj(workflow_id)
 
 
 class BaseClass(BaseWorkflowSymbol):
@@ -705,6 +715,32 @@ class WorkflowObj(BaseWorkflowSymbol):
     def __init__(self, workflow_id):
         self.WORKFLOW_ID = workflow_id
 
+def parameterize_workflow(object: object) -> dict:
+    """parameterize_workflow takes an workflow object and returns a dictionary of the object's attributes and methods.
+
+    Args:
+        object (Union[BaseClass, list, int, float, str, None])): the object to parameterize
+
+    Returns:
+        dict: a dictionary of the object's attributes and methods.
+    """
+    if isinstance(object, BaseWorkflowSymbol):
+        if hasattr(object, "WORKFLOW_ID"):
+            return object.WORKFLOW_ID
+        else:
+            return {
+                **{"BC_class_name": type(object).__name__},
+                **{"args": [parameterize_workflow(arg) for arg in object.args]},
+                **{"kwargs": {k: parameterize_workflow(v) for k, v in object.kwargs.items()}},
+            }
+    elif isinstance(object, (list, tuple)):
+        return [parameterize_workflow(o) for o in object]
+    elif isinstance(object, dict):
+        return {k: parameterize_workflow(v) for k, v in object.items()}
+    elif isinstance(object, (int, float, str, bool)):
+        return object
+    else:
+        return str(object)
 
 def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
     """parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
@@ -720,11 +756,7 @@ def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
     Returns:
         dict: dictionary of parameters necessary to instantiate the object.
     """
-    if issubclass(type(object), BaseClass) or (
-        issubclass(type(object), BaseWorkflowSymbol) and hasattr(object, "WORKFLOW_ID")
-    ):
-        if hasattr(object, "WORKFLOW_ID"):
-            return {"WORKFLOW_ID": object.WORKFLOW_ID}
+    if issubclass(type(object), BaseWorkflowSymbol):
         return {
             **{"BC_class_name": type(object).__name__},
             **{"args": [parameterize(arg) for arg in object.args]},
@@ -902,8 +934,7 @@ def save(model: BaseClass, fname: str):
         fname (str): the file name to save the model to
     """
 
-    if hasattr(model, "WORKFLOW_ID"):
-
+    if hasattr(model, "WORKFLOW_ID") and not _runtime.is_local:
         WORKFLOW_ID = model.WORKFLOW_ID
         oas_connector.storage.child(
             f"{oas_connector.uid}/sessions/{_runtime.session_id}/{WORKFLOW_ID}.oce.delete"
