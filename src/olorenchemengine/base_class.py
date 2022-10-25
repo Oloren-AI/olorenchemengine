@@ -1174,9 +1174,9 @@ class BaseErrorModel(BaseClass):
         scores: np.ndarray,
         quantile: float = 0.95,
         method: str = "roll",
-        window: int = 100,
-        bins: int = 10,
-        min_per_bin: int = 5,
+        window: int = 50,
+        bins: int = 20,
+        min_per_bin: int = 10,
         filename: str = "figure.png",
     ):
         """Fits confidence scores to residuals.
@@ -1223,8 +1223,8 @@ class BaseErrorModel(BaseClass):
         funcs = [
             lambda x, a, b, c: a * np.exp(b * x) + c,
             lambda x, a, b, c: (a * x + b) / (1 + c * x),
-            lambda x, a, b: a * np.log(x + b),
-            lambda x, a, b: a * x ** b,
+            lambda x, a, b, c: a * np.log(b * x + c),
+            lambda x, a, b, c: a * x ** b + c,
             lambda x, a, b: a * x + b
         ]
         min_mse = None
@@ -1248,7 +1248,7 @@ class BaseErrorModel(BaseClass):
         sorted_scores = np.sort(scores)
         plt.xlabel(self.__class__.__name__)
         plt.ylabel("Absolute Error")
-        plt.scatter(scores, residuals, c="black", alpha=0.2)
+        plt.scatter(scores, residuals, c="black", s=1)
         plt.scatter(X, y, c="blue")
         plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
         plt.savefig(filename)
