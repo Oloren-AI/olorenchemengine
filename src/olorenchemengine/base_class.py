@@ -1222,8 +1222,9 @@ class BaseErrorModel(BaseClass):
 
         funcs = [
             lambda x, a, b, c: a * np.exp(b * x) + c,
-            lambda x, a, b, c: a * np.log(x + b) + c,
-            lambda x, a, b, c: a * x ** b + c,
+            lambda x, a, b, c: (a * x + b) / (1 + c * x),
+            lambda x, a, b: a * np.log(x + b),
+            lambda x, a, b: a * x ** b,
             lambda x, a, b: a * x + b
         ]
         min_mse = None
