@@ -239,7 +239,7 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
             self.kwargs = {k: v for k, v in kwargs.items() if k not in ignored_kwargs}
 
             WORKFLOW_ID = generate_uuid()
-            
+
             if issubclass(type(self), BaseClass):
                 _runtime.add_instruction(
                     {
@@ -248,9 +248,9 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
                         "parameters": parameterize_workflow(self),
                     }
                 )
-                
+
             self.WORKFLOW_ID = WORKFLOW_ID
-        
+
         if _runtime.is_local:
             return func(self, *args, **kwargs)
 
@@ -281,6 +281,54 @@ def generate_uuid():
     import uuid
 
     return str(uuid.uuid4())
+
+class UnionFind:
+    def __init__(self):
+        self.id = {}
+        self.rank = {}
+
+    # find the Set ID of Node x
+    def find(self, x):
+      # Get the value associated with key x, if it's not in the map return x
+      y = self.id.get(x, x)
+      # check if the current node is a Set ID node
+      if y != x:
+          # change the hash value of node x to Set ID value of node y
+          self.id[x] = y = self.find(y)
+      return y
+
+
+    # union two different sets setting one Set's parent to the other parent
+    def union(self, x, y):
+        # check if keys exist in our rank map; if not, add them
+        if self.find(x) not in self.rank:
+            self.rank[self.find(x)] = 0
+        if self.find(y) not in self.rank:
+            self.rank[self.find(y)] = 0
+        if self.rank[self.find(x)] < self.rank[self.find(y)]:
+            self.id[self.find(x)] = self.find(y)
+        else:
+            self.id[self.find(y)] = self.find(x)
+            # if rank is the same then we update x rank and increment by 1
+            # we make y's parent equal to x's parent, so x has increased depth
+            if self.rank[self.find(x)] == self.rank[self.find(y)]:
+                self.rank[self.find(x)] = self.rank[self.find(x)] + 1
+
+def workflow(obj, standardize_ids=True):
+    if not hasattr(obj, "WORKFLOW_ID"):
+        raise ValueError("Object has no WORKFLOW_ID attribute.")
+
+    workflow_ids = [obj["WORKFLOW_ID"] for obj in _runtime.instruction_buffer]
+
+    u = UnionFind()
+
+    for i, workflow_id in enumerate(workflow_ids):
+        for j, instruction in enumerate(_runtime.instruction_buffer):
+            if workflow_id in json.dumps(instruction) and instruction.get("PARENT_WORKFLOW_ID", "") != workflow_id:
+                u.union(i, j)
+
+    set_id = u.find(workflow_ids.index(obj.WORKFLOW_ID))
+    return [_runtime.instruction_buffer[i] for i in range(len(workflow_ids)) if u.find(i) == set_id]
 
 
 class _WorkflowRuntime:
@@ -505,7 +553,7 @@ def _truncate_json(json_obj, max_length=40):
 
 
 class BaseWorkflowSymbol:
-    
+
     @log_arguments
     def __init__(
         self, WORKFLOW_SYMBOL_NAME, WORKFLOW_PARENT, args=None, kwargs=None
@@ -596,15 +644,15 @@ class BaseWorkflowSymbol:
     def __getattribute__(self, key, force = False):
         if force:
             return object.__getattribute__(self, key)
-        
+
         if _runtime.is_local:
             out = object.__getattribute__(self, key)
             if not inspect.ismethod(out):
                 return out
-            
+
         if key == "_upload_workflow":
             return object.__getattribute__(self, key)
-        
+
         if "ipython_canary_method_should_not_exist" in key:
             return {}
         if (
@@ -618,7 +666,7 @@ class BaseWorkflowSymbol:
             if not hasattr(self, "WORKFLOW_CHILDREN"):
                 self.WORKFLOW_CHILDREN = {}
             self.WORKFLOW_CHILDREN[key] = BaseWorkflowSymbol(key, self)
-        
+
         return self.WORKFLOW_CHILDREN[key]
 
     def __call__(self, *args, **kwargs):
