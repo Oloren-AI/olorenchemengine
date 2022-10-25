@@ -10,6 +10,7 @@ import urllib.parse
 import fasttreeshap
 import shap
 
+from rdkit.Chem.Draw import rdMolDraw2D
 from IPython.display import IFrame
 from pandas.core.indexes.accessors import NoNewAttributesMixin
 
@@ -1829,7 +1830,7 @@ class ShapleyValues(BaseVisualization):
         self.tree_shap = fasttreeshap.TreeExplainer(self.surrogate_model, algorithm = "auto")
         
         super().__init__(log=False)
-        self.packages += ["plotly"]
+        self.packages += ["plotly", "olorenrenderer"]
         
         self.df = pd.DataFrame({})
 
@@ -1841,34 +1842,26 @@ class ShapleyValues(BaseVisualization):
         
         prediction = self.oce_surrogate.predict(molecule)
         shap_values = self.tree_shap(self.oce_surrogate.preprocess(molecule, prediction)).values
-
         rep = self.oce_surrogate.representation
 
         top_shap_indices = np.argsort(shap_values[0])[-5:]
         top_shap_values = shap_values[0][top_shap_indices]
-        data_dict = {"shap_values": top_shap_values.tolist(), "shap_index": top_shap_indices.tolist()}
-        print('--------')
-        print(top_shap_indices)
-        print(top_shap_values)
-        print('done')
-        # normalize with the sum of all the shap values
+        top_shap =max(shap_values[0])
+        print(top_shap)
+        shap_dict = dict(zip(top_shap_indices, top_shap_values))
+        norm_shap_dict = dict(zip(top_shap_indices, [int(shap/top_shap*15) for shap in top_shap_values]))
+        print(shap_dict)
+        print(norm_shap_dict)
 
-        print(data_dict)
-
-        # converting this to the molecule 
-
-        
-        mol = Chem.MolFromSmiles(molecule)
         info = rep.info(molecule)
-        print(info)
         
         def get_substructures(bits):
             """
             Returns a list of the substructures of the molecule.
             """
+            bits = bits.tolist()
             mol = Chem.MolFromSmiles(molecule)
             info = rep.info(molecule)
-            print(info)
 
             sub_structures = {}
             for i in bits:
@@ -1876,12 +1869,11 @@ class ShapleyValues(BaseVisualization):
                     atom_tuples = info[i]
                     atomID = atom_tuples[0][0]
                     radius = atom_tuples[0][1]
-                    print('been indexed')
-                    sub_structures[str(i)] = str(getSubstructSmi(mol, int(atomID), int(radius)))
+                    sub_structures[i] = str(getSubstructSmi(mol, int(atomID), int(radius)))
                 else:
-                    print('cannot find bit' + str(i))
-
-            return sub_structures
+                    print('cannot find bit ' + str(i))
+            clean_bits = list(sub_structures.keys())
+            return sub_structures, clean_bits
         
         def getSubstructSmi(mol,atomID,radius):
             if radius>0:
@@ -1895,36 +1887,56 @@ class ShapleyValues(BaseVisualization):
                 atomsToUse = [atomID]
                 env=None
 
-            smi = Chem.MolFragmentToSmiles(mol,atomsToUse,bondsToUse=env,allHsExplicit=True, allBondsExplicit=True, rootedAtAtom=atomID)
+            smi = Chem.MolFragmentToSmiles(mol,atomsToUse,bondsToUse=env, rootedAtAtom=atomID)
             return smi
 
+        mol = Chem.MolFromSmiles(molecule)
+        sub_structures, clean_bits = get_substructures(top_shap_indices)
+        clean_values = shap_values[0][clean_bits].tolist()
 
-        sub_structures = get_substructures(top_shap_indices)
+        print(clean_bits)
         print(sub_structures)
         
-        # print('sbbbbbb')
+        all_hit_ats = []
+        for index in range(len(clean_bits)): 
+            x = Chem.MolFromSmarts(sub_structures[clean_bits[index]])
+            test_ats = list(mol.GetSubstructMatch(x))
+            print(test_ats)
 
+            shap_val = norm_shap_dict[clean_bits[index]]
+
+            for at in test_ats:
+                mol.GetAtomWithIdx(at).SetAtomMapNum(shap_val) # now index matches with shap value in clean values
         
-
-        # shapley = {str(i): Draw.DrawMorganBit(mol, i, info, useSVG=True) for i in clean_shap}
-
-        # print(shapley)
-        
-        return data_dict
-
-        # import plotly
-
-        # for a in molecule.GetAtoms():
-
         # def rgb_to_hex(x, colorscale = self.colorscale):
         #     if not isinstance(x, list):
         #         x = [x]
         #     x = plotly.colors.sample_colorscale(colorscale, x, colortype="hex")
         #     x = np.rint(np.array(x)*255).astype(int)
-        #     return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]
+        #     return ['#%02x%02x%02x' % (x_[0], x_[1], x_[2]) for x_ in x]        
+        return {
+            "SMILES": Chem.MolToSmiles(mol),
+            "highlights": [[1, "#001100"], [10001, "#001100"], 
+            [2, "#002200"], [20002, "#002200"],
+            [3, "#003300"], [30003, "#003300"],
+            [4, "#004400"], [40004, "#004400"],
+            [5, "#005500"], [50005, "#005500"],
+            [6, "#006600"], [60006, "#006600"],
+            [7, "#007700"], [70007, "#007700"],
+            [8, "#008800"], [80008, "#008800"],
+            [9, "#009900"], [90009, "#009900"],
+            [10, "#00AA00"], [100010, "#00AA00"],
+            [11, "#00BB00"], [110011, "#00BB00"],
+            [12, "#00CC00"], [120012, "#00CC00"],
+            [13, "#00DD00"], [130013, "#00DD00"],
+            [14, "#00EE00"], [140014, "#00EE00"],
+            [15, "#00FF00"], [150015, "#00FF00"]]
+
+        }
+
 
         # return {
-        #     "SMILES": Chem.MolToSmiles(molecule),
+        #     "SMILES": Chem.MolToSmiles(mol),
         #     "highlights": [
         #         [i+1, rgb_to_hex((i+1)/self.nbins)[0]]  for i in range(self.nbins)
         #     ]

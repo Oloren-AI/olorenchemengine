@@ -547,27 +547,3 @@ def make_surrogate_model(self,
     # return 1 
 
 BaseModel.make_surrogate_model = make_surrogate_model
-
-def _BaseModel_save_with_surrogate(self) -> dict:
-    d = self._save()
-    if hasattr(self, "surrogate_model"):
-        d.update({"perturbation_engine": saves(self.perturbation_engine)})
-    if hasattr(self, "surrogate_rep"):
-        d.update({"rep": saves(self.surrogate_rep)})
-    if hasattr(self, "surrogate_model"):
-        d.update({"surrogate_model": saves(self.surrogate_model)})
-    return d
-    # d.update(BaseModel._save())
-
-BaseModel._save = _BaseModel_save_with_surrogate
-
-def _BaseModel_load_with_surrogate(self, d) -> None:
-    self._load(d)
-    if "perturbation_engine" in d.keys():
-        self.perturbation_engine = loads(d["perturbation_engine"])
-    if "surrogate_rep" in d.keys():
-        self.rep = loads(d["surrogate_rep"])
-    if "surrogate_model" in d.keys():
-        self.surrogate_model = loads(d["surrogate_model"])
-
-BaseModel._load = _BaseModel_load_with_surrogate

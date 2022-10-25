@@ -767,6 +767,18 @@ class BaseModel(BaseClass):
             d.update({"em_status": self.em_status})
         if hasattr(self, "normalization") and issubclass(type(self.normalization), BasePreprocessor):
             d.update({"normalization": self.normalization._save()})
+
+        if hasattr(self, "surrogate_rep"):
+            print(self.surrogate_rep)
+            
+            d.update({"rep": saves(self.surrogate_rep)})
+        if hasattr(self, "surrogate_model"):
+            print(self.surrogate_model)
+            import joblib
+            
+            b = io.BytesIO()
+            joblib.dump(self.obj, b)
+            d.update({"surrogate_model": b.getvalue()})
         return d
 
     def _load(self, d) -> None:
@@ -785,6 +797,12 @@ class BaseModel(BaseClass):
             self.em_status = d["em_status"]
         if "normalization" in d.keys():
             self.normalization._load(d["normalization"])
+        
+        if "surrogate_rep" in d.keys():
+            self.rep = loads(d["surrogate_rep"])
+        if "surrogate_model" in d.keys():
+            import joblib
+            self.surrogate_model = loads(joblib.load(io.BytesIO(d["obj"])))
 
     def copy(self) -> BaseModel:
         """returns a copy of itself

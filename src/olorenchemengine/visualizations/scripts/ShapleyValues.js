@@ -1,33 +1,43 @@
-const data = JSON.parse(
-  document.getElementById("basevis-entry").dataset.visdata
-);
+var div = document.getElementById("basevis-entry");
+var data = JSON.parse(document.getElementById("basevis-entry").dataset.visdata);
 
-var trace = {
-  x: data.shap_index,
-  y: data.shap_values,
-  type: 'bar',
-  autosize: true,
-};
+var title = document.createElement("h2");
+title.innerHTML = "Shapley Values Highlighted on Molecule";
+div.appendChild(title)
 
-var plot_data = [trace];
+var begin_span = document.createElement("span");
+begin_span.innerHTML = "less sensitive ";
+div.appendChild(begin_span);
 
-var layout = {
-  title: {
-      text: "Top 10 Feature Shapley Values"
-  },
-  xaxis: {
-      title: {text: "Vector Indices"},
-      type: "linear"
-  },
-  yaxis: {
-      title: {text: "Shapley Value"},
-      type: "linear"
-  },
-};
+for (var i = 0; i < data["highlights"].length; i++) {
+  var dot = document.createElement("span");
+  dot.style.height = "10px";
+  dot.style.width = "10px";
+  dot.style.backgroundColor = data["highlights"][i][1];
+  dot.style.borderRadius = "50%";
+  dot.style.display = "inline-block";
+  div.appendChild(dot);
+  
+  var spacer = document.createElement("span");
+  spacer.innerHTML = " ";
+  div.appendChild(spacer);
+}
 
+var end_span = document.createElement("span");
+end_span.innerHTML = "most sensitive";
+div.appendChild(end_span);
 
-Plotly.newPlot("basevis-entry", plot_data, layout, {
-  displaylogo: false,
-  modeBarButtonsToRemove: ["zoom2d", "pan2d", "select2d", "lasso2d"],
-});
+var div2 = document.createElement("div");
+div.appendChild(div2);
 
+var canvas = document.createElement("canvas");
+canvas.id = "smiles-canvas";
+div2.appendChild(canvas);
+
+let options = {};
+let smilesDrawer = new SmilesDrawer.Drawer(options);
+
+SmilesDrawer.parse(data["SMILES"], function(smi) {
+    // Draw to the canvas
+    smilesDrawer.draw(smi, "smiles-canvas", "light", false, highlights=data["highlights"]);
+  });
