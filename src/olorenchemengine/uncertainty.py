@@ -128,8 +128,8 @@ class RandomForestEnsemble(BaseEnsembleModel):
             self.ensembles.append(ensemble_model)
 
 class BaseFingerprintModel(BaseErrorModel):
-    """BaseFingerprintModel is the base class for error models that require the
-    computation of Morgan Fingerprints.
+    """ BaseFingerprintModel is the base class for error models that require the
+        computation of Morgan Fingerprints.
     """
 
     def build(
@@ -158,7 +158,7 @@ class BaseFingerprintModel(BaseErrorModel):
 
 
 class SDC(BaseFingerprintModel):
-    """SDC is an error model that predicts error bars based on the Sum of
+    """ SDC is an error model that predicts error bars based on the Sum of
         Distance-weighted Contributions: `Molecular Similarity-Based Domain
         Applicability Metric Efficiently Identifies Out-of-Domain Compounds
         <http://dx.doi.org/10.1021/acs.jcim.8b00597>`_
@@ -191,7 +191,7 @@ class SDC(BaseFingerprintModel):
 
 
 class TargetDistDC(SDC):
-    """TargetDistDC is an error model that calculates the root-mean-square
+    """ TargetDistDC is an error model that calculates the root-mean-square
         difference between the predicted activity of the target molecule and
         the observed activities of all training molecules, weighted by the DC.
 
@@ -224,7 +224,7 @@ class TargetDistDC(SDC):
 
 
 class TrainDistDC(SDC):
-    """TrainDistDC is an error model that calculates the root-mean-square
+    """ TrainDistDC is an error model that calculates the root-mean-square
         difference between the predicted and observed activities of all
         training molecules, weighted by the DC.
 
@@ -257,7 +257,7 @@ class TrainDistDC(SDC):
 
 
 class KNNSimilarity(BaseFingerprintModel):
-    """NNSimilarity is an error model that calculates mean Tanimoto similarity
+    """ NNSimilarity is an error model that calculates mean Tanimoto similarity
         between the target molecule and the k most similar training molecules
         using a Morgan Fingerprint with a radius of 2 bonds.
 
@@ -289,7 +289,7 @@ class KNNSimilarity(BaseFingerprintModel):
 
 
 class TargetDistKNN(KNNSimilarity):
-    """TargetDistKNN is an error model that calculates the root-mean-square
+    """ TargetDistKNN is an error model that calculates the root-mean-square
         difference between the predicted activity of the target molecule and
         the observed activities of the k most similar training molecules,
         weighted by their similarity.
@@ -323,7 +323,7 @@ class TargetDistKNN(KNNSimilarity):
 
 
 class TrainDistKNN(KNNSimilarity):
-    """TrainDistKNN is an error model that calculates the root-mean-square
+    """ TrainDistKNN is an error model that calculates the root-mean-square
         difference between the predicted and observed activities of the k most
         similar training molecules to the target molecule, weighted by their
         similarity.
@@ -357,7 +357,7 @@ class TrainDistKNN(KNNSimilarity):
 
 
 class Predicted(BaseErrorModel):
-    """Predicted is an error model that predicts error bars based on only the
+    """ Predicted is an error model that predicts error bars based on only the
         predicted value of a molecule. It is best used as part of an aggregate
         error model rather than by itself.
 
@@ -366,7 +366,7 @@ class Predicted(BaseErrorModel):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.Predicted()])
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.AggregateErrorModel([oce.SDC(), oce.Predicted()])
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
@@ -378,9 +378,35 @@ class Predicted(BaseErrorModel):
     def calculate(self, X, y_pred):
         return y_pred
 
+class Naive(BaseErrorModel):
+    """ Naive is an error model that predicts a uniform confidence interval
+        based on the errors of the fitting dataset. Used exclusively for
+        benchmarking error models.
+    """
+
+    @log_arguments
+    def __init__(self):
+        pass
+
+    def calculate(self, X, y_pred):
+        pass
+    
+    def _fit(
+        self,
+        residuals: np.ndarray,
+        scores: np.ndarray,
+        quantile: float = 0.95
+    ):
+        self.ci = pd.Series(residuals).quantile(quantile)
+
+    def score(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+    ):
+        return np.array([self.ci for _ in X])
 
 class ADAN(BaseErrorModel):
-    """ADAN is an error model that predicts error bars based on one or
+    """ ADAN is an error model that predicts error bars based on one or
         multiple ADAN categories: `Applicability Domain Analysis (ADAN): A
         Robust Method for Assessing the Reliability of Drug Property Predictions
         <https://doi.org/10.1021/ci500172z>`_
@@ -597,7 +623,8 @@ class AggregateErrorModel(BaseErrorModel):
 
         Parameters:
             error_models (list of BaseErrorModel): list of error models to be aggregated
-            reduction (BaseReduction): reduction method used to aggregate uncertainty scores
+            reduction (BaseReduction): reduction method used to aggregate uncertainty scores.
+                Must output 1 component. Default oce.FactorAnalysis().
     
     Example
     ------------------------------
@@ -605,7 +632,7 @@ class AggregateErrorModel(BaseErrorModel):
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit(train["Drug"], train["Y"])
-    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()], reduction = oce.FactorAnalysis())
+    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()])
     error_model.build(model, train["Drug"], train["Y"])
     error_model.fit(valid["Drug"], valid["Y"])
     error_model.score(test["Drug"])
@@ -613,7 +640,11 @@ class AggregateErrorModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, error_models: List[BaseErrorModel], reduction: BaseReduction):
+    def __init__(
+        self, 
+        error_models: List[BaseErrorModel], 
+        reduction: BaseReduction = oce.FactorAnalysis(n_components = 1)
+    ):
         if not isinstance(error_models, list):
             raise TypeError("error_models must be a list")
         self.error_models = error_models
