@@ -6,6 +6,10 @@ from olorenchemengine.visualizations.visualization import *
 
 
 class MatchedPairsTable(BaseVisualization):
+    """
+    This visualization is intended to show matched pairs of molecules in a dataset
+    which differ based on a set of feature columns defined in the dataset object.
+    """
     @log_arguments
     def __init__(
         self,
