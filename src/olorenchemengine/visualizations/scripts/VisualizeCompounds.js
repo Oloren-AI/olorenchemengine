@@ -8,6 +8,7 @@ let smilesDrawer = new SmilesDrawer.Drawer(options);
 basevis = document.getElementById("basevis-entry");
 table = document.createElement("table");
 basevis.appendChild(table);
+
 for (var y = 0; y < data.table_height; y++) {
   let tr = document.createElement("tr");
   table.appendChild(tr);
@@ -32,7 +33,7 @@ for (var y = 0; y < data.table_height; y++) {
     tr.appendChild(td);
 
     SmilesDrawer.parse(data.smiles[ix], function (smiles) {
-      smilesDrawer.draw(smiles, `canvas_${x}-${y}`, "light", false);
+      smilesDrawer.draw(smiles, `canvas_${x}-${y}`, "light", false, highlights = data["highlights"]);
     });
   }
 }

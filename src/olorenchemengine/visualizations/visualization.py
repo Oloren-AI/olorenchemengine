@@ -383,6 +383,7 @@ class VisualizeCompounds(BaseVisualization):
         table_height: int = 5,
         compound_width: int = 500,
         compound_height: int = 500,
+        highlights = [],
         annotations=None,
         kekulize=True,
         box=False,
@@ -424,6 +425,7 @@ class VisualizeCompounds(BaseVisualization):
         self.table_height = table_height
         self.compound_width = compound_width
         self.compound_height = compound_height
+        self.highlights = highlights
         self.annotations = annotations
         self.kekulize = kekulize
         self.box = box
@@ -438,14 +440,15 @@ class VisualizeCompounds(BaseVisualization):
                 )
                 for s in self.compounds
             ]
-            d = {
-                "smiles": self.compounds,
-                "table_width": self.table_width,
-                "table_height": self.table_height,
-                "compound_width": self.compound_width,
-                "compound_height": self.compound_height,
-                "box": self.box,
-            }
+        d = {
+            "smiles": self.compounds,
+            "table_width": self.table_width,
+            "table_height": self.table_height,
+            "compound_width": self.compound_width,
+            "compound_height": self.compound_height,
+            "highlights": self.highlights,
+            "box": self.box,
+        }
 
         if not self.annotations is None:
             d.update(
