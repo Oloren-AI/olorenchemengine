@@ -12,6 +12,7 @@ from .base_class import *
 from .basics import *
 from .dataset import *
 from .representations import *
+from .reduction import *
 
 class BaseEnsembleModel(BaseErrorModel):
     """ BaseEnsembleModel is the base class for error models that estimate
@@ -142,8 +143,11 @@ class BaseFingerprintModel(BaseErrorModel):
         if isinstance(self.X_train, pd.DataFrame):
             self.X_train.columns = ["SMILES"]
         smiles = SMILESRepresentation().convert(self.X_train)
-        mols = [Chem.MolFromSmiles(smi) for smi in smiles]
-        self.train_fps = [AllChem.GetMorganFingerprint(mol, 2) for mol in mols]
+        self.train_fps = list(self.get_fps(smiles))
+
+    def get_fps(self, smiles: List[str]) -> List:
+        get_fp = lambda smiles: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smiles), 2)
+        return list(np.vectorize(get_fp)(smiles))
 
     def _save(self) -> dict:
         d = super()._save()
@@ -181,13 +185,14 @@ class SDC(BaseFingerprintModel):
         self.a = a
 
     def calculate(self, X, y_pred):
-        def sdc(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            return np.sum(np.exp(-self.a * TD / (1 - TD)))
+        ref_fps = self.get_fps(X)
 
-        return np.array([sdc(smi) for smi in tqdm(X)])
+        def sdc(fp):
+            TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            return np.sum(np.exp(-self.a * (1 - TS) / TS))
+        sdc_vec = np.vectorize(sdc)
+
+        return sdc_vec(ref_fps)
 
 
 class TargetDistDC(SDC):
@@ -212,8 +217,8 @@ class TargetDistDC(SDC):
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            DC = np.exp(-self.a * TD / (1 - TD))
+            TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
+            DC = np.exp(-self.a * (1 - TS) / TS)
             error = np.abs(self.y_train - pred)
             if np.sum(DC) == 0:
                 return np.sqrt(np.mean(error))
@@ -243,17 +248,17 @@ class TrainDistDC(SDC):
 
     def calculate(self, X, y_pred):
         residuals = np.abs(self.y_train - self.y_pred_train)
+        ref_fps = self.get_fps(X)
 
-        def dist(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            DC = np.exp(-self.a * TD / (1 - TD))
+        def dist(fp):
+            TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            DC = np.exp(-self.a * (1 - TS) / TS)
             if np.sum(DC) == 0:
                 return np.sqrt(np.mean(residuals))
             return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
 
-        return np.array([dist(smi) for smi in tqdm(X)])
+        dist_vec = np.vectorize(dist)
+        return dist_vec(ref_fps)
 
 
 class KNNSimilarity(BaseFingerprintModel):
@@ -279,14 +284,14 @@ class KNNSimilarity(BaseFingerprintModel):
         self.k = k
 
     def calculate(self, X, y_pred):
-        def mean_sim(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            return np.mean(sorted(similarity)[-self.k :])
+        ref_fps = self.get_fps(X)
 
-        return np.array([mean_sim(smi) for smi in tqdm(X)])
+        def mean_sim(fp):
+            similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            return np.mean(np.partition(test, self.k)[-self.k:])
 
+        sim_vec = np.vectorize(mean_sim)
+        return sim_vec(ref_fps)
 
 class TargetDistKNN(KNNSimilarity):
     """ TargetDistKNN is an error model that calculates the root-mean-square
@@ -313,7 +318,7 @@ class TargetDistKNN(KNNSimilarity):
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             error = np.abs(self.y_train - pred)
-            idxs = np.argsort(similarity)[-self.k:]
+            idxs = np.argpartition(similarity, self.k)[-self.k:]
             if np.sum(similarity[idxs]) == 0:
                 return np.sqrt(np.mean(error[idxs]))
             return np.sqrt(np.dot(similarity[idxs], error[idxs]) / np.sum(similarity[idxs]))
@@ -343,17 +348,18 @@ class TrainDistKNN(KNNSimilarity):
 
     def calculate(self, X, y_pred):
         residuals = np.abs(self.y_train - self.y_pred_train)
+        ref_fps = self.get_fps(X)
 
-        def dist(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            idxs = np.argsort(similarity)[-self.k:]
+        def dist(fp):
+            similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            idxs = np.argpartition(similarity, self.k)[-self.k:]
             if np.sum(similarity[idxs]) == 0:
                 return np.sqrt(np.mean(residuals[idxs]))
             return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
+        
+        dist_vec = np.vectorize(dist)
 
-        return np.array([dist(smi) for smi in tqdm(X)])
+        return dist_vec(ref_fps)
 
 
 class Predicted(BaseErrorModel):
@@ -624,7 +630,7 @@ class AggregateErrorModel(BaseErrorModel):
         Parameters:
             error_models (list of BaseErrorModel): list of error models to be aggregated
             reduction (BaseReduction): reduction method used to aggregate uncertainty scores.
-                Must output 1 component. Default oce.FactorAnalysis().
+                Must output 1 component. Default FactorAnalysis().
     
     Example
     ------------------------------
@@ -643,7 +649,7 @@ class AggregateErrorModel(BaseErrorModel):
     def __init__(
         self, 
         error_models: List[BaseErrorModel], 
-        reduction: BaseReduction = oce.FactorAnalysis(n_components = 1)
+        reduction: BaseReduction = FactorAnalysis(n_components = 1)
     ):
         if not isinstance(error_models, list):
             raise TypeError("error_models must be a list")

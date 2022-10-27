@@ -1197,16 +1197,17 @@ class BaseErrorModel(BaseClass):
             y = []
             for i in range(bins):
                 ith_bin = bin_labels == i
-                if np.sum(ith_bin) >= min_per_bin:
-                    X.append(np.mean(scores[ith_bin]))
-                    y.append(pd.Series(residuals[ith_bin]).quantile(quantile))
+                if np.sum(ith_bin) < min_per_bin:
+                    continue
+                X.append(np.mean(scores[ith_bin]))
+                y.append(np.quantile(residuals[ith_bin], quantile))
             X = np.array(X)
             y = np.array(y)
         elif method == "qbin":
             bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
             n_labels = int(max(bin_labels) + 1)
             X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
-            y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(n_labels)])
+            y = np.array([np.quantile(residuals[bin_labels == i], quantile) for i in range(n_labels)])
         elif method == "roll":
             results = list(zip(scores, residuals))
             scores, residuals = zip(*sorted(results))
