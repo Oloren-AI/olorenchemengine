@@ -22,6 +22,8 @@ class VisualizeMCS(VisualizeCompounds):
         timeout (int): the timeout for the MCS calculation in seconds
         invert_colors (bool): invert the colors of the MCS such that the MCS is 
             red and the differences are green. Default False.
+        completeRingsOnly (bool): only consider complete rings in the MCS, parameter
+            for rdkit.Chem.rdFMCS.FindMCS. Default True.
     """
     
     @log_arguments
