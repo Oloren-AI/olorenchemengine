@@ -4,4 +4,3 @@ from .matched_pairs import *
 from .exploratory_analysis import *
 from .visualize_interpret import *
 from .compounds import *
-from .util import sample_colorscale
