@@ -372,6 +372,9 @@ class VisualizeCompounds(BaseVisualization):
             the table. Will only be considered if dataset is a BaseDataset.
         kekulize = True (bool): Whether or not to kekulize molecules for rendering.
             Default is True.
+        highlights (list): List of indices of atoms to highlight in the compounds.
+            Format is a list of lists of the form [Atom Map Number, Color (hex)].
+            Default is [].
         box = True (bool):
         shuffle = True (bool): Whether or not to shuffle the compounds."""
 
