@@ -982,7 +982,7 @@ class BaseSKLearnModel(BaseModel):
         if self.representation is None:
             return X
         else:
-            return self.representation.convert(X, fit=fit)
+            return self.representation.convert(X, ys = y, fit=fit)
 
     def _fit(self, X_train, y_train):
         values, counts = np.unique(y_train, return_counts=True)
