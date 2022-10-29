@@ -556,9 +556,10 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
         **kwargs
     ):
         from xgboost import XGBClassifier, XGBRegressor
+        import torch
 
         regressor = XGBRegressor(
-            tree_method="gpu_hist",
+            tree_method="gpu_hist" if torch.cuda.is_available() else "hist",
             n_estimators=n_estimators,
             max_depth=max_depth,
             max_leaves=max_leaves,
@@ -568,7 +569,7 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
         )
 
         classifier = XGBClassifier(
-            tree_method="gpu_hist",
+            tree_method="gpu_hist" if torch.cuda.is_available() else "hist",
             n_estimators=n_estimators,
             max_depth=max_depth,
             max_leaves=max_leaves,
@@ -605,6 +606,7 @@ class ZWK_XGBoostModel(BaseSKLearnModel, BaseObject):
         self, representation, n_iter=100, scoring=None, verbose=2, cv=5, **kwargs
     ):
         from xgboost import XGBClassifier, XGBRegressor
+        import torch
 
         if scoring == "spearman":
             from scipy.stats import spearmanr
@@ -618,10 +620,10 @@ class ZWK_XGBoostModel(BaseSKLearnModel, BaseObject):
             scoring = spearman
 
         regressor = self.autofit(
-            XGBRegressor(tree_method="gpu_hist"), n_iter, cv, scoring, verbose
+            XGBRegressor(tree_method="gpu_hist" if torch.cuda.is_available() else "hist"), n_iter, cv, scoring, verbose
         )
         classifier = self.autofit(
-            XGBClassifier(tree_method="gpu_hist"), n_iter, cv, scoring, verbose
+            XGBClassifier(tree_method="gpu_hist" if torch.cuda.is_available() else "hist"), n_iter, cv, scoring, verbose
         )
 
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
