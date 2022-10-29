@@ -1,7 +1,7 @@
 from olorenchemengine.internal import *
 from olorenchemengine.representations import *
 
-class SimLookup(BaseCompoundVecRepresentation):
+class SimLookup_beta(BaseCompoundVecRepresentation):
     
     @log_arguments
     def __init__(self, rep: BaseCompoundVecRepresentation, *args, metric: str = "cosine", k: int = 3,
