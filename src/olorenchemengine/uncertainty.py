@@ -508,6 +508,7 @@ class ADAN(BaseErrorModel):
         return self._calculate(X, Xp, y_pred, self.criterion)
 
     def _calculate(self, X, Xp, y_pred, criterion: str, standardize: bool = True):
+        from sklearn.neighbors import NearestNeighbors
         if criterion in ("A", "A_raw"):
             dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
         elif criterion in ("B", "B_raw"):
@@ -591,6 +592,7 @@ class ADAN(BaseErrorModel):
             neighbor_thresh (float): fraction of closest training queries to consider
         """
         n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
+        from sklearn.neighbors import NearestNeighbors
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(self.Xp_train)
         distances, indices = nbrs.kneighbors(Xp)
 
