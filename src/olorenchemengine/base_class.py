@@ -1077,8 +1077,20 @@ class BaseErrorModel(BaseClass):
     """
 
     @log_arguments
-    def __init__(self, ci=0.8, log=True, **kwargs):
+    def __init__(self, ci: float = 0.8, 
+        method: str = "qbin",
+        window: int = 100,
+        bins: int = 10,
+        min_per_bin: int = 5,
+        log=True, 
+        **kwargs):
+        
         self.ci = ci
+        self.method = method
+        self.window = window
+        self.bins = bins
+        self.min_per_bin = min_per_bin
+        
 
     def build(
         self,
@@ -1188,10 +1200,6 @@ class BaseErrorModel(BaseClass):
         residuals: np.ndarray,
         scores: np.ndarray,
         quantile: float = 0.95,
-        method: str = "roll",
-        window: int = 100,
-        bins: int = 10,
-        min_per_bin: int = 5,
         filename: str = "figure.png",
     ):
         """Fits confidence scores to residuals.
@@ -1206,31 +1214,31 @@ class BaseErrorModel(BaseClass):
             min_per_bin (int): minimum number of instances per bin
             filename (str): save destination of the fitted plot
         """
-        if method == "bin":
-            bin_labels = pd.cut(scores, bins, labels=False)
+        if self.method == "bin":
+            bin_labels = pd.cut(scores, self.bins, labels=False)
             X = []
             y = []
-            for i in range(bins):
+            for i in range(self.bins):
                 ith_bin = bin_labels == i
-                if np.sum(ith_bin) >= min_per_bin:
+                if np.sum(ith_bin) >= self.min_per_bin:
                     X.append(np.mean(scores[ith_bin]))
                     y.append(pd.Series(residuals[ith_bin]).quantile(quantile))
             X = np.array(X)
             y = np.array(y)
-        elif method == "qbin":
-            bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
+        elif self.method == "qbin":
+            bin_labels = pd.qcut(scores, self.bins, labels=False, duplicates="drop")
             n_labels = int(max(bin_labels) + 1)
             X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
             y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(n_labels)])
-        elif method == "roll":
+        elif sself.method == "roll":
             results = list(zip(scores, residuals))
             scores, residuals = zip(*sorted(results))
-            X = pd.Series(scores).rolling(window).mean()
-            y = pd.Series(residuals).rolling(window).quantile(quantile)
+            X = pd.Series(scores).rolling(self.window).mean()
+            y = pd.Series(residuals).rolling(self.window).quantile(quantile)
             X = np.array(X[~np.isnan(X)])
             y = np.array(y[~np.isnan(y)])
         else:
-            raise NameError("method {} is not recognized".format(method))
+            raise NameError("method {} is not recognized".format(self.method))
 
         import matplotlib.pyplot as plt
         from scipy.optimize import curve_fit
@@ -1269,11 +1277,7 @@ class BaseErrorModel(BaseClass):
 
         self.residuals = residuals
         self.scores = scores
-        self.method = method
-        self.bins = bins
-        self.window = window
         self.quantile = quantile
-        self.min_per_bin = min_per_bin
         self.filename = filename
 
     def score(
@@ -1347,10 +1351,6 @@ class BaseErrorModel(BaseClass):
             self._fit(
                 residuals,
                 scores,
-                method=method,
-                bins=bins,
-                window=window,
                 quantile=quantile,
-                min_per_bin=min_per_bin,
                 filename=filename,
             )
