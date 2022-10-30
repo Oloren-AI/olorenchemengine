@@ -271,6 +271,8 @@ class BaseTorchGeometricModel(BaseModel):
 
         self.trainer = Trainer(
             accelerator="auto", 
+            devices=-1,
+            auto_select_gpus=False,
             max_epochs=self.epochs, 
             auto_lr_find=auto_lr_find,
             num_sanity_val_steps=0
