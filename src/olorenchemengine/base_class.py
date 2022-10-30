@@ -1076,8 +1076,9 @@ class BaseErrorModel(BaseClass):
         score: returns confidence intervals on a dataset
     """
 
-    def __init__(self):
-        pass
+    @log_arguments
+    def __init__(self, ci=0.8, log=True, **kwargs):
+        self.ci = ci
 
     def build(
         self,
@@ -1118,7 +1119,7 @@ class BaseErrorModel(BaseClass):
         self,
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
         y: Union[np.ndarray, list, pd.Series],
-        ci: float = 0.80,
+        ci: float = None,
         **kwargs,
     ):
         """Fits confidence scores to an external dataset
@@ -1127,6 +1128,9 @@ class BaseErrorModel(BaseClass):
             X (array-like): features, smiles
             y (array-like): true values
         """
+        if ci is None:
+            ci = self.ci
+            
         X = oce.SMILESRepresentation().convert(X)
         y_pred = np.array(self.model.predict(X)).flatten()
         residuals = np.abs(np.array(y) - y_pred)
@@ -1135,12 +1139,16 @@ class BaseErrorModel(BaseClass):
         self._fit(residuals, scores, quantile = ci, **kwargs)
 
     def fit_cv(self,  X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series], n_splits: int = 5, ci: float = 0.80, **kwargs):
+        y: Union[np.ndarray, list, pd.Series], n_splits: int = 5, ci: float = None, **kwargs):
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
             n_splits (int): Number of cross validation splits, default 5
         """
+        
+        if ci is None:
+            ci = self.ci
+            
         from sklearn.model_selection import KFold
         from sklearn.calibration import calibration_curve
         

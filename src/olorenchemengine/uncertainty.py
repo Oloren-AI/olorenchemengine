@@ -19,9 +19,10 @@ class BaseEnsembleModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16):            
+    def __init__(self, ensemble_model = None, n_ensembles = 16, log=True, **kwargs):      
         self.ensemble_model = ensemble_model
         self.n_ensembles = n_ensembles
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -69,9 +70,9 @@ class BootstrapEnsemble(BaseEnsembleModel):
     """
     
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25):
-        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles)
+    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25, log=True, **kwargs):
         self.bootstrap_size = bootstrap_size
+        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles,log=False, **kwargs)
 
     def build(
         self,
@@ -177,8 +178,9 @@ class SDC(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, a=3):
+    def __init__(self, a=3, log=True, **kwargs):
         self.a = a
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
@@ -278,8 +280,9 @@ class KNNSimilarity(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, k=5):
+    def __init__(self, k=5, log=True, **kwargs):
         self.k = k
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
@@ -376,11 +379,6 @@ class Predicted(BaseErrorModel):
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
-
-    @log_arguments
-    def __init__(self):
-        pass
-
     def calculate(self, X, y_pred):
         return y_pred
 
@@ -405,8 +403,9 @@ class ADAN(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, criterion: str):
+    def __init__(self, criterion: str, log=True, **kwargs):
         self.criterion = criterion
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -623,11 +622,13 @@ class AggregateErrorModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, error_models: List[BaseErrorModel], reduction: BaseReduction):
+    def __init__(self, error_models: List[BaseErrorModel], reduction: BaseReduction, log=True,
+                 **kwargs):
         if not isinstance(error_models, list):
             raise TypeError("error_models must be a list")
         self.error_models = error_models
         self.reduction = reduction
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
