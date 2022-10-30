@@ -181,6 +181,7 @@ class SDC(BaseFingerprintModel):
         self.a = a
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         def sdc(smi):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -209,6 +210,7 @@ class TargetDistDC(SDC):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -242,6 +244,7 @@ class TrainDistDC(SDC):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
 
         def dist(smi):
@@ -279,6 +282,7 @@ class KNNSimilarity(BaseFingerprintModel):
         self.k = k
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         def mean_sim(smi):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -308,6 +312,7 @@ class TargetDistKNN(KNNSimilarity):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -342,6 +347,7 @@ class TrainDistKNN(KNNSimilarity):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
 
         def dist(smi):
@@ -477,6 +483,7 @@ class ADAN(BaseErrorModel):
         }
 
     def calculate_full(self, X):
+        X = SMILESRepresentation().convert(X)
         criteria = ["A", "B", "C", "D", "E", "F"]
         y_pred = np.array(self.model.predict(X)).flatten()
         X = self.preprocess(X)
@@ -493,6 +500,7 @@ class ADAN(BaseErrorModel):
         self.results = pd.DataFrame(self.results)
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         """Calcualtes confidence scores."""
         X = self.preprocess(X)
         Xp = self.reduction.transform(X)[:, : self.n_components]
