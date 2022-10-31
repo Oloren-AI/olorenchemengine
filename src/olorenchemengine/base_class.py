@@ -1199,7 +1199,7 @@ class BaseErrorModel(BaseClass):
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        quantile: float = 0.95,
+        quantile: float = None,
         filename: str = "figure.png",
     ):
         """Fits confidence scores to residuals.
@@ -1214,6 +1214,9 @@ class BaseErrorModel(BaseClass):
             min_per_bin (int): minimum number of instances per bin
             filename (str): save destination of the fitted plot
         """
+        if quantile is None:
+            quantile = self.ci
+        
         if self.method == "bin":
             bin_labels = pd.cut(scores, self.bins, labels=False)
             X = []
@@ -1230,7 +1233,7 @@ class BaseErrorModel(BaseClass):
             n_labels = int(max(bin_labels) + 1)
             X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
             y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(n_labels)])
-        elif sself.method == "roll":
+        elif self.method == "roll":
             results = list(zip(scores, residuals))
             scores, residuals = zip(*sorted(results))
             X = pd.Series(scores).rolling(self.window).mean()
