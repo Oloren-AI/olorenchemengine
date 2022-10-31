@@ -3,7 +3,6 @@ from olorenchemengine.internal import *
 from olorenchemengine.gnn import *
 
 import torch.nn.functional as F
-from torch_geometric.nn import global_mean_pool
 
 from torch_geometric.nn import SuperGATConv
 

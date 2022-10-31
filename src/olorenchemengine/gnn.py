@@ -23,8 +23,8 @@ class BaseLightningModule(*lm_imports):
         input_dimensions (Tuple, optional): Tulpe describing the dimensions of the input data. Defaults to None.
     """
 
-    def __init__(self, optim: str = "adam", input_dimensions: Tuple = None):
-        super().__init__()
+    def __init__(self, *args, optim: str = "adam", input_dimensions: Tuple = None, **kwargs):
+        super().__init__(*args, **kwargs)
         self.optim = optim
 
     def set_task_type(self, task_type, pos_weight=torch.tensor([1])):
@@ -71,10 +71,14 @@ class BaseLightningModule(*lm_imports):
     # train, val, test, steps
     ##########################
     def training_step(self, batch, batch_idx):
-        y_true = batch.y.float()
-        y_pred = self.forward(batch)
-        loss = self.loss(y_pred, y_true)
-        return loss
+        try:
+            y_true = batch.y.float()
+            y_pred = self.forward(batch)
+            loss = self.loss(y_pred, y_true)
+            return loss
+        except Exception as e:
+            print(e)
+            return None
 
     def validation_step(self, batch, batch_idx):
         y_true = batch.y.float()
@@ -271,6 +275,8 @@ class BaseTorchGeometricModel(BaseModel):
 
         self.trainer = Trainer(
             accelerator="auto", 
+            devices=-1,
+            auto_select_gpus=False,
             max_epochs=self.epochs, 
             auto_lr_find=auto_lr_find,
             num_sanity_val_steps=0
