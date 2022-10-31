@@ -274,10 +274,9 @@ class BaseTorchGeometricModel(BaseModel):
         from pytorch_lightning import Trainer
 
         self.trainer = Trainer(
-            accelerator="auto", 
-            devices=-1,
+            accelerator="auto",
             auto_select_gpus=False,
-            max_epochs=self.epochs, 
+            max_epochs=self.epochs,
             auto_lr_find=auto_lr_find,
             num_sanity_val_steps=0
         )
@@ -317,7 +316,7 @@ class BaseTorchGeometricModel(BaseModel):
 
     def _predict(self, X):
         self.network.eval()
-        
+
         from torch_geometric.data import DataLoader as PyGDataLoader
 
         dataloader = PyGDataLoader(X, batch_size=self.batch_size, num_workers=oce.CONFIG["NUM_WORKERS"])
