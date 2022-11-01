@@ -1128,7 +1128,7 @@ class BaseErrorModel(BaseClass):
         """
         y_pred = np.array(self.model.predict(X)).flatten()
         residuals = np.abs(np.array(y) - y_pred)
-        scores = np.array(self.calculate(X, y_pred))
+        scores = self.calculate(X, y_pred)
 
         self._fit(residuals, scores, **kwargs)
 
@@ -1176,7 +1176,7 @@ class BaseErrorModel(BaseClass):
         method: str = "roll",
         window: int = 50,
         bins: int = 20,
-        min_per_bin: int = 10,
+        return_fig: bool = True,
         filename: str = "figure.png",
     ):
         """Fits confidence scores to residuals.
@@ -1193,28 +1193,20 @@ class BaseErrorModel(BaseClass):
         """
         if method == "bin":
             bin_labels = pd.cut(scores, bins, labels=False)
-            X = []
-            y = []
-            for i in range(bins):
-                ith_bin = bin_labels == i
-                if np.sum(ith_bin) < min_per_bin:
-                    continue
-                X.append(np.mean(scores[ith_bin]))
-                y.append(np.quantile(residuals[ith_bin], quantile))
-            X = np.array(X)
-            y = np.array(y)
+            X = [np.mean(scores[bin_labels == i]) for i in range(bins)]
+            y = [np.quantile(residuals[bin_labels == i], quantile) for i in range(bins)]
         elif method == "qbin":
             bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
             n_labels = int(max(bin_labels) + 1)
-            X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
-            y = np.array([np.quantile(residuals[bin_labels == i], quantile) for i in range(n_labels)])
+            X = [np.mean(scores[bin_labels == i]) for i in range(n_labels)]
+            y = [np.quantile(residuals[bin_labels == i], quantile) for i in range(n_labels)]
         elif method == "roll":
-            results = list(zip(scores, residuals))
-            scores, residuals = zip(*sorted(results))
+            idxs = np.argsort(scores)
+            scores, residuals = scores[idx], residuals[idx]
             X = pd.Series(scores).rolling(window).mean()
             y = pd.Series(residuals).rolling(window).quantile(quantile)
-            X = np.array(X[~np.isnan(X)])
-            y = np.array(y[~np.isnan(y)])
+            X = X[~np.isnan(X)]
+            y = y[~np.isnan(X)]
         else:
             raise NameError("method {} is not recognized".format(method))
 
@@ -1228,6 +1220,9 @@ class BaseErrorModel(BaseClass):
             lambda x, a, b, c: a * x ** b + c,
             lambda x, a, b: a * x + b
         ]
+
+        X = np.array(X)
+        y = np.array(y)
         min_mse = None
         for func in funcs:
             try:
@@ -1246,13 +1241,14 @@ class BaseErrorModel(BaseClass):
         floor, ceil = np.min(residuals), np.max(residuals)
         self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), ceil), floor))
 
-        sorted_scores = np.sort(scores)
-        plt.xlabel(self.__class__.__name__)
-        plt.ylabel("Absolute Error")
-        plt.scatter(scores, residuals, c="black", s=1)
-        plt.scatter(X, y, c="blue")
-        plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
-        plt.savefig(filename)
+        if return_fig:
+            sorted_scores = np.sort(scores)
+            plt.xlabel(self.__class__.__name__)
+            plt.ylabel("Absolute Error")
+            plt.scatter(scores, residuals, c="black", s=1)
+            plt.scatter(X, y, c="blue")
+            plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
+            plt.savefig(filename)
 
         self.residuals = residuals
         self.scores = scores

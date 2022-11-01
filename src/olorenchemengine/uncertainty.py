@@ -288,7 +288,7 @@ class KNNSimilarity(BaseFingerprintModel):
 
         def mean_sim(fp):
             similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
-            return np.mean(np.partition(test, self.k)[-self.k:])
+            return np.mean(np.partition(similarity, self.k)[-self.k:])
 
         sim_vec = np.vectorize(mean_sim)
         return sim_vec(ref_fps)
