@@ -20,7 +20,7 @@ col_select.appendChild(col_select_default);
 
 for (var i = 0; i < data["ids"].length; i++) {
   col_select_option = document.createElement("option");
-  col_select_option.innerHTML = data["ids"][i];
+  col_select_option.innerHTML = data["ids"][i] + data["table"][i];
   col_select_option.value = i;
   col_select.appendChild(col_select_option);
 }

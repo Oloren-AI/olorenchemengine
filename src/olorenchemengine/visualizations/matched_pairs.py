@@ -56,7 +56,7 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         pair_df["smiles2"] = smiles.iloc[pairs[:, 1]].tolist()
         
         # map feature columns
-        cols = [dataset.structure_col] + dataset.feature_cols
+        cols = [dataset.structure_col] + [dataset.property_col] + dataset.feature_cols
         pair_df = pair_df.merge(dataset.data[cols], left_on = "smiles1", 
                 right_on = dataset.structure_col, suffixes=("", " 1"))
         pair_df = pair_df.rename(columns = {col: col + " 1" for col in cols})
@@ -114,7 +114,7 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         self.annotations = []
         
         from pandas.api.types import is_numeric_dtype
-        for col in dataset.feature_cols:
+        for col in dataset.feature_cols + [dataset.property_col]:
             if is_numeric_dtype(dataset.data[col]):
                 self.annotations.append(col + " diff (2-1)")
                 pair_df[col + " diff (2-1)"] = (pair_df[col + " 2"] - 
@@ -153,16 +153,19 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         pair_df["display_smiles_1"] = display_smiles_1
         pair_df["display_smiles_2"] = display_smiles_2
         
+        pair_df = pair_df.sort_values(dataset.property_col + " diff (2-1)", ascending = False)
+        
         if id is None:
             self.ids = [
-                (row["index1"], row["index2"])\
+                str((row["index1"], row["index2"]))\
                 for i, row in pair_df.iterrows()
             ]
         else:
             self.ids = [
-                (row[id + " 1"], row[id + " 2"])\
+                str((row[id + " 1"], row[id + " 2"]))\
                 for i, row in pair_df.iterrows()
             ]
+        self.ids = [id + " " + val for id, val in zip(self.ids, pair_df[dataset.property_col + " diff (2-1)"].tolist())]
         
         pair_df = pair_df.drop(columns = ["pair", "diff"])
         self.pair_df = pair_df
