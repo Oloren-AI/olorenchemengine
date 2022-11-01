@@ -1152,20 +1152,24 @@ class BaseErrorModel(BaseClass):
         residuals = np.abs(np.array(y) - y_pred)
         scores = self.calculate(X, y_pred)
 
-        self._fit(residuals, scores, quantile = ci, **kwargs)
+        self._fit(residuals, scores, ci = ci, **kwargs)
 
     def fit_cv(
         self, 
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
         y: Union[np.ndarray, list, pd.Series],
         n_splits: int = 5,
-        ci: float = None, **kwargs
+        ci: float = None, 
+        **kwargs
     ):
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
             n_splits (int): Number of cross validation splits, default 5
-        """ 
+        """
+        if ci is None:
+            ci = self.ci
+            
         from sklearn.model_selection import KFold
         from sklearn.calibration import calibration_curve
         
@@ -1198,12 +1202,13 @@ class BaseErrorModel(BaseClass):
             else:
                 scores = np.concatenate((scores, new_scores))
 
-        self._fit(residuals, scores, **kwargs)
+        self._fit(residuals, scores, ci = ci, **kwargs)
 
     def _fit(
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
+        ci: float = None,
         filename: str = "figure.png",
     ):
         """Fits confidence scores to residuals.
@@ -1211,22 +1216,26 @@ class BaseErrorModel(BaseClass):
         Args:
             residuals (1-dimensional np.ndarray): array of residuals
             scores (1-dimensional np.ndarray): array of confidence scores
+            quantile (float): confidence interval quantile to capture during fitting
             filename (str): save destination of the fitted plot
         """
+        if ci is None:
+            ci = self.ci
+
         if self.method == "bin":
             bin_labels = pd.cut(scores, self.bins, labels=False)
             X = [np.mean(scores[bin_labels == i]) for i in range(self.bins)]
-            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(self.bins)]
+            y = [np.quantile(residuals[bin_labels == i], ci) for i in range(self.bins)]
         elif self.method == "qbin":
             bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
             n_labels = int(max(bin_labels) + 1)
             X = [np.mean(scores[bin_labels == i]) for i in range(n_labels)]
-            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(n_labels)]
+            y = [np.quantile(residuals[bin_labels == i], ci) for i in range(n_labels)]
         elif self.method == "roll":
             idxs = np.argsort(scores)
             scores, residuals = scores[idx], residuals[idx]
             X = pd.Series(scores).rolling(window).mean()
-            y = pd.Series(residuals).rolling(window).quantile(self.ci)
+            y = pd.Series(residuals).rolling(window).quantile(ci)
             X = X[~np.isnan(X)]
             y = y[~np.isnan(X)]
         else:
@@ -1274,7 +1283,6 @@ class BaseErrorModel(BaseClass):
 
         self.residuals = residuals
         self.scores = scores
-        self.quantile = quantile
         self.filename = filename
 
     def score(
