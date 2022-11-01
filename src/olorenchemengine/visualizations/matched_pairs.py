@@ -3,9 +3,188 @@ from typing import *
 from olorenchemengine.base_class import *
 from olorenchemengine.dataset import *
 from olorenchemengine.visualizations.visualization import *
+from olorenchemengine.representations import *
+from olorenchemengine.basics import *
 
+class CompoundDistMatchedPairsViewer(BaseVisualization):
+    """
+    This view allows the user to browse all matched pairs in a dataset based on 
+    compound distances matched pairs
+    
+    Parameters:
+        dataset (BaseDataset): The dataset to conduct the compound distance-based
+            matched pairs analysis on
+        id (str): The id column in the dataset to define the pairs by. 
+            Must be in dataset.feature_cols. Default is None meaning the index 
+            which identifies pairs by (row_num_1, row_num_2).
+        rep (BaseRepresentation): The representation to use for the analysis.
+            Defaults to MorganVecRepresentation.
+        invert_colors (bool): invert the colors of the MCS such that the MCS is
+            red and the differences are green. Default False.
+    """
+    
+    @log_arguments
+    def __init__(
+        self,
+        dataset: BaseDataset,
+        *args,
+        id: str = None,
+        rep: BaseCompoundVecRepresentation = MorganVecRepresentation(),
+        invert_colors: bool = False,
+        timeout: float = 1,
+        show_display_smiles: bool = False,
+        show_structure_col: bool = False,
+        log = True,
+        **kwargs
+    ):
+        # calculate distances and similarities and filter
+        smiles = dataset.data[dataset.structure_col]
+        dists = rep.calculate_distance(smiles, 
+                                       smiles, 
+                                       metric="rogerstanimoto")
+        sim = 1 - dists
+        pairs = np.argwhere(sim > 0.95)
+        pairs = pairs[pairs[:, 0] < pairs[:, 1]]
+        print(f"{len(pairs)} pairs with similarity > 0.95")
+        
+        # construct the list of pairs
+        pair_df = pd.DataFrame(pairs, columns = ["index1", "index2"])
+        pair_df["sim"] = sim[pairs[:, 0], pairs[:, 1]]
+        
+        # map structure columns
+        pair_df["smiles1"] = smiles.iloc[pairs[:, 0]].tolist()
+        pair_df["smiles2"] = smiles.iloc[pairs[:, 1]].tolist()
+        
+        # map feature columns
+        cols = [dataset.structure_col] + dataset.feature_cols
+        pair_df = pair_df.merge(dataset.data[cols], left_on = "smiles1", 
+                right_on = dataset.structure_col, suffixes=("", " 1"))
+        pair_df = pair_df.rename(columns = {col: col + " 1" for col in cols})
+        pair_df = pair_df.merge(dataset.data[cols], left_on = "smiles2", 
+                right_on = dataset.structure_col, suffixes=("", " 2"))
+        pair_df = pair_df.rename(columns = {col: col + " 2" for col in cols})
+        
+        # helper method to get fragments with MCS differences
+        def get_diff(pair):
+            mols = [Chem.MolFromSmiles(pair[0]), Chem.MolFromSmiles(pair[1])]
 
-class MatchedPairsTable(BaseVisualization):
+            mols_ = []
+            for s, m in zip(smiles, mols):
+                if m is None:
+                    print(f"Could not parse {s}, skipping")
+                mols_.append(m)
+            mols = mols_
+
+            from rdkit.Chem.rdFMCS import FindMCS
+            result = FindMCS(mols, completeRingsOnly=True, timeout = timeout)
+            smarts = result.smartsString
+
+            mol_frags = []
+            for mol in mols:
+                matches = mol.GetSubstructMatches(Chem.MolFromSmarts(smarts))
+
+                mol = Chem.RWMol(mol)
+                mol.BeginBatchEdit()
+                for a_idx in matches[0]:
+                    mol.RemoveAtom(a_idx)
+                mol.CommitBatchEdit()
+                frags = Chem.GetMolFrags(mol, asMols=False)
+                frags_ = []
+                for frag in frags:
+                    mol_ = copy.deepcopy(mol)
+                    mol_.BeginBatchEdit()
+                    for i in range(mol_.GetNumAtoms()):
+                        if i not in frag:
+                            mol_.RemoveAtom(i)
+                    mol_.CommitBatchEdit()
+                    frags_.append(Chem.MolToSmiles(mol_))
+                mol_frags.append(frags_)
+            return mol_frags
+
+        # get the fragments
+        pair_df["pair"] = [pair for pair in pair_df[["smiles1", "smiles2"]].values]
+        from tqdm import tqdm
+        tqdm.pandas()
+        pair_df["diff"] = pair_df["pair"].progress_apply(get_diff)
+        
+        pair_df["diff1"] = [diff[0] for diff in pair_df["diff"]]
+        pair_df["diff2"] = [diff[1] for diff in pair_df["diff"]]
+        
+        # get the feature annotations for both sides of the pair
+        self.annotations = []
+        
+        from pandas.api.types import is_numeric_dtype
+        for col in dataset.feature_cols:
+            if is_numeric_dtype(dataset.data[col]):
+                self.annotations.append(col + " diff (2-1)")
+                pair_df[col + " diff (2-1)"] = (pair_df[col + " 2"] - 
+                    pair_df[col + " 1"])
+            else:
+                self.annotations.append(col + " 1")
+                self.annotations.append(col + " 2")
+        
+        if show_display_smiles:
+            self.annotations.append("smiles1")
+            self.annotations.append("smiles2")
+        
+        if show_structure_col:
+            self.annotations.append(dataset.structure_col + " 1")
+            self.annotations.append(dataset.structure_col + " 2")
+                
+        # Find the common MCS between pairs and highlight it
+        from rdkit.Chem.rdFMCS import FindMCS
+        display_smiles_1 = []
+        display_smiles_2 = []
+        for pair in pair_df["pair"]:
+            mols = [Chem.MolFromSmiles(pair[0]), Chem.MolFromSmiles(pair[1])]
+            result = FindMCS(mols, 
+                             completeRingsOnly=False, timeout = timeout)
+            smarts = result.smartsString
+            for mol in mols:
+                matches = mol.GetSubstructMatches(Chem.MolFromSmarts(smarts))
+                for a_idx in matches[0]:
+                    mol.GetAtomWithIdx(a_idx).SetAtomMapNum(2)
+                for a_idx in range(mol.GetNumAtoms()):
+                    if a_idx not in matches[0]:
+                        mol.GetAtomWithIdx(a_idx).SetAtomMapNum(1)
+            display_smiles_1.append(Chem.MolToSmiles(mols[0]))
+            display_smiles_2.append(Chem.MolToSmiles(mols[1]))
+        
+        pair_df["display_smiles_1"] = display_smiles_1
+        pair_df["display_smiles_2"] = display_smiles_2
+        
+        if id is None:
+            self.ids = [
+                (row["index1"], row["index2"])\
+                for i, row in pair_df.iterrows()
+            ]
+        else:
+            self.ids = [
+                (row[id + " 1"], row[id + " 2"])\
+                for i, row in pair_df.iterrows()
+            ]
+        
+        pair_df = pair_df.drop(columns = ["pair", "diff"])
+        self.pair_df = pair_df
+        self.invert_colors = invert_colors
+        
+        super().__init__(*args, log = False, **kwargs)
+        self.packages += ["olorenrenderer"]
+        
+    def get_data(self):
+        if self.invert_colors:
+            highlights = [[2, "#fb8fff"], [1, "#8fff9c"]]
+        else:
+            highlights = [[1, "#fb8fff"], [2, "#8fff9c"]]
+            
+        return {
+            "annotations": self.annotations,
+            "ids": self.ids,
+            "table": self.pair_df.to_dict("r"),
+            "highlights": highlights,
+        }
+
+class MatchedPairsFeaturesTable(BaseVisualization):
     """
     This visualization is intended to show matched pairs of molecules in a dataset
     which differ based on a set of feature columns defined in the dataset object.
@@ -142,7 +321,7 @@ class MatchedPairsTable(BaseVisualization):
         return "MatchedPairsTable"
 
 
-class MatchedPairsHeatmap(MatchedPairsTable):
+class MatchedPairsFeaturesHeatmap(MatchedPairsFeaturesTable):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.packages = ["d3", "plotly"]
