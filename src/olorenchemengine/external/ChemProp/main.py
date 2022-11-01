@@ -18,6 +18,7 @@ from torch_geometric.nn import global_mean_pool
 from torch_scatter import scatter_sum
 from tqdm import tqdm
 
+import olorenchemengine as oce
 from olorenchemengine.base_class import BaseModel, QuantileTransformer, log_arguments
 from olorenchemengine.internal import mock_imports
 from olorenchemengine.representations import (
@@ -215,7 +216,7 @@ class DMPNNEncoder(nn.Module):
 
 
 #### General ChemProp model training method, to be used with _fit in the ChemPropModel() class implementation. ####
-def train(config, loader, setting, device=torch.device("cpu")):
+def train(config, loader, setting):
     criterion = config["loss"]
     model = config["model"]
     optimizer = config["optimizer"]
@@ -226,10 +227,10 @@ def train(config, loader, setting, device=torch.device("cpu")):
     else:
         criterion = nn.MSELoss()
 
-    model = model.to(device)
+    model = model.to(oce.CONFIG["DEVICE"])
     model.train()
     for batch in loader:
-        batch = batch.to(device)
+        batch = batch.to(oce.CONFIG["DEVICE"])
 
         optimizer.zero_grad()
         out = model(batch)
@@ -241,14 +242,14 @@ def train(config, loader, setting, device=torch.device("cpu")):
 
 
 #### General ChemProp model prediction method, to be used with _predict in the ChemPropModel() class implementation. ####
-def predict(config, loader, setting="classification", device=torch.device("cpu")):
+def predict(config, loader, setting="classification"):
     model = config["model"]
 
-    model = model.to(device)
+    model = model.to(oce.CONFIG["DEVICE"])
     model.eval()
     y_pred = []
     for batch in tqdm(loader, total=len(loader)):
-        batch = batch.to(device)
+        batch = batch.to(oce.CONFIG["DEVICE"])
         with torch.no_grad():
             if setting == "classification":
                 batch_preds = torch.sigmoid(model(batch))
@@ -291,7 +292,6 @@ class ChemPropModel(BaseModel):
         lr: float = 1e-3,
         hidden_size: int = 300,
         depth: int = 3,
-        map_location="cuda:0",
         **kwargs
     ):
 
@@ -302,9 +302,6 @@ class ChemPropModel(BaseModel):
         self.lr = lr
         self.hidden_size = hidden_size
         self.dropout_rate = dropout_rate
-
-        self.map_location = map_location
-        self.device = torch.device(self.map_location)
 
         AF = ChemProp_AF()
         BF = ChemProp_BF()
@@ -322,7 +319,7 @@ class ChemPropModel(BaseModel):
         initialize_weights(self.model)
 
         super().__init__(preprocessor=QuantileTransformer(), **kwargs)
-        self.model.to(self.device)
+        self.model.to(oce.CONFIG["DEVICE"])
 
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
         self.criterion = nn.BCEWithLogitsLoss()

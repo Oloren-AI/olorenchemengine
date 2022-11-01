@@ -2,6 +2,10 @@ import olorenchemengine as oce
 from olorenchemengine.internal import *
 from olorenchemengine.gnn import *
 
+import torch.nn.functional as F
+
+from torch_geometric.nn import SuperGATConv
+
 class SuperGATModel_beta(BaseLightningModule):
 
     """ SuperGAT is a network
@@ -17,6 +21,7 @@ class SuperGATModel_beta(BaseLightningModule):
         self,
         hidden_channels: int = 8,
         heads: int = 8,
+        pooling_function: str = "mean",
         negative_slope: float = 0.2,
         dropout: float = 0.0,
         add_self_loops: bool = True,
@@ -43,32 +48,42 @@ class SuperGATModel_beta(BaseLightningModule):
         self.is_undirected = is_undirected
         self.lr = lr
         self.optim = optim
+        
+        from torch_geometric.nn import (
+            global_add_pool,
+            global_max_pool,
+            global_mean_pool,
+        )
+
+        if pooling_function.lower() == "add":
+            self.pooling_function = global_add_pool
+        elif pooling_function.lower() == "mean":
+            self.pooling_function = global_mean_pool
+        elif pooling_function.lower() == "max":
+            self.pooling_function = global_max_pool
 
     def create(self, dimensions):
-        from torch_geometric.nn import SuperGATConv
-
         self.conv1 = SuperGATConv(dimensions[0], self.hidden_channels, heads=self.heads,
                                   dropout=self.dropout, attention_type=self.attention_type,
                                   edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,
                                   negative_slope=self.negative_slope, add_self_loops=self.add_self_loops,
                                   bias=self.bias, neg_sample_ratio=self.neg_sample_ratio)
-        self.conv2 = SuperGATConv(self.hidden_channels*self.heads, 1, heads=self.heads,
+        self.conv2 = SuperGATConv(self.hidden_channels*self.heads, self.hidden_channels*self.heads,
+                                  heads=self.heads,
                                   concat=False, dropout=self.dropout, attention_type=self.attention_type,
                                   edge_sample_ratio=self.edge_sample_ratio, is_undirected=self.is_undirected,
                                   negative_slope=self.negative_slope, add_self_loops=self.add_self_loops,
                                   bias=self.bias, neg_sample_ratio=self.neg_sample_ratio)
+        self.lin1 = nn.Linear(self.hidden_channels*self.heads, 1)
 
     def forward(self, batch):
-        import torch.nn.functional as F
-        from torch_geometric.nn import global_mean_pool
-
         if batch.x.is_cuda:
             dtype = torch.cuda.FloatTensor
         else:
             dtype = torch.FloatTensor
         x = batch.x.type(dtype)
+        
         edge_index = batch.edge_index
-        edge_attr = batch.edge_attr.type(dtype)
 
         del dtype
         
@@ -76,8 +91,8 @@ class SuperGATModel_beta(BaseLightningModule):
         x = F.elu(self.conv1(x, edge_index))
         x = F.dropout(x, p=self.dropout, training=self.training)
         x = self.conv2(x, edge_index)
-        x = global_mean_pool(x, batch.batch)
-        return F.log_softmax(x, dim=-1)
+        x = self.pooling_function(x, batch.batch, size=batch.num_graphs)
+        return self.lin1(x)
     
     ##########################
     # train, val, test, steps
@@ -91,10 +106,11 @@ class SuperGATModel_beta(BaseLightningModule):
         else:
             dtype = torch.FloatTensor
         x = batch.x.type(dtype)
+        
         edge_index = batch.edge_index
-        edge_attr = batch.edge_attr.type(dtype)
+        #edge_attr = batch.edge_attr.type(dtype)
 
-        del dtype
+        #del dtype
         
         x = F.dropout(x, p=0.6, training=self.training)
         x = F.elu(self.conv1(x, edge_index))
@@ -103,8 +119,8 @@ class SuperGATModel_beta(BaseLightningModule):
         
         x = self.conv2(x, edge_index)
         att_loss += self.conv2.get_attention_loss()
-        x = global_mean_pool(x, batch.batch)
-        y_pred = F.log_softmax(x, dim=-1)
+        x = self.pooling_function(x, batch.batch, size=batch.num_graphs)
+        y_pred = self.lin1(x)
         
         loss = self.loss(y_pred, batch.y)
         loss += 4.0 * att_loss

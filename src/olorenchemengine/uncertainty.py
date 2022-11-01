@@ -20,9 +20,10 @@ class BaseEnsembleModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16):            
+    def __init__(self, ensemble_model = None, n_ensembles = 16, log=True, **kwargs):      
         self.ensemble_model = ensemble_model
         self.n_ensembles = n_ensembles
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -70,9 +71,9 @@ class BootstrapEnsemble(BaseEnsembleModel):
     """
     
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25):
-        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles)
+    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25, log=True, **kwargs):
         self.bootstrap_size = bootstrap_size
+        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles, log=False, **kwargs)
 
     def build(
         self,
@@ -181,10 +182,12 @@ class SDC(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, a=3):
+    def __init__(self, a=3, log=True, **kwargs):
         self.a = a
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         ref_fps = self.get_fps(X)
 
         def sdc(fp):
@@ -214,6 +217,8 @@ class TargetDistDC(SDC):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
+        
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -247,6 +252,7 @@ class TrainDistDC(SDC):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
         ref_fps = self.get_fps(X)
 
@@ -280,10 +286,12 @@ class KNNSimilarity(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, k=5):
+    def __init__(self, k=5, log=True, **kwargs):
         self.k = k
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         ref_fps = self.get_fps(X)
 
         def mean_sim(fp):
@@ -313,6 +321,7 @@ class TargetDistKNN(KNNSimilarity):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -347,6 +356,7 @@ class TrainDistKNN(KNNSimilarity):
     """
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
         ref_fps = self.get_fps(X)
 
@@ -376,11 +386,6 @@ class Predicted(BaseErrorModel):
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
-
-    @log_arguments
-    def __init__(self):
-        pass
-
     def calculate(self, X, y_pred):
         return y_pred
 
@@ -391,8 +396,8 @@ class Naive(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self):
-        pass
+    def __init__(log=True, self):
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
         pass
@@ -431,8 +436,9 @@ class ADAN(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, criterion: str):
+    def __init__(self, criterion: str, log=True, **kwargs):
         self.criterion = criterion
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -509,6 +515,7 @@ class ADAN(BaseErrorModel):
         }
 
     def calculate_full(self, X):
+        X = SMILESRepresentation().convert(X)
         criteria = ["A", "B", "C", "D", "E", "F"]
         y_pred = np.array(self.model.predict(X)).flatten()
         X = self.preprocess(X)
@@ -525,6 +532,7 @@ class ADAN(BaseErrorModel):
         self.results = pd.DataFrame(self.results)
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         """Calcualtes confidence scores."""
         X = self.preprocess(X)
         Xp = self.reduction.transform(X)[:, : self.n_components]
@@ -532,6 +540,7 @@ class ADAN(BaseErrorModel):
         return self._calculate(X, Xp, y_pred, self.criterion)
 
     def _calculate(self, X, Xp, y_pred, criterion: str, standardize: bool = True):
+        from sklearn.neighbors import NearestNeighbors
         if criterion in ("A", "A_raw"):
             dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
         elif criterion in ("B", "B_raw"):
@@ -615,6 +624,7 @@ class ADAN(BaseErrorModel):
             neighbor_thresh (float): fraction of closest training queries to consider
         """
         n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
+        from sklearn.neighbors import NearestNeighbors
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(self.Xp_train)
         distances, indices = nbrs.kneighbors(Xp)
 
@@ -649,12 +659,15 @@ class AggregateErrorModel(BaseErrorModel):
     def __init__(
         self, 
         error_models: List[BaseErrorModel], 
-        reduction: BaseReduction = FactorAnalysis(n_components = 1)
+        reduction: BaseReduction = FactorAnalysis(n_components = 1),
+        log=True,
+        **kwargs
     ):
         if not isinstance(error_models, list):
             raise TypeError("error_models must be a list")
         self.error_models = error_models
         self.reduction = reduction
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
