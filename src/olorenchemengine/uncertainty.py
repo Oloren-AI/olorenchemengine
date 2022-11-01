@@ -110,6 +110,10 @@ class RandomForestEnsemble(BaseEnsembleModel):
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
     
     def build(
         self,
@@ -133,6 +137,10 @@ class BaseFingerprintModel(BaseErrorModel):
     """ BaseFingerprintModel is the base class for error models that require the
         computation of Morgan Fingerprints.
     """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -216,6 +224,10 @@ class TargetDistDC(SDC):
     ------------------------------
     """
 
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
         
@@ -250,6 +262,10 @@ class TrainDistDC(SDC):
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
@@ -320,6 +336,10 @@ class TargetDistKNN(KNNSimilarity):
     ------------------------------
     """
 
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
         def dist(smi, pred):
@@ -355,6 +375,10 @@ class TrainDistKNN(KNNSimilarity):
     ------------------------------
     """
 
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
@@ -386,6 +410,11 @@ class Predicted(BaseErrorModel):
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+
     def calculate(self, X, y_pred):
         return y_pred
 
@@ -396,7 +425,7 @@ class Naive(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(log=True, self):
+    def __init__(self, log=True, **kwargs):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
