@@ -200,6 +200,9 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         super().__init__(*args, log = False, **kwargs)
         self.packages += ["olorenrenderer"]
         
+    def get_diff_table(self):
+        return self.pair_df
+        
     def get_data(self):
         if self.invert_colors:
             highlights = [[2, "#fb8fff"], [1, "#8fff9c"]]
