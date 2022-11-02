@@ -34,6 +34,7 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         timeout: float = 1,
         show_display_smiles: bool = False,
         show_structure_col: bool = False,
+        match_threshold: int = 10,
         log = True,
         **kwargs
     ):
@@ -75,19 +76,40 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
                 mols_.append(m)
             mols = mols_
 
-            from rdkit.Chem.rdFMCS import FindMCS
-            result = FindMCS(mols, completeRingsOnly=True, timeout = timeout)
-            smarts = result.smartsString
+            continue_mcs = True
+            patts = []
+            while continue_mcs:
+                try:
+                    from rdkit.Chem.rdFMCS import FindMCS
+                    result = FindMCS(mols, completeRingsOnly=True, timeout = timeout)
+                    smarts = result.smartsString
+                    patt = Chem.MolFromSmarts(smarts)
+                    if len(patt.GetAtoms()) > match_threshold:
+                        mol_frags = []
+                        mols_ = []
+                        for mol in mols:
+                            mol = Chem.Mol(mol)
+                            matches = mol.GetSubstructMatches(patt)
 
+                            mol = Chem.RWMol(mol)
+                            mol.BeginBatchEdit()
+                            for a_idx in matches[0]:
+                                mol.RemoveAtom(a_idx)
+                            mol.CommitBatchEdit()
+                            mol.UpdatePropertyCache()
+                            Chem.FastFindRings(mol)
+                            mols_.append(mol)
+                        mols = mols_
+                        patts.append(patt)
+                    else:
+                        continue_mcs = False
+                except Exception as e:
+                    print(e)
+                    continue_mcs = False
+                    
             mol_frags = []
             for mol in mols:
-                matches = mol.GetSubstructMatches(Chem.MolFromSmarts(smarts))
-
                 mol = Chem.RWMol(mol)
-                mol.BeginBatchEdit()
-                for a_idx in matches[0]:
-                    mol.RemoveAtom(a_idx)
-                mol.CommitBatchEdit()
                 frags = Chem.GetMolFrags(mol, asMols=False)
                 frags_ = []
                 for frag in frags:
@@ -99,13 +121,15 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
                     mol_.CommitBatchEdit()
                     frags_.append(Chem.MolToSmiles(mol_))
                 mol_frags.append(frags_)
-            return mol_frags
+            return mol_frags, patts
 
         # get the fragments
         pair_df["pair"] = [pair for pair in pair_df[["smiles1", "smiles2"]].values]
         from tqdm import tqdm
         tqdm.pandas()
-        pair_df["diff"] = pair_df["pair"].progress_apply(get_diff)
+        res =  list(zip(*pair_df["pair"].progress_apply(get_diff).tolist()))
+        pair_df["diff"] = res[0]
+        pair_df["patt"] = res[1]
         
         pair_df["diff1"] = [diff[0] for diff in pair_df["diff"]]
         pair_df["diff2"] = [diff[1] for diff in pair_df["diff"]]
@@ -135,18 +159,20 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         from rdkit.Chem.rdFMCS import FindMCS
         display_smiles_1 = []
         display_smiles_2 = []
-        for pair in pair_df["pair"]:
+        for pair, patts in zip(pair_df["pair"], pair_df["patt"]):
             mols = [Chem.MolFromSmiles(pair[0]), Chem.MolFromSmiles(pair[1])]
-            result = FindMCS(mols, 
-                             completeRingsOnly=False, timeout = timeout)
-            smarts = result.smartsString
             for mol in mols:
-                matches = mol.GetSubstructMatches(Chem.MolFromSmarts(smarts))
-                for a_idx in matches[0]:
-                    mol.GetAtomWithIdx(a_idx).SetAtomMapNum(2)
-                for a_idx in range(mol.GetNumAtoms()):
-                    if a_idx not in matches[0]:
-                        mol.GetAtomWithIdx(a_idx).SetAtomMapNum(1)
+                for i in range(mol.GetNumAtoms()):
+                    mol.GetAtomWithIdx(i).SetAtomMapNum(1)
+                for patt in patts:
+                    try:
+                        patt = Chem.MolFromSmiles(Chem.MolToSmiles(Chem.RemoveHs(patt)))
+                        matches = mol.GetSubstructMatches(patt)
+                        for a_idx in matches[0]:
+                            mol.GetAtomWithIdx(a_idx).SetAtomMapNum(2)
+                    except:
+                        print(Chem.MolToSmiles(mol))
+                        print(Chem.MolToSmiles(patt))
             display_smiles_1.append(Chem.MolToSmiles(mols[0]))
             display_smiles_2.append(Chem.MolToSmiles(mols[1]))
         
@@ -165,9 +191,9 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
                 str((row[id + " 1"], row[id + " 2"]))\
                 for i, row in pair_df.iterrows()
             ]
-        self.ids = [id + " " + val for id, val in zip(self.ids, pair_df[dataset.property_col + " diff (2-1)"].tolist())]
+        self.ids = [id + " " + str(val) for id, val in zip(self.ids, pair_df[dataset.property_col + " diff (2-1)"].tolist())]
         
-        pair_df = pair_df.drop(columns = ["pair", "diff"])
+        pair_df = pair_df.drop(columns = ["pair", "diff", "patt"])
         self.pair_df = pair_df
         self.invert_colors = invert_colors
         
