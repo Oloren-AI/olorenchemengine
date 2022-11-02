@@ -522,6 +522,23 @@ class TorchMLP(BaseModel):
 
         self.network = torch.load(io.BytesIO(d["save"]))
 
+class LGBoostModel(BaseSKLearnModel, BaseObject):
+    """Light Gradient Boosting Model
+
+        Parameters:
+            representation (BaseRepresentation): representation to use for the model
+            **kwargs: parameters to pass to LGB Model
+    """
+
+    @log_arguments
+    def __init__(self, representation, **kwargs):
+        import lightgbm as lgbm
+
+        regressor = lgbm.LGBMRegressor(**kwargs)
+
+        classifier = lgbm.LGBMClassifier(**kwargs)
+
+        super().__init__(representation, regressor, classifier, log=False, **kwargs)
 
 class XGBoostModel(BaseSKLearnModel, BaseObject):
     """XGBoost model
