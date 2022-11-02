@@ -804,7 +804,7 @@ class BaseModel(BaseClass):
 
     def create_error_model(
         self, 
-        error_model_class: class, 
+        error_model: BaseErrorModel, 
         X_train: Union[pd.DataFrame, np.ndarray, list, pd.Series], 
         y_train: Union[np.ndarray, list, pd.Series], 
         X_valid: Union[pd.DataFrame, np.ndarray, list, pd.Series] = None, 
@@ -817,7 +817,7 @@ class BaseModel(BaseClass):
         or cross validation. The error model is stored in model.error_model.
 
         Args:
-            error_model (BaseErrorModel class): Error model type to be created
+            error_model (BaseErrorModel): Error model type to be created
             X_train (array-like): Input data for model training
             y_train (array-like): Values for model training
             X_valid (array-like): Input data for error model fitting. If no value passed in, the 
@@ -831,12 +831,12 @@ class BaseModel(BaseClass):
 
         model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
         model.fit(train["Drug"], train["Y"])
-        oce.create_error_model(model, oce.SDC, train["Drug"], train["Y"], valid["Drug"], valid["Y"], ci = 0.95, method = "roll")
+        oce.create_error_model(model, oce.SDC(), train["Drug"], train["Y"], valid["Drug"], valid["Y"], ci = 0.95, method = "roll")
         model.error_model.score(test["Drug"])
         ------------------------------
         """
         self.em_status = "fitted"
-        self.error_model = error_model(**kwargs)
+        self.error_model = type(error_model)(**kwargs)
         self.error_model.build(self, X_train, y_train)
         if X_valid is None or y_valid is None:
             self.error_model.fit_cv()
@@ -1240,7 +1240,7 @@ class BaseErrorModel(BaseClass):
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        filename: str = "figure.png",
+        filename: str = "figure.html",
     ):
         """Fits confidence scores to residuals.
 
@@ -1272,7 +1272,8 @@ class BaseErrorModel(BaseClass):
         X = np.array(X)
         y = np.array(y)
 
-        import matplotlib.pyplot as plt
+        import plotly.express as px
+        import plotly.graph_objects as go
         from scipy.optimize import curve_fit
 
         funcs = [
@@ -1298,20 +1299,21 @@ class BaseErrorModel(BaseClass):
                 opt_func = func
                 opt_popt = popt
                 min_mse = mse
-        floor, ceil = np.min(residuals), np.max(residuals)
-        self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), ceil), floor))
-
-        sorted_scores = np.sort(scores)
-        plt.xlabel(self.__class__.__name__)
-        plt.ylabel("Absolute Error")
-        plt.scatter(scores, residuals, c="black", s=1)
-        plt.scatter(X, y, c="blue")
-        plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
-        plt.savefig(filename)
-
+        
         self.residuals = residuals
         self.scores = scores
         self.filename = filename
+        self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), max(residuals)), min(residuals)))
+        
+        t = np.linspace(min(scores), max(scores), 100)
+        fig1 = px.scatter(x = X, y = y, color = ["#636EFA"] * len(y), color_discrete_map="identity", size=[1] * len(y))
+        fig2 = px.line(x=t, y=self.reg(t), color = ["#EF553B"] * len(t), color_discrete_map="identity")
+        fig3 = px.scatter(x = scores, y = residuals, color = ["#00CC96"] * len(residuals), color_discrete_map="identity", opacity=0.2)
+        fig1.update_traces(hovertemplate=None, hoverinfo='x+y')
+        fig2.update_traces(hovertemplate=None, hoverinfo='x+y')
+        fig3.update_traces(hovertemplate=None, hoverinfo='skip')
+        fig = go.Figure(data=fig1.data + fig2.data + fig3.data)
+        fig.write_html(filename, auto_open=True)
 
     def score(
         self,
