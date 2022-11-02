@@ -522,12 +522,12 @@ class TorchMLP(BaseModel):
 
         self.network = torch.load(io.BytesIO(d["save"]))
 
-class LGBoostModel(BaseSKLearnModel, BaseObject):
-    """Light Gradient Boosting Model
+class LGBMModel(BaseSKLearnModel, BaseObject):
+    """Light Gradient-Boosting Machine Model
 
         Parameters:
-            representation (BaseRepresentation): representation to use for the model
-            **kwargs: parameters to pass to LGB Model
+            representation (BaseRepresentation): The representation to use for the model
+            **kwargs: parameters for LGBM to pass. See a list of full parameters at LGBM documentation https://lightgbm.readthedocs.io/en/v3.3.2/
     """
 
     @log_arguments
