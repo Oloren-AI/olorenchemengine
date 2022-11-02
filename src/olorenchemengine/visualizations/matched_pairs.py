@@ -171,8 +171,7 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
                         for a_idx in matches[0]:
                             mol.GetAtomWithIdx(a_idx).SetAtomMapNum(2)
                     except:
-                        print(Chem.MolToSmiles(mol))
-                        print(Chem.MolToSmiles(patt))
+                        pass
             display_smiles_1.append(Chem.MolToSmiles(mols[0]))
             display_smiles_2.append(Chem.MolToSmiles(mols[1]))
         
