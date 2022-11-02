@@ -802,6 +802,47 @@ class BaseModel(BaseClass):
 
         return d
 
+    def create_error_model(
+        self, 
+        error_model_class: class, 
+        X_train: Union[pd.DataFrame, np.ndarray, list, pd.Series], 
+        y_train: Union[np.ndarray, list, pd.Series], 
+        X_valid: Union[pd.DataFrame, np.ndarray, list, pd.Series] = None, 
+        y_valid: Union[np.ndarray, list, pd.Series] = None,
+        **kwargs
+    ):
+        """Initializes, builds, and fits an error model on the input value.
+
+        The error model is built with the training dataset and fit via either a validation dataset
+        or cross validation. The error model is stored in model.error_model.
+
+        Args:
+            error_model (BaseErrorModel class): Error model type to be created
+            X_train (array-like): Input data for model training
+            y_train (array-like): Values for model training
+            X_valid (array-like): Input data for error model fitting. If no value passed in, the 
+                error model is fit via cross validation on the training dataset.
+            y_valid (array-like): Values for error model fitting. If no value passed in, the 
+                error model is fit via cross validation on the training dataset.
+        
+        Example
+        ------------------------------
+        import olorenchemengine as oce
+
+        model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+        model.fit(train["Drug"], train["Y"])
+        oce.create_error_model(model, oce.SDC, train["Drug"], train["Y"], valid["Drug"], valid["Y"], ci = 0.95, method = "roll")
+        model.error_model.score(test["Drug"])
+        ------------------------------
+        """
+        self.em_status = "fitted"
+        self.error_model = error_model(**kwargs)
+        self.error_model.build(self, X_train, y_train)
+        if X_valid is None or y_valid is None:
+            self.error_model.fit_cv()
+        else:
+            self.error_model.fit(X_valid, y_valid)
+
     def _save(self) -> dict:
         d = {}
         if hasattr(self, "ymean") and hasattr(self, "ystd"):
@@ -1065,18 +1106,17 @@ class BaseErrorModel(BaseClass):
 
     Estimates confidence intervals for trained oce models.
 
-    BaseDomainApplicability will be depreciated.
-
     Args:
         ci (float): desired confidence interval
-        method ({'bin','qbin','roll'}): whether to fit the error model via binning, quantile binning, or rolling quantile
+        method ({'bin','qbin','roll'}): whether to fit the error model via binning, 
+            quantile binning, or rolling quantile
         bins (int): number of bins for binned quantiles
         window (int): window size for rolling quantiles
 
     Methods:
         build: builds the error model from a trained BaseModel and dataset
         calculate: calculates confidence scores from inputs
-        fit_valid: fits confidence scores to a trained model and validation dataset
+        fit: fits confidence scores to a trained model and external dataset
         fit_cv: fits confidence scores to k-fold cross validation on the training dataset
         _fit: fits confidence scores to residuals
         score: returns confidence intervals on a dataset
@@ -1261,14 +1301,13 @@ class BaseErrorModel(BaseClass):
         floor, ceil = np.min(residuals), np.max(residuals)
         self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), ceil), floor))
 
-        if return_fig:
-            sorted_scores = np.sort(scores)
-            plt.xlabel(self.__class__.__name__)
-            plt.ylabel("Absolute Error")
-            plt.scatter(scores, residuals, c="black", s=1)
-            plt.scatter(X, y, c="blue")
-            plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
-            plt.savefig(filename)
+        sorted_scores = np.sort(scores)
+        plt.xlabel(self.__class__.__name__)
+        plt.ylabel("Absolute Error")
+        plt.scatter(scores, residuals, c="black", s=1)
+        plt.scatter(X, y, c="blue")
+        plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
+        plt.savefig(filename)
 
         self.residuals = residuals
         self.scores = scores
@@ -1321,7 +1360,6 @@ class BaseErrorModel(BaseClass):
             d.update({"bins": self.bins})
             d.update({"window": self.window})
             d.update({"quantile": self.quantile})
-            d.update({"min_per_bin": self.min_per_bin})
             d.update({"filename": self.filename})
         return d
 
@@ -1333,18 +1371,12 @@ class BaseErrorModel(BaseClass):
             self.y_train = d["y_train"]
             self.y_pred_train = d["y_pred_train"]
         if "residuals" in d.keys():
-            residuals = d["residuals"]
-            scores = d["scores"]
-            method = d["method"]
-            bins = d["bins"]
-            window = d["window"]
-            quantile = d["quantile"]
-            min_per_bin = d["min_per_bin"]
-            filename = d["filename"]
+            self.residuals = d["residuals"]
+            self.scores = d["scores"]
+            self.method = d["method"]
+            self.bins = d["bins"]
+            self.window = d["window"]
+            self.quantile = d["quantile"]
+            self.filename = d["filename"]
 
-            self._fit(
-                residuals,
-                scores,
-                quantile=quantile,
-                filename=filename,
-            )
+            self._fit(residuals, scores)
