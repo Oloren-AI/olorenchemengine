@@ -6,7 +6,7 @@ from olorenchemengine.visualizations.visualization import *
 from olorenchemengine.representations import *
 from olorenchemengine.basics import *
 
-class CompoundDistMatchedPairsViewer(BaseVisualization):
+class CompoundDistMatchedPairsViewer_beta(BaseVisualization):
     """
     This view allows the user to browse all matched pairs in a dataset based on 
     compound distances matched pairs
@@ -201,6 +201,10 @@ class CompoundDistMatchedPairsViewer(BaseVisualization):
         
     def get_diff_table(self):
         return self.pair_df
+    
+    @property
+    def JS_NAME(self) -> str:
+        return "CompoundDistMatchedPairsViewer"
         
     def get_data(self):
         if self.invert_colors:
