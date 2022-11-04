@@ -46,11 +46,15 @@ Installation
 _______________________________
 
 **Prerequisites**
-- Install Pytorch: https://pytorch.org/TensorRT/tutorials/installation.html
-- Install Pytorch Geometric: https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
+
+* Install Pytorch: https://pytorch.org/TensorRT/tutorials/installation.html
+* Install Pytorch Geometric: https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
 
 **Install Command:**
-- pip install olorenchemengine[full]
+
+.. code-block:: bash
+
+  pip install olorenchemengine[full]
 
 Here are some common error messages and solutions:
 https://oloren-ai.notion.site/Oloren-ChemEngine-Installation-FAQ-f2edec771a7f4350af5fdc361d494604
