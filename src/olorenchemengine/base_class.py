@@ -1067,6 +1067,12 @@ class BaseErrorModel(BaseClass):
 
     BaseDomainApplicability will be depreciated.
 
+    Args:
+        ci (float): desired confidence interval
+        method ({'bin','qbin','roll'}): whether to fit the error model via binning, quantile binning, or rolling quantile
+        bins (int): number of bins for binned quantiles
+        window (int): window size for rolling quantiles
+
     Methods:
         build: builds the error model from a trained BaseModel and dataset
         calculate: calculates confidence scores from inputs
@@ -1076,9 +1082,20 @@ class BaseErrorModel(BaseClass):
         score: returns confidence intervals on a dataset
     """
 
-    def __init__(self):
-        pass
-
+    @log_arguments
+    def __init__(self, 
+        ci: float = 0.95, 
+        method: str = "qbin",
+        window: int = 50,
+        bins: int = 20,
+        log=True, 
+        **kwargs):
+        
+        self.ci = ci
+        self.method = method
+        self.window = window
+        self.bins = bins
+        
     def build(
         self,
         model: BaseModel,
@@ -1125,14 +1142,21 @@ class BaseErrorModel(BaseClass):
         Args:
             X (array-like): features, smiles
             y (array-like): true values
-        """
+        """ 
+        X = oce.SMILESRepresentation().convert(X)
         y_pred = np.array(self.model.predict(X)).flatten()
         residuals = np.abs(np.array(y) - y_pred)
-        scores = np.array(self.calculate(X, y_pred))
+        scores = self.calculate(X, y_pred)
 
         self._fit(residuals, scores, **kwargs)
 
-    def fit_cv(self, n_splits: int = 5, **kwargs):
+    def fit_cv(
+        self, 
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y: Union[np.ndarray, list, pd.Series],
+        n_splits: int = 5,
+        **kwargs
+    ):
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
@@ -1140,17 +1164,21 @@ class BaseErrorModel(BaseClass):
         """
         from sklearn.model_selection import KFold
         from sklearn.calibration import calibration_curve
-
+        
+        X = np.array(oce.SMILESRepresentation().convert(X))
+        if issubclass(type(y), pd.Series):
+            y = y.values
+        
         residuals = None
         scores = None
         kf = KFold(n_splits=n_splits)
 
         for train_index, test_index in kf.split(X):
-            X_train, X_test = self.X_train[train_index], self.X_train[test_index]
-            y_train, y_test = self.y_train[train_index], self.y_train[test_index]
+            X_train, X_test = X[train_index], X[test_index]
+            y_train, y_test = y[train_index], y[test_index]
             model = self.model.copy()
             model.fit(X_train, y_train)
-
+            
             y_pred_test = np.array(model.predict(X_test)).flatten()
             pred_error = np.abs(y_test - y_pred_test)
             if residuals is None:
@@ -1172,11 +1200,6 @@ class BaseErrorModel(BaseClass):
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        quantile: float = 0.95,
-        method: str = "roll",
-        window: int = 100,
-        bins: int = 10,
-        min_per_bin: int = 5,
         filename: str = "figure.png",
     ):
         """Fits confidence scores to residuals.
@@ -1184,48 +1207,42 @@ class BaseErrorModel(BaseClass):
         Args:
             residuals (1-dimensional np.ndarray): array of residuals
             scores (1-dimensional np.ndarray): array of confidence scores
-            method ({'bin','qbin','roll'}): whether to fit the error model via binning, quantile binning, or rolling quantile
-            bins (int): number of bins for binned quantiles
-            window (int): window size for rolling quantiles
             quantile (float): confidence interval quantile to capture during fitting
-            min_per_bin (int): minimum number of instances per bin
             filename (str): save destination of the fitted plot
         """
-        if method == "bin":
-            bin_labels = pd.cut(scores, bins, labels=False)
-            X = []
-            y = []
-            for i in range(bins):
-                ith_bin = bin_labels == i
-                if np.sum(ith_bin) >= min_per_bin:
-                    X.append(np.mean(scores[ith_bin]))
-                    y.append(pd.Series(residuals[ith_bin]).quantile(quantile))
-            X = np.array(X)
-            y = np.array(y)
-        elif method == "qbin":
-            bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
+        if self.method == "bin":
+            bin_labels = pd.cut(scores, self.bins, labels=False)
+            X = [np.mean(scores[bin_labels == i]) for i in range(self.bins)]
+            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(self.bins)]
+        elif self.method == "qbin":
+            bin_labels = pd.qcut(scores, self.bins, labels=False, duplicates="drop")
             n_labels = int(max(bin_labels) + 1)
-            X = np.array([np.mean(scores[bin_labels == i]) for i in range(n_labels)])
-            y = np.array([pd.Series(residuals[bin_labels == i]).quantile(quantile) for i in range(n_labels)])
-        elif method == "roll":
-            results = list(zip(scores, residuals))
-            scores, residuals = zip(*sorted(results))
-            X = pd.Series(scores).rolling(window).mean()
-            y = pd.Series(residuals).rolling(window).quantile(quantile)
-            X = np.array(X[~np.isnan(X)])
-            y = np.array(y[~np.isnan(y)])
+            X = [np.mean(scores[bin_labels == i]) for i in range(n_labels)]
+            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(n_labels)]
+        elif self.method == "roll":
+            idxs = np.argsort(scores)
+            scores, residuals = scores[idx], residuals[idx]
+            X = pd.Series(scores).rolling(self.window).mean()
+            y = pd.Series(residuals).rolling(self.window).quantile(self.ci)
+            X = X[~np.isnan(X)]
+            y = y[~np.isnan(X)]
         else:
-            raise NameError("method {} is not recognized".format(method))
+            raise NameError("method {} is not recognized".format(self.method))
+        
+        X = np.array(X)
+        y = np.array(y)
 
         import matplotlib.pyplot as plt
         from scipy.optimize import curve_fit
 
         funcs = [
             lambda x, a, b, c: a * np.exp(b * x) + c,
-            lambda x, a, b, c: a * np.log(x + b) + c,
+            lambda x, a, b, c: (a * x + b) / (1 + c * x),
+            lambda x, a, b, c: a * np.log(b * x + c),
             lambda x, a, b, c: a * x ** b + c,
             lambda x, a, b: a * x + b
         ]
+
         min_mse = None
         for func in funcs:
             try:
@@ -1244,21 +1261,17 @@ class BaseErrorModel(BaseClass):
         floor, ceil = np.min(residuals), np.max(residuals)
         self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), ceil), floor))
 
-        sorted_scores = np.sort(scores)
-        plt.xlabel(self.__class__.__name__)
-        plt.ylabel("Absolute Error")
-        plt.scatter(scores, residuals, c="black", alpha=0.2)
-        plt.scatter(X, y, c="blue")
-        plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
-        plt.savefig(filename)
+        if return_fig:
+            sorted_scores = np.sort(scores)
+            plt.xlabel(self.__class__.__name__)
+            plt.ylabel("Absolute Error")
+            plt.scatter(scores, residuals, c="black", s=1)
+            plt.scatter(X, y, c="blue")
+            plt.plot(sorted_scores, self.reg(sorted_scores), c="red")
+            plt.savefig(filename)
 
         self.residuals = residuals
         self.scores = scores
-        self.method = method
-        self.bins = bins
-        self.window = window
-        self.quantile = quantile
-        self.min_per_bin = min_per_bin
         self.filename = filename
 
     def score(
@@ -1332,10 +1345,6 @@ class BaseErrorModel(BaseClass):
             self._fit(
                 residuals,
                 scores,
-                method=method,
-                bins=bins,
-                window=window,
                 quantile=quantile,
-                min_per_bin=min_per_bin,
                 filename=filename,
             )

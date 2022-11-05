@@ -216,7 +216,6 @@ class GlobalPool(nn.Module):
             pooled = torch.cat([pooled, candidates], dim=1)
         return pooled
 
-
 class GINNetwork(nn.Module):
     def __init__(
         self,

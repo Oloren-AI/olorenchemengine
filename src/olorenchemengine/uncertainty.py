@@ -12,6 +12,7 @@ from .base_class import *
 from .basics import *
 from .dataset import *
 from .representations import *
+from .reduction import *
 
 class BaseEnsembleModel(BaseErrorModel):
     """ BaseEnsembleModel is the base class for error models that estimate
@@ -19,9 +20,10 @@ class BaseEnsembleModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16):            
+    def __init__(self, ensemble_model = None, n_ensembles = 16, log=True, **kwargs):      
         self.ensemble_model = ensemble_model
         self.n_ensembles = n_ensembles
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -69,9 +71,9 @@ class BootstrapEnsemble(BaseEnsembleModel):
     """
     
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25):
-        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles)
+    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25, log=True, **kwargs):
         self.bootstrap_size = bootstrap_size
+        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles, log=False, **kwargs)
 
     def build(
         self,
@@ -108,6 +110,10 @@ class RandomForestEnsemble(BaseEnsembleModel):
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
     
     def build(
         self,
@@ -128,9 +134,13 @@ class RandomForestEnsemble(BaseEnsembleModel):
             self.ensembles.append(ensemble_model)
 
 class BaseFingerprintModel(BaseErrorModel):
-    """BaseFingerprintModel is the base class for error models that require the
-    computation of Morgan Fingerprints.
+    """ BaseFingerprintModel is the base class for error models that require the
+        computation of Morgan Fingerprints.
     """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -142,8 +152,11 @@ class BaseFingerprintModel(BaseErrorModel):
         if isinstance(self.X_train, pd.DataFrame):
             self.X_train.columns = ["SMILES"]
         smiles = SMILESRepresentation().convert(self.X_train)
-        mols = [Chem.MolFromSmiles(smi) for smi in smiles]
-        self.train_fps = [AllChem.GetMorganFingerprint(mol, 2) for mol in mols]
+        self.train_fps = list(self.get_fps(smiles))
+
+    def get_fps(self, smiles: List[str]) -> List:
+        get_fp = lambda smiles: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smiles), 2)
+        return list(np.vectorize(get_fp)(smiles))
 
     def _save(self) -> dict:
         d = super()._save()
@@ -158,7 +171,7 @@ class BaseFingerprintModel(BaseErrorModel):
 
 
 class SDC(BaseFingerprintModel):
-    """SDC is an error model that predicts error bars based on the Sum of
+    """ SDC is an error model that predicts error bars based on the Sum of
         Distance-weighted Contributions: `Molecular Similarity-Based Domain
         Applicability Metric Efficiently Identifies Out-of-Domain Compounds
         <http://dx.doi.org/10.1021/acs.jcim.8b00597>`_
@@ -177,21 +190,24 @@ class SDC(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, a=3):
+    def __init__(self, a=3, log=True, **kwargs):
         self.a = a
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        def sdc(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            return np.sum(np.exp(-self.a * TD / (1 - TD)))
+        X = SMILESRepresentation().convert(X)
+        ref_fps = self.get_fps(X)
 
-        return np.array([sdc(smi) for smi in tqdm(X)])
+        def sdc(fp):
+            TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            return np.sum(np.exp(-self.a * (1 - TS) / TS))
+        sdc_vec = np.vectorize(sdc)
+
+        return sdc_vec(ref_fps)
 
 
 class TargetDistDC(SDC):
-    """TargetDistDC is an error model that calculates the root-mean-square
+    """ TargetDistDC is an error model that calculates the root-mean-square
         difference between the predicted activity of the target molecule and
         the observed activities of all training molecules, weighted by the DC.
 
@@ -208,12 +224,18 @@ class TargetDistDC(SDC):
     ------------------------------
     """
 
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
+        
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            DC = np.exp(-self.a * TD / (1 - TD))
+            TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
+            DC = np.exp(-self.a * (1 - TS) / TS)
             error = np.abs(self.y_train - pred)
             if np.sum(DC) == 0:
                 return np.sqrt(np.mean(error))
@@ -224,7 +246,7 @@ class TargetDistDC(SDC):
 
 
 class TrainDistDC(SDC):
-    """TrainDistDC is an error model that calculates the root-mean-square
+    """ TrainDistDC is an error model that calculates the root-mean-square
         difference between the predicted and observed activities of all
         training molecules, weighted by the DC.
 
@@ -241,23 +263,28 @@ class TrainDistDC(SDC):
     ------------------------------
     """
 
-    def calculate(self, X, y_pred):
-        residuals = np.abs(self.y_train - self.y_pred_train)
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
 
-        def dist(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TD = 1 - np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            DC = np.exp(-self.a * TD / (1 - TD))
+    def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
+        residuals = np.abs(self.y_train - self.y_pred_train)
+        ref_fps = self.get_fps(X)
+
+        def dist(fp):
+            TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            DC = np.exp(-self.a * (1 - TS) / TS)
             if np.sum(DC) == 0:
                 return np.sqrt(np.mean(residuals))
             return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
 
-        return np.array([dist(smi) for smi in tqdm(X)])
+        dist_vec = np.vectorize(dist)
+        return dist_vec(ref_fps)
 
 
 class KNNSimilarity(BaseFingerprintModel):
-    """NNSimilarity is an error model that calculates mean Tanimoto similarity
+    """ NNSimilarity is an error model that calculates mean Tanimoto similarity
         between the target molecule and the k most similar training molecules
         using a Morgan Fingerprint with a radius of 2 bonds.
 
@@ -275,21 +302,23 @@ class KNNSimilarity(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, k=5):
+    def __init__(self, k=5, log=True, **kwargs):
         self.k = k
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        def mean_sim(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            return np.mean(sorted(similarity)[-self.k :])
+        X = SMILESRepresentation().convert(X)
+        ref_fps = self.get_fps(X)
 
-        return np.array([mean_sim(smi) for smi in tqdm(X)])
+        def mean_sim(fp):
+            similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            return np.mean(np.partition(similarity, self.k)[-self.k:])
 
+        sim_vec = np.vectorize(mean_sim)
+        return sim_vec(ref_fps)
 
 class TargetDistKNN(KNNSimilarity):
-    """TargetDistKNN is an error model that calculates the root-mean-square
+    """ TargetDistKNN is an error model that calculates the root-mean-square
         difference between the predicted activity of the target molecule and
         the observed activities of the k most similar training molecules,
         weighted by their similarity.
@@ -307,13 +336,18 @@ class TargetDistKNN(KNNSimilarity):
     ------------------------------
     """
 
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
             similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             error = np.abs(self.y_train - pred)
-            idxs = np.argsort(similarity)[-self.k:]
+            idxs = np.argpartition(similarity, self.k)[-self.k:]
             if np.sum(similarity[idxs]) == 0:
                 return np.sqrt(np.mean(error[idxs]))
             return np.sqrt(np.dot(similarity[idxs], error[idxs]) / np.sum(similarity[idxs]))
@@ -323,7 +357,7 @@ class TargetDistKNN(KNNSimilarity):
 
 
 class TrainDistKNN(KNNSimilarity):
-    """TrainDistKNN is an error model that calculates the root-mean-square
+    """ TrainDistKNN is an error model that calculates the root-mean-square
         difference between the predicted and observed activities of the k most
         similar training molecules to the target molecule, weighted by their
         similarity.
@@ -341,23 +375,29 @@ class TrainDistKNN(KNNSimilarity):
     ------------------------------
     """
 
-    def calculate(self, X, y_pred):
-        residuals = np.abs(self.y_train - self.y_pred_train)
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
 
-        def dist(smi):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            idxs = np.argsort(similarity)[-self.k:]
+    def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
+        residuals = np.abs(self.y_train - self.y_pred_train)
+        ref_fps = self.get_fps(X)
+
+        def dist(fp):
+            similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            idxs = np.argpartition(similarity, self.k)[-self.k:]
             if np.sum(similarity[idxs]) == 0:
                 return np.sqrt(np.mean(residuals[idxs]))
             return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
+        
+        dist_vec = np.vectorize(dist)
 
-        return np.array([dist(smi) for smi in tqdm(X)])
+        return dist_vec(ref_fps)
 
 
 class Predicted(BaseErrorModel):
-    """Predicted is an error model that predicts error bars based on only the
+    """ Predicted is an error model that predicts error bars based on only the
         predicted value of a molecule. It is best used as part of an aggregate
         error model rather than by itself.
 
@@ -366,21 +406,47 @@ class Predicted(BaseErrorModel):
     import olorenchemengine as oce
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestErrorModel([oce.SDC(), oce.Predicted()])
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.AggregateErrorModel([oce.SDC(), oce.Predicted()])
     model.predict(test["Drug"], return_ci = True)
     ------------------------------
     """
 
     @log_arguments
-    def __init__(self):
-        pass
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
         return y_pred
 
+class Naive(BaseErrorModel):
+    """ Naive is an error model that predicts a uniform confidence interval
+        based on the errors of the fitting dataset. Used exclusively for
+        benchmarking error models.
+    """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):
+        super().__init__(log=False, **kwargs)
+
+    def calculate(self, X, y_pred):
+        pass
+    
+    def _fit(
+        self,
+        residuals: np.ndarray,
+        scores: np.ndarray,
+        quantile: float = 0.95
+    ):
+        self.ci = pd.Series(residuals).quantile(quantile)
+
+    def score(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+    ):
+        return np.array([self.ci for _ in X])
 
 class ADAN(BaseErrorModel):
-    """ADAN is an error model that predicts error bars based on one or
+    """ ADAN is an error model that predicts error bars based on one or
         multiple ADAN categories: `Applicability Domain Analysis (ADAN): A
         Robust Method for Assessing the Reliability of Drug Property Predictions
         <https://doi.org/10.1021/ci500172z>`_
@@ -399,8 +465,9 @@ class ADAN(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, criterion: str):
+    def __init__(self, criterion: str, log=True, **kwargs):
         self.criterion = criterion
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,
@@ -477,6 +544,7 @@ class ADAN(BaseErrorModel):
         }
 
     def calculate_full(self, X):
+        X = SMILESRepresentation().convert(X)
         criteria = ["A", "B", "C", "D", "E", "F"]
         y_pred = np.array(self.model.predict(X)).flatten()
         X = self.preprocess(X)
@@ -493,6 +561,7 @@ class ADAN(BaseErrorModel):
         self.results = pd.DataFrame(self.results)
 
     def calculate(self, X, y_pred):
+        X = SMILESRepresentation().convert(X)
         """Calcualtes confidence scores."""
         X = self.preprocess(X)
         Xp = self.reduction.transform(X)[:, : self.n_components]
@@ -500,6 +569,7 @@ class ADAN(BaseErrorModel):
         return self._calculate(X, Xp, y_pred, self.criterion)
 
     def _calculate(self, X, Xp, y_pred, criterion: str, standardize: bool = True):
+        from sklearn.neighbors import NearestNeighbors
         if criterion in ("A", "A_raw"):
             dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
         elif criterion in ("B", "B_raw"):
@@ -583,6 +653,7 @@ class ADAN(BaseErrorModel):
             neighbor_thresh (float): fraction of closest training queries to consider
         """
         n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
+        from sklearn.neighbors import NearestNeighbors
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(self.Xp_train)
         distances, indices = nbrs.kneighbors(Xp)
 
@@ -597,7 +668,8 @@ class AggregateErrorModel(BaseErrorModel):
 
         Parameters:
             error_models (list of BaseErrorModel): list of error models to be aggregated
-            reduction (BaseReduction): reduction method used to aggregate uncertainty scores
+            reduction (BaseReduction): reduction method used to aggregate uncertainty scores.
+                Must output 1 component. Default FactorAnalysis().
     
     Example
     ------------------------------
@@ -605,7 +677,7 @@ class AggregateErrorModel(BaseErrorModel):
 
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit(train["Drug"], train["Y"])
-    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()], reduction = oce.FactorAnalysis())
+    error_model = oce.AggregateErrorModel(error_models = [oce.TargetDistDC(), oce.TrainDistDC()])
     error_model.build(model, train["Drug"], train["Y"])
     error_model.fit(valid["Drug"], valid["Y"])
     error_model.score(test["Drug"])
@@ -613,11 +685,18 @@ class AggregateErrorModel(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, error_models: List[BaseErrorModel], reduction: BaseReduction):
+    def __init__(
+        self, 
+        error_models: List[BaseErrorModel], 
+        reduction: BaseReduction = FactorAnalysis(n_components = 1),
+        log=True,
+        **kwargs
+    ):
         if not isinstance(error_models, list):
             raise TypeError("error_models must be a list")
         self.error_models = error_models
         self.reduction = reduction
+        super().__init__(log=False, **kwargs)
 
     def build(
         self,

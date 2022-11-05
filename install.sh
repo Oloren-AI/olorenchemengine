@@ -89,7 +89,7 @@ else
         python3.8 -m pip install -e $SCRIPT_DIR
         python3.8 -m pip install -e "${SCRIPT_DIR}[full]"
     else
-        python3.8 -m pip install "olorenchemengine[full] @ git+https://github.com/Oloren-AI/olorenchemengine.git"
+        python3.8 -m pip install "olorenchemengine[full]"
     fi
 fi
 

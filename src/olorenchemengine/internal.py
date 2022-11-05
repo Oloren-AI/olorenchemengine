@@ -200,10 +200,11 @@ def download_public_file(path, redownload=False):
         os.makedirs(os.path.dirname(local_path))
 
     print(f"Downloading {path}...")
+    import urllib
     import urllib.request
 
     urllib.request.urlretrieve(
-        f"https://storage.googleapis.com/oloren-public-data/{path}", local_path
+        urllib.parse.quote(f"https://storage.googleapis.com/oloren-public-data/{path}",safe='/:?=&'), local_path
     )
     return local_path
 
