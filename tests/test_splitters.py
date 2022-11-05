@@ -13,9 +13,9 @@ __copyright__ = "Oloren AI"
 """
 
 
-def remote(func):
+def workflow(func):
     def wrapper(*args, **kwargs):
-        with oce.Remote("http://api.oloren.ai:5000") as remote:
+        with oce.Workflow("http://api.oloren.ai:5000") as workflow:
             func(*args, **kwargs)
 
     return wrapper

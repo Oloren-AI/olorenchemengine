@@ -266,7 +266,7 @@ offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
                 Server version.
 
         Oloren ChemEngine online is the public, dependency-free version of OCE, which compiles OCE code locally for fast,
-        parallelized, remote execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
+        parallelized, workflow execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
         CONFIDENTAIL DATA, and is only intended for demonstration purposes. The securely privately hosted Server version is
         called Oloren ChemEngine Enterprise.\n"""
 
@@ -275,5 +275,5 @@ offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
 
 def online(session_url="https://aws.chemengine.org"):
     global online_session
-    online_session = Remote(session_url)
+    online_session = Workflow(session_url)
     online_session.__enter__()

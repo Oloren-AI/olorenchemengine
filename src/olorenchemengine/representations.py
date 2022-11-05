@@ -739,9 +739,9 @@ class BaseCompoundVecRepresentation(BaseVecRepresentation):
         names (List[str]): list of the names of the features in the vector representation, optional."""
 
     @log_arguments
-    def __init__(self, normalize=False, **kwargs):
+    def __init__(self, normalize=False, log=True, **kwargs):
         self.normalize = normalize
-        super().__init__(**kwargs)
+        super().__init__(log=False, **kwargs)
 
     def __len__(self):
         return len(self._convert("C"))

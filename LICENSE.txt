@@ -537,11 +537,11 @@ to collect a royalty for further conveying from those to whom you convey
 the Program, the only way you could satisfy both those terms and this
 License would be to refrain entirely from conveying the Program.
 
-  13. Remote Network Interaction; Use with the GNU General Public License.
+  13. Workflow Network Interaction; Use with the GNU General Public License.
 
   Notwithstanding any other provision of this License, if you modify the
 Program, your modified version must prominently offer all users
-interacting with it remotely through a computer network (if your version
+interacting with it workflowly through a computer network (if your version
 supports such interaction) an opportunity to receive the Corresponding
 Source of your version by providing access to the Corresponding Source
 from a network server at no charge, through some standard or customary
@@ -647,7 +647,7 @@ the "copyright" line and a pointer to where the full notice is found.
 
 Also add information on how to contact you by electronic and paper mail.
 
-  If your software can interact with users remotely through a computer
+  If your software can interact with users workflowly through a computer
 network, you should also make sure that it provides a way for users to
 get its source.  For example, if your program is a web application, its
 interface could display a "Source" link that leads users to an archive
