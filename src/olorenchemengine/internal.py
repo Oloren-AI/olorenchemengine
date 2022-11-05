@@ -253,7 +253,9 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
             self.WORKFLOW_ID = WORKFLOW_ID
 
         if _runtime.is_local:
-            return func(self, *args, **kwargs)
+            bf = json.dumps(_runtime.instruction_buffer)
+            out = func(self, *args, **kwargs)
+            _runtime.instruction_buffer = json.loads(bf)
 
     wrapper.__wrapped__ = func
 
@@ -328,8 +330,17 @@ def workflow(obj, standardize_ids=True):
             if workflow_id in json.dumps(instruction) and instruction.get("PARENT_WORKFLOW_ID", "") != workflow_id:
                 u.union(i, j)
 
+
     set_id = u.find(workflow_ids.index(obj.WORKFLOW_ID))
-    return [_runtime.instruction_buffer[i] for i in range(len(workflow_ids)) if u.find(i) == set_id]
+    out = [_runtime.instruction_buffer[i] for i in range(len(workflow_ids)) if u.find(i) == set_id]
+
+    if standardize_ids:
+        out_str = json.dumps(out)
+        for i, obj in enumerate(out):
+            out_str = out_str.replace(obj["WORKFLOW_ID"], str(i))
+        out = json.loads(out_str)
+
+    return out
 
 
 class _WorkflowRuntime:
