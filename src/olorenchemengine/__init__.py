@@ -86,36 +86,45 @@ logging.getLogger().setLevel(logging.ERROR)
 import os
 from os import path
 
-if not path.exists(path.join(path.expanduser("~"), f".oce/")):
-    os.mkdir(path.join(path.expanduser("~"), f".oce/"))
-
-if not path.exists(path.join(path.expanduser("~"), f".oce/cache/")):
-    os.mkdir(path.join(path.expanduser("~"), f".oce/cache/"))
-
-if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/")):
-    os.mkdir(path.join(path.expanduser("~"), f".oce/cache/vecrep/"))
-
 import json
 
 import pandas as pd
 
+if not path.exists(path.join(path.expanduser("~"), f".oce/")):
+    os.mkdir(path.join(path.expanduser("~"), f".oce/"))
+    
 CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".oce/CONFIG.json")
 if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH) as f:
         CONFIG_ = json.load(f)
 else:
-    CONFIG_ = {
-        "MAP_LOCATION": "cpu",
-        "USE_CUDA": False,
-        "CDD_TOKEN": None,
-        "VAULT_ID": None,
-        "NUM_WORKERS": 0,
-    }
-    with open(CONFIG_PATH, "w+") as f:
-        json.dump(CONFIG_, f)
+    CONFIG_ = {}
+    
+defaults = {
+    "MAP_LOCATION": "cpu",
+    "USE_CUDA": False,
+    "CDD_TOKEN": None,
+    "VAULT_ID": None,
+    "NUM_WORKERS": 0,
+    "CACHE_PATH": os.path.join(os.path.expanduser("~"), ".oce/cache/"),
+    "CACHE": True
+}
+
+for k, v in defaults.items():
+    if k not in CONFIG_:
+        CONFIG_[k] = v
+        
+with open(CONFIG_PATH, "w+") as f:
+    json.dump(CONFIG_, f)
 
 CONFIG = CONFIG_.copy()
 
+if not path.exists(CONFIG["CACHE_PATH"]):
+    os.mkdir(CONFIG["CACHE_PATH"])
+
+print(CONFIG["CACHE_PATH"])
+if not path.exists(path.join(CONFIG["CACHE_PATH"], "vecrep/")):
+    os.mkdir(path.join(CONFIG["CACHE_PATH"], "vecrep/"))
 
 def update_config():
     """Update the configuration file.
