@@ -122,7 +122,6 @@ CONFIG = CONFIG_.copy()
 if not path.exists(CONFIG["CACHE_PATH"]):
     os.mkdir(CONFIG["CACHE_PATH"])
 
-print(CONFIG["CACHE_PATH"])
 if not path.exists(path.join(CONFIG["CACHE_PATH"], "vecrep/")):
     os.mkdir(path.join(CONFIG["CACHE_PATH"], "vecrep/")) # The passed CACHE_PATH must already exist
 
