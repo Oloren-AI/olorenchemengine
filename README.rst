@@ -59,6 +59,11 @@ _______________________________
 Here are some common error messages and solutions:
 https://oloren-ai.notion.site/Oloren-ChemEngine-Installation-FAQ-f2edec771a7f4350af5fdc361d494604
 
+**Install Live Version from GitHub Command**
+
+.. code-block:: bash
+
+  pip install --upgrade "olorenchemengine[full] @ git+https://github.com/Oloren-AI/olorenchemengine.git"
 _______________________________
 Docker
 _______________________________
