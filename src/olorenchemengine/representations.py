@@ -441,18 +441,14 @@ class BaseVecRepresentation(BaseRepresentation):
 
         from os import path
 
-        if not path.exists(path.join(path.expanduser("~"), f".oce/cache/")):
-            os.mkdir(path.join(path.expanduser("~"), f".oce/cache/"))
-        if not path.exists(path.join(path.expanduser("~"), f".oce/cache/vecrep/")):
-            os.mkdir(path.join(path.expanduser("~"), f".oce/cache/vecrep/"))
         if not path.exists(
             path.join(
-                path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}"
+                oce.CONFIG["CACHE_PATH"], f"vecrep/{self.__class__.__name__}/"
             )
         ):
             os.mkdir(
                 path.join(
-                    path.expanduser("~"), f".oce/cache/vecrep/{self.__class__.__name__}"
+                oce.CONFIG["CACHE_PATH"], f"vecrep/{self.__class__.__name__}/"
                 )
             )
 
@@ -494,16 +490,16 @@ class BaseVecRepresentation(BaseRepresentation):
 
         from os import path
 
-        if path.exists(
+        if oce.CONFIG["CACHE"] and path.exists(
             path.join(
-                path.expanduser("~"),
-                f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy",
+                oce.CONFIG["CACHE_PATH"],
+                f"vecrep/{self.__class__.__name__}/{input_hash}.npy",
             )
         ):
             return np.load(
                 path.join(
-                    path.expanduser("~"),
-                    f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy",
+                    oce.CONFIG["CACHE_PATH"],
+                    f"vecrep/{self.__class__.__name__}/{input_hash}.npy",
                 ),
                 allow_pickle=True,
             )
@@ -540,14 +536,15 @@ class BaseVecRepresentation(BaseRepresentation):
                 feats.values[:] = np.nan_to_num(x.reshape(feats.values.shape))
 
         output = np.nan_to_num(np.array(feats.to_records(index=False).tolist()))
-        np.save(
-            path.join(
-                path.expanduser("~"),
-                f".oce/cache/vecrep/{self.__class__.__name__}/{input_hash}.npy",
-            ),
-            output,
-            allow_pickle=True,
-        )
+        if oce.CONFIG["CACHE"]:
+            np.save(
+                path.join(
+                    oce.CONFIG["CACHE_PATH"],
+                    f"vecrep/{self.__class__.__name__}/{input_hash}.npy",
+                ),
+                output,
+                allow_pickle=True,
+            )
         return output
 
     def calculate_distance(

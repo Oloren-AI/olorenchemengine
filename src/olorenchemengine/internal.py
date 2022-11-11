@@ -190,7 +190,7 @@ def download_public_file(path, redownload=False):
     @param redownload: Whether to redownload the file if it already exists.
     """
 
-    local_path = os.path.join(os.path.expanduser("~"), ".oce", path)
+    local_path = os.path.join(olorenchemengine.CONFIG["CACHE_PATH"], path)
 
     if os.path.exists(local_path) and not redownload:
         return local_path
