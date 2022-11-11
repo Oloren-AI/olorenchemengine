@@ -45,17 +45,25 @@ _______________________________
 Installation
 _______________________________
 
-In a fresh Python 3.8 environment, you can install the package with the following command, pasted into your terminal after activating your virtual environment:
+**Prerequisites**
+
+* Install Pytorch: https://pytorch.org/TensorRT/tutorials/installation.html
+* Install Pytorch Geometric: https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
+
+**Install Command:**
 
 .. code-block:: bash
 
-    bash <(curl -s https://raw.githubusercontent.com/Oloren-AI/olorenchemengine/master/install.sh)
-
-Feel free to check out install.sh to see what is happening under the hood. This will work fine in both a conda environment and a pip environment. The reason why a fresh environment is preferred is because PyTorch Geometric/ PyTorch/ CUDA are very particular about versioning, which often are more muddled in existing environment.
+  pip install olorenchemengine[full]
 
 Here are some common error messages and solutions:
 https://oloren-ai.notion.site/Oloren-ChemEngine-Installation-FAQ-f2edec771a7f4350af5fdc361d494604
 
+**Install Live Version from GitHub Command**
+
+.. code-block:: bash
+
+  pip install --upgrade "olorenchemengine[full] @ git+https://github.com/Oloren-AI/olorenchemengine.git"
 _______________________________
 Docker
 _______________________________
