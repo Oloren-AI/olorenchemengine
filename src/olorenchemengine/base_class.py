@@ -1241,7 +1241,7 @@ class BaseErrorModel(BaseClass):
         residuals: np.ndarray,
         scores: np.ndarray,
         filename: str = "figure.html",
-    ):
+    ) -> go.Figure:
         """Fits confidence scores to residuals.
 
         Args:
@@ -1249,6 +1249,9 @@ class BaseErrorModel(BaseClass):
             scores (1-dimensional np.ndarray): array of confidence scores
             quantile (float): confidence interval quantile to capture during fitting
             filename (str): save destination of the fitted plot
+
+        Returns:
+            plotly figure of fitted model against validation dataset
         """
         if self.method == "bin":
             bin_labels = pd.cut(scores, self.bins, labels=False)
@@ -1314,6 +1317,7 @@ class BaseErrorModel(BaseClass):
         fig3.update_traces(hovertemplate=None, hoverinfo='skip')
         fig = go.Figure(data=fig1.data + fig2.data + fig3.data)
         fig.write_html(filename, auto_open=True)
+        return fig
 
     def score(
         self,

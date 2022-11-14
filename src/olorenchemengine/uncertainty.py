@@ -201,9 +201,8 @@ class SDC(BaseFingerprintModel):
         def sdc(fp):
             TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
             return np.sum(np.exp(-self.a * (1 - TS) / TS))
-        sdc_vec = np.vectorize(sdc)
 
-        return sdc_vec(ref_fps)
+        return np.array([sdc(fp) for fp in tqdm(ref_fps)])
 
 
 class TargetDistDC(SDC):
@@ -279,8 +278,7 @@ class TrainDistDC(SDC):
                 return np.sqrt(np.mean(residuals))
             return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
 
-        dist_vec = np.vectorize(dist)
-        return dist_vec(ref_fps)
+        return np.array([dist(fp) for fp in tqdm(ref_fps)])
 
 
 class KNNSimilarity(BaseFingerprintModel):
@@ -314,8 +312,7 @@ class KNNSimilarity(BaseFingerprintModel):
             similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
             return np.mean(np.partition(similarity, self.k)[-self.k:])
 
-        sim_vec = np.vectorize(mean_sim)
-        return sim_vec(ref_fps)
+        return np.array([mean_sim(fp) for fp in tqdm(ref_fps)])
 
 class TargetDistKNN(KNNSimilarity):
     """ TargetDistKNN is an error model that calculates the root-mean-square
@@ -342,6 +339,7 @@ class TargetDistKNN(KNNSimilarity):
 
     def calculate(self, X, y_pred):
         X = SMILESRepresentation().convert(X)
+
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -391,9 +389,7 @@ class TrainDistKNN(KNNSimilarity):
                 return np.sqrt(np.mean(residuals[idxs]))
             return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
         
-        dist_vec = np.vectorize(dist)
-
-        return dist_vec(ref_fps)
+        return np.array([dist(fp) for fp in tqdm(ref_fps)])
 
 
 class Predicted(BaseErrorModel):
