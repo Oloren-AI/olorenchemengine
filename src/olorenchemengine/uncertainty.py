@@ -151,10 +151,10 @@ class BaseFingerprintModel(BaseErrorModel):
         super().build(model, X, y)
         if isinstance(self.X_train, pd.DataFrame):
             self.X_train.columns = ["SMILES"]
-        smiles = SMILESRepresentation().convert(self.X_train)
-        self.train_fps = list(self.get_fps(smiles))
+        self.train_fps = list(self.get_fps(self.X_train))
 
     def get_fps(self, smiles: List[str]) -> List:
+        smiles = np.array(SMILESRepresentation().convert(smiles))
         get_fp = lambda smiles: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smiles), 2)
         return list(np.vectorize(get_fp)(smiles))
 
@@ -195,7 +195,6 @@ class SDC(BaseFingerprintModel):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         ref_fps = self.get_fps(X)
 
         def sdc(fp):
@@ -227,9 +226,7 @@ class TargetDistDC(SDC):
     def __init__(self, log=True, **kwargs):      
         super().__init__(log=False, **kwargs)
 
-    def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
-        
+    def calculate(self, X, y_pred):        
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -267,7 +264,6 @@ class TrainDistDC(SDC):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
         ref_fps = self.get_fps(X)
 
@@ -305,7 +301,6 @@ class KNNSimilarity(BaseFingerprintModel):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         ref_fps = self.get_fps(X)
 
         def mean_sim(fp):
@@ -338,8 +333,6 @@ class TargetDistKNN(KNNSimilarity):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
-
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -378,7 +371,6 @@ class TrainDistKNN(KNNSimilarity):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
         ref_fps = self.get_fps(X)
 
@@ -540,7 +532,6 @@ class ADAN(BaseErrorModel):
         }
 
     def calculate_full(self, X):
-        X = SMILESRepresentation().convert(X)
         criteria = ["A", "B", "C", "D", "E", "F"]
         y_pred = np.array(self.model.predict(X)).flatten()
         X = self.preprocess(X)
@@ -557,7 +548,6 @@ class ADAN(BaseErrorModel):
         self.results = pd.DataFrame(self.results)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         """Calcualtes confidence scores."""
         X = self.preprocess(X)
         Xp = self.reduction.transform(X)[:, : self.n_components]
@@ -566,6 +556,7 @@ class ADAN(BaseErrorModel):
 
     def _calculate(self, X, Xp, y_pred, criterion: str, standardize: bool = True):
         from sklearn.neighbors import NearestNeighbors
+        
         if criterion in ("A", "A_raw"):
             dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
         elif criterion in ("B", "B_raw"):
@@ -648,8 +639,9 @@ class ADAN(BaseErrorModel):
             n_drop (int): 1 if fitting, 0 if scoring
             neighbor_thresh (float): fraction of closest training queries to consider
         """
-        n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
         from sklearn.neighbors import NearestNeighbors
+        
+        n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(self.Xp_train)
         distances, indices = nbrs.kneighbors(Xp)
 
@@ -710,16 +702,66 @@ class AggregateErrorModel(BaseErrorModel):
         Args:
             X (array-like): features, smiles
             y (array-like): true values
+        
+        Returns:
+            plotly figure of fitted model against validation dataset
         """
         y_pred = np.array(self.model.predict(X)).flatten()
         scores = [error_model.calculate(X, y_pred) for error_model in self.error_models]
         scores = np.transpose(np.stack(scores))
+
         self.reduction.fit(scores)
-
+        aggregate_scores = self.reduction.transform(scores).flatten()
         residuals = np.abs(np.array(y) - y_pred)
-        scores = self.reduction.transform(scores)
 
-        self._fit(residuals, scores, **kwargs)
+        return self._fit(residuals, aggregate_scores, **kwargs)
+
+    def fit_cv(self, n_splits: int = 5, **kwargs):
+        """Fits confidence scores to the training dataset via cross validation.
+
+        Args:
+            n_splits (int): Number of cross validation splits, default 5
+
+        Returns:
+            plotly figure of fitted model against validation dataset
+        """
+        from sklearn.model_selection import KFold
+
+        self.X_train = np.array(self.X_train).flatten()
+
+        residuals = None
+        scores = None
+        kf = KFold(n_splits=n_splits)
+
+        split = 1
+        for train_index, test_index in kf.split(X):
+            print('evaluating split {} of {}'.format(split, n_splits))
+            split += 1
+
+            X_train, X_test = self.X_train[train_index], self.X_train[test_index]
+            y_train, y_test = self.y_train[train_index], self.y_train[test_index]
+            model = self.model.copy()
+            model.fit(X_train, y_train)
+            
+            y_pred_test = np.array(model.predict(X_test)).flatten()
+            pred_error = np.abs(y_test - y_pred_test)
+            if residuals is None:
+                residuals = pred_error
+            else:
+                residuals = np.concatenate((residuals, pred_error))
+
+            for error_model in self.error_models:
+                error_model.build(model, X_train, y_train)
+            scores_fold = [error_model.calculate(X_test, y_pred_test) for error_model in self.error_models]
+            scores_fold = np.stack(scores_fold)
+            if scores is None:
+                scores = scores_fold
+            else:
+                scores = np.concatenate((scores, scores_fold))
+        
+        self.reduction.fit(np.transpose(scores))
+        aggregate_scores = self.reduction.transform(scores).flatten()
+        return self._fit(residuals, aggregate_scores, **kwargs)
 
     def calculate(
         self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y_pred: np.ndarray

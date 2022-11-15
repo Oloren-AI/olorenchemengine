@@ -604,7 +604,7 @@ class BaseModel(BaseClass):
                         VisualizeError,
                     )
 
-                    ci = self.error_model.quantile
+                    ci = self.error_model.ci
                     result["vis"] = [
                         VisualizeError(
                             self.error_model.y_train,
@@ -678,7 +678,11 @@ class BaseModel(BaseClass):
 
         kf = KFold(n_splits=n_splits)
 
+        split = 1
         for train_index, test_index in kf.split(X):
+            print('evaluating split {} of {}'.format(split, n_splits))
+            split += 1
+
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
             model = self.copy()
@@ -726,7 +730,7 @@ class BaseModel(BaseClass):
             true = true.reshape(-1)
             residuals = np.abs(pred - true)
             if hasattr(self, "error_model"):
-                self.error_model._fit(residuals, scores, quantile=ci)
+                self.error_model._fit(residuals, scores)
                 self.em_status = "fitted"
         elif self.setting == "classification":
             self.calibrator = LinearRegression()
@@ -1146,12 +1150,12 @@ class BaseErrorModel(BaseClass):
 
         Parameters:
             model (BaseModel): trained model
-            X (array-like): training features, smiles
+            X (array-like): training features, list of SMILES
             y (array-like): training values
         """
         self.model = model
         self.X_train = X
-        self.y_train = np.array(y)
+        self.y_train = np.array(y).flatten()
         self.y_pred_train = np.array(self.model.predict(self.X_train)).flatten()
 
     @abstractmethod
@@ -1163,7 +1167,7 @@ class BaseErrorModel(BaseClass):
         """To be implemented by the child class; calculates confidence scores from inputs.
 
         Args:
-            X: features, SMILES
+            X: features, list of SMILES
             y_pred (1-dimensional np.ndarray): predicted values
 
         Returns:
@@ -1176,46 +1180,50 @@ class BaseErrorModel(BaseClass):
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
         y: Union[np.ndarray, list, pd.Series],
         **kwargs,
-    ):
+    ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to an external dataset
 
         Args:
             X (array-like): features, smiles
             y (array-like): true values
+        
+        Returns:
+            plotly figure of fitted model against validation dataset
         """ 
-        X = oce.SMILESRepresentation().convert(X)
         y_pred = np.array(self.model.predict(X)).flatten()
         residuals = np.abs(np.array(y) - y_pred)
         scores = self.calculate(X, y_pred)
 
-        self._fit(residuals, scores, **kwargs)
+        return self._fit(residuals, scores, **kwargs)
 
     def fit_cv(
-        self, 
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
+        self,
         n_splits: int = 5,
         **kwargs
-    ):
+    ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
             n_splits (int): Number of cross validation splits, default 5
+
+        Returns:
+            plotly figure of fitted model against validation dataset
         """
         from sklearn.model_selection import KFold
-        from sklearn.calibration import calibration_curve
         
-        X = np.array(oce.SMILESRepresentation().convert(X))
-        if issubclass(type(y), pd.Series):
-            y = y.values
-        
+        self.X_train = np.array(self.X_train).flatten()
+
         residuals = None
         scores = None
         kf = KFold(n_splits=n_splits)
 
-        for train_index, test_index in kf.split(X):
-            X_train, X_test = X[train_index], X[test_index]
-            y_train, y_test = y[train_index], y[test_index]
+        split = 1
+        for train_index, test_index in kf.split(self.X_train):
+            print('evaluating split {} of {}'.format(split, n_splits))
+            split += 1
+
+            X_train, X_test = self.X_train[train_index], self.X_train[test_index]
+            y_train, y_test = self.y_train[train_index], self.y_train[test_index]
             model = self.model.copy()
             model.fit(X_train, y_train)
             
@@ -1228,20 +1236,20 @@ class BaseErrorModel(BaseClass):
 
             em = type(self)(*self.args, **self.kwargs)
             em.build(model, X_train, y_train)
-            new_scores = em.calculate(X_test, y_pred_test)
+            scores_fold = em.calculate(X_test, y_pred_test)
             if scores is None:
-                scores = new_scores
+                scores = scores_fold
             else:
-                scores = np.concatenate((scores, new_scores))
+                scores = np.concatenate((scores, scores_fold))
 
-        self._fit(residuals, scores, **kwargs)
+        return self._fit(residuals, scores, **kwargs)
 
     def _fit(
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
         filename: str = "figure.html",
-    ) -> go.Figure:
+    ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to residuals.
 
         Args:
@@ -1264,7 +1272,7 @@ class BaseErrorModel(BaseClass):
             y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(n_labels)]
         elif self.method == "roll":
             idxs = np.argsort(scores)
-            scores, residuals = scores[idx], residuals[idx]
+            scores, residuals = scores[idxs], residuals[idxs]
             X = pd.Series(scores).rolling(self.window).mean()
             y = pd.Series(residuals).rolling(self.window).quantile(self.ci)
             X = X[~np.isnan(X)]
@@ -1326,7 +1334,7 @@ class BaseErrorModel(BaseClass):
         """Calculates confidence scores on a dataset.
 
         Args:
-            X (array-like): dataset being evaluated, sequence of SMILES
+            X (array-like): target dataset, list of SMILES
 
         Returns:
             a list of confidence intervals for each input
@@ -1365,7 +1373,7 @@ class BaseErrorModel(BaseClass):
             d.update({"method": self.method})
             d.update({"bins": self.bins})
             d.update({"window": self.window})
-            d.update({"quantile": self.quantile})
+            d.update({"ci": self.ci})
             d.update({"filename": self.filename})
         return d
 
@@ -1382,7 +1390,7 @@ class BaseErrorModel(BaseClass):
             self.method = d["method"]
             self.bins = d["bins"]
             self.window = d["window"]
-            self.quantile = d["quantile"]
+            self.ci = d["ci"]
             self.filename = d["filename"]
 
-            self._fit(residuals, scores)
+            self._fit(self.residuals, self.scores)
