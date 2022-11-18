@@ -25,13 +25,7 @@ class BaseEnsembleModel(BaseErrorModel):
         self.n_ensembles = n_ensembles
         super().__init__(log=False, **kwargs)
 
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-    ):
-        super().build(model, X, y)
+    def _build(self, **kwargs):
         if self.ensemble_model is None:
             self.ensemble_model = self.model.copy()
         self.ensembles = []
@@ -43,13 +37,13 @@ class BaseEnsembleModel(BaseErrorModel):
     def _save(self) -> dict:
         d = super()._save()
         if hasattr(self, "ensembles"):
-            d.update({"ensembles": [model._save() for model in self.ensembles]})
+            d.update({"ensembles": [saves(model) for model in self.ensembles]})
         return d
 
     def _load(self, d) -> None:
         super()._load(d)
         if "ensembles" in d.keys():
-            self.ensembles = [model._load() for model in d["ensembles"]]
+            self.ensembles = [loads(model) for model in d["ensembles"]]
     
 class BootstrapEnsemble(BaseEnsembleModel):
     """ BootstrapEnsemble estimates uncertainty based on the variance of several
@@ -71,17 +65,12 @@ class BootstrapEnsemble(BaseEnsembleModel):
     """
     
     @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16, bootstrap_size = 0.25, log=True, **kwargs):
+    def __init__(self, ensemble_model = None, n_ensembles = 12, bootstrap_size = 0.25, log=True, **kwargs):
         self.bootstrap_size = bootstrap_size
         super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles, log=False, **kwargs)
 
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-    ):
-        super().build(model, X, y)
+    def _build(self, **kwargs):
+        super()._build()
 
         from sklearn.model_selection import train_test_split
         
@@ -115,15 +104,9 @@ class RandomForestEnsemble(BaseEnsembleModel):
     def __init__(self, log=True, **kwargs):      
         super().__init__(log=False, **kwargs)
     
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-        **kwargs
-    ):
-        super().build(model, X, y)
-        
+    def _build(self, **kwargs):
+        super()._build()
+
         for n in tqdm(range(self.n_ensembles)):
             ensemble_model = RandomForestModel(
                 oce.MorganVecRepresentation(radius=2, nbits=2048), 
@@ -142,19 +125,13 @@ class BaseFingerprintModel(BaseErrorModel):
     def __init__(self, log=True, **kwargs):      
         super().__init__(log=False, **kwargs)
 
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-    ):
-        super().build(model, X, y)
+    def _build(self, **kwargs):
         if isinstance(self.X_train, pd.DataFrame):
             self.X_train.columns = ["SMILES"]
-        smiles = SMILESRepresentation().convert(self.X_train)
-        self.train_fps = list(self.get_fps(smiles))
+        self.train_fps = list(self.get_fps(self.X_train))
 
     def get_fps(self, smiles: List[str]) -> List:
+        smiles = np.array(SMILESRepresentation().convert(smiles))
         get_fp = lambda smiles: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smiles), 2)
         return list(np.vectorize(get_fp)(smiles))
 
@@ -195,15 +172,13 @@ class SDC(BaseFingerprintModel):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         ref_fps = self.get_fps(X)
 
         def sdc(fp):
             TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
             return np.sum(np.exp(-self.a * (1 - TS) / TS))
-        sdc_vec = np.vectorize(sdc)
 
-        return sdc_vec(ref_fps)
+        return np.array([sdc(fp) for fp in tqdm(ref_fps)])
 
 
 class TargetDistDC(SDC):
@@ -228,9 +203,7 @@ class TargetDistDC(SDC):
     def __init__(self, log=True, **kwargs):      
         super().__init__(log=False, **kwargs)
 
-    def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
-        
+    def calculate(self, X, y_pred):        
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -268,7 +241,6 @@ class TrainDistDC(SDC):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
         ref_fps = self.get_fps(X)
 
@@ -279,8 +251,7 @@ class TrainDistDC(SDC):
                 return np.sqrt(np.mean(residuals))
             return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
 
-        dist_vec = np.vectorize(dist)
-        return dist_vec(ref_fps)
+        return np.array([dist(fp) for fp in tqdm(ref_fps)])
 
 
 class KNNSimilarity(BaseFingerprintModel):
@@ -307,15 +278,13 @@ class KNNSimilarity(BaseFingerprintModel):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         ref_fps = self.get_fps(X)
 
         def mean_sim(fp):
             similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
             return np.mean(np.partition(similarity, self.k)[-self.k:])
 
-        sim_vec = np.vectorize(mean_sim)
-        return sim_vec(ref_fps)
+        return np.array([mean_sim(fp) for fp in tqdm(ref_fps)])
 
 class TargetDistKNN(KNNSimilarity):
     """ TargetDistKNN is an error model that calculates the root-mean-square
@@ -341,7 +310,6 @@ class TargetDistKNN(KNNSimilarity):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
@@ -380,7 +348,6 @@ class TrainDistKNN(KNNSimilarity):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
         residuals = np.abs(self.y_train - self.y_pred_train)
         ref_fps = self.get_fps(X)
 
@@ -391,9 +358,7 @@ class TrainDistKNN(KNNSimilarity):
                 return np.sqrt(np.mean(residuals[idxs]))
             return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
         
-        dist_vec = np.vectorize(dist)
-
-        return dist_vec(ref_fps)
+        return np.array([dist(fp) for fp in tqdm(ref_fps)])
 
 
 class Predicted(BaseErrorModel):
@@ -429,21 +394,21 @@ class Naive(BaseErrorModel):
         super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
-        pass
+        return np.array([0 for _ in X])
     
     def _fit(
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        quantile: float = 0.95
     ):
-        self.ci = pd.Series(residuals).quantile(quantile)
+        self.error = np.quantile(residuals, self.ci)
+        self.reg = lambda X: np.array([self.error for _ in X])
 
     def score(
         self,
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
     ):
-        return np.array([self.ci for _ in X])
+        return self.reg(X)
 
 class ADAN(BaseErrorModel):
     """ ADAN is an error model that predicts error bars based on one or
@@ -452,7 +417,14 @@ class ADAN(BaseErrorModel):
         <https://doi.org/10.1021/ci500172z>`_
 
         Parameters:
-            criteria (Union[str, list, set]): the ADAN criteria to be considered
+            criterion (str): the ADAN criteria to be considered.
+            rep (BaseCompoundVecRepresentation): the representation to use. By default, 
+                usees the representation of the BaseModel object.
+            dim_reduction ({"pls", "pca"}): the dimensionality reduction to use. 
+            explvar (float): the desired variance to be captured by the dimensionality
+                reduction components as a proportion of total variance.
+            threshold (float): the quantile for a criterion to be considered as out of
+                its standard range.
 
     Example
     ------------------------------
@@ -465,51 +437,47 @@ class ADAN(BaseErrorModel):
     """
 
     @log_arguments
-    def __init__(self, criterion: str, log=True, **kwargs):
-        self.criterion = criterion
-        super().__init__(log=False, **kwargs)
-
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
+    def __init__(
+        self, 
+        criterion: str = "Category", 
         rep: BaseCompoundVecRepresentation = None,
         dim_reduction: str = "pls",
         explvar: float = 0.8,
         threshold: float = 0.95,
+        log=True, 
+        **kwargs
     ):
-        super().build(model, X, y)
+        self.criterion = criterion
         self.rep = rep
+        self.dim_reduction = dim_reduction
+        self.explvar = explvar
+        self.threshold = threshold
+        super().__init__(log=False, **kwargs)
 
-        self.X_train = self.preprocess(self.X_train)
-        thresh = int(self.X_train.shape[0] * threshold)
-        max_components = min(100, min(self.X_train.shape))
+    def _build(self, **kwargs):
+        self.X_rep = self.preprocess(self.X_train)
+        self.n_components = min(self.X_rep.shape)
 
-        if dim_reduction == "pls":
+        if self.dim_reduction == "pls":
             from sklearn.cross_decomposition import PLSRegression
 
-            self.reduction = PLSRegression(n_components=max_components)
-            self.reduction.fit(self.X_train, self.y_train)
+            self.reduction = PLSRegression(n_components=self.n_components)
+            self.reduction.fit(self.X_rep, self.y_train)
             x_var = np.var(self.reduction.x_scores_, axis=0)
             x_var /= np.sum(x_var)
-        elif dim_reduction == "pca":
+        elif self.dim_reduction == "pca":
             from sklearn.decomposition import PCA
 
-            self.reduction = PCA(n_components=max_components)
-            self.reduction.fit(self.X_train, self.y_train)
+            self.reduction = PCA(n_components=self.n_components)
+            self.reduction.fit(self.X_rep, self.y_train)
             x_var = self.reduction.explained_variance_ratio_
         else:
-            raise NameError("dim_reduction {} is not recognized".format(dim_reduction))
+            raise NameError("dim_reduction {} is not recognized. Valid inputs are 'pls' and 'pca'.".format(self.dim_reduction))
 
-        self.dim_reduction = dim_reduction
+        if np.sum(x_var) > self.explvar:
+            self.n_components = np.where(np.cumsum(x_var) > self.explvar)[0][0] + 1
 
-        if np.sum(x_var) > explvar:
-            self.n_components = np.where(np.cumsum(x_var) >= explvar)[0][0] + 1
-        else:
-            self.n_components = max_components
-
-        self.Xp_train = self.reduction.transform(self.X_train)[:, : self.n_components]
+        self.Xp_train = self.reduction.transform(self.X_rep)[:, : self.n_components]
         self.Xp_mean = np.mean(self.Xp_train, axis=0)
         self.y_mean = np.mean(self.y_train)
 
@@ -520,7 +488,7 @@ class ADAN(BaseErrorModel):
 
         centroid_dist = np.linalg.norm(self.Xp_train - self.Xp_mean, axis=1)
         neighbor_dist = distances[:, 1]
-        model_dist = self.DModX(self.X_train, self.Xp_train)
+        model_dist = self.DModX(self.X_rep, self.Xp_train)
         y_mean_dist = np.abs(self.y_train - self.y_mean)
         y_nei_dist = np.abs(self.y_train - self.y_train[indices[:, 1]])
         SDEP_dist = self.SDEP(self.Xp_train, n_drop=1)
@@ -534,17 +502,18 @@ class ADAN(BaseErrorModel):
             "F_raw": SDEP_dist,
         }
 
+        thresh = int(self.X_rep.shape[0] * self.threshold)
         self.thresholds_ = {
-            "A": sorted(centroid_dist)[thresh],
-            "B": sorted(neighbor_dist)[thresh],
-            "C": sorted(model_dist)[thresh],
-            "D": sorted(y_mean_dist)[thresh],
-            "E": sorted(y_nei_dist)[thresh],
-            "F": sorted(SDEP_dist)[thresh],
+            "A": np.partition(centroid_dist, -thresh)[-thresh],
+            "B": np.partition(neighbor_dist, -thresh)[-thresh],
+            "C": np.partition(model_dist, -thresh)[-thresh],
+            "D": np.partition(y_mean_dist, -thresh)[-thresh],
+            "E": np.partition(y_nei_dist, -thresh)[-thresh],
+            "F": np.partition(SDEP_dist, -thresh)[-thresh],
         }
 
-    def calculate_full(self, X):
-        X = SMILESRepresentation().convert(X)
+    def calculate_full(self, X, standardize: bool = True):
+        """Calculates complete confidence scores for visualization."""
         criteria = ["A", "B", "C", "D", "E", "F"]
         y_pred = np.array(self.model.predict(X)).flatten()
         X = self.preprocess(X)
@@ -555,21 +524,26 @@ class ADAN(BaseErrorModel):
             self.results[c] = self._calculate(X, Xp, y_pred, c)
         for c in criteria:
             c += "_raw"
-            self.results[c] = self._calculate(X, Xp, y_pred, c)
+            self.results[c] = self._calculate(X, Xp, y_pred, c, standardize=standardize)
         self.results["Category"] = np.sum([self.results[c] for c in criteria], axis=0)
 
         self.results = pd.DataFrame(self.results)
 
-    def calculate(self, X, y_pred):
-        X = SMILESRepresentation().convert(X)
+    def calculate(self, X, y_pred, standardize: bool = True):
         """Calcualtes confidence scores."""
         X = self.preprocess(X)
         Xp = self.reduction.transform(X)[:, : self.n_components]
-
-        return self._calculate(X, Xp, y_pred, self.criterion)
+        
+        if self.criterion == "Category":
+            criteria = ["A", "B", "C", "D", "E", "F"]
+            return np.sum([self._calculate(X, Xp, y_pred, c) for c in criteria], axis=0)
+        else:
+            return self._calculate(X, Xp, y_pred, self.criterion, standardize=standardize)
 
     def _calculate(self, X, Xp, y_pred, criterion: str, standardize: bool = True):
+        """Calcualtes confidence scores for a given criteron."""
         from sklearn.neighbors import NearestNeighbors
+        
         if criterion in ("A", "A_raw"):
             dist = np.linalg.norm(Xp - self.Xp_mean, axis=1)
         elif criterion in ("B", "B_raw"):
@@ -587,9 +561,9 @@ class ADAN(BaseErrorModel):
             indices = nbrs.kneighbors(Xp)[1]
             dist = np.abs(y_pred - self.y_train[indices.flatten()])
         else:
-            raise NameError("criterion {} is not recognized".format(criterion))
+            raise NameError("Criterion {} is not recognized.".format(criterion))
 
-        if "raw" in criterion:
+        if len(criterion) > 1:
             if standardize:
                 return (dist - np.mean(self.training_[criterion])) / np.std(
                     self.training_[criterion]
@@ -636,7 +610,7 @@ class ADAN(BaseErrorModel):
                 + self.reduction.mean_
             )
         return np.linalg.norm(X - X_reconstructed, axis=1) / np.sqrt(
-            self.X_train.shape[1] - self.n_components
+            self.X_rep.shape[1] - self.n_components
         )
 
     def SDEP(
@@ -652,8 +626,9 @@ class ADAN(BaseErrorModel):
             n_drop (int): 1 if fitting, 0 if scoring
             neighbor_thresh (float): fraction of closest training queries to consider
         """
-        n_neighbors = int(self.X_train.shape[0] * neighbor_thresh) + n_drop
         from sklearn.neighbors import NearestNeighbors
+        
+        n_neighbors = int(self.X_rep.shape[0] * neighbor_thresh) + n_drop
         nbrs = NearestNeighbors(n_neighbors=n_neighbors).fit(self.Xp_train)
         distances, indices = nbrs.kneighbors(Xp)
 
@@ -667,7 +642,7 @@ class AggregateErrorModel(BaseErrorModel):
         several different BaseErrorModels.
 
         Parameters:
-            error_models (list of BaseErrorModel): list of error models to be aggregated
+            *error_models (BaseErrorModel): error models to be aggregated
             reduction (BaseReduction): reduction method used to aggregate uncertainty scores.
                 Must output 1 component. Default FactorAnalysis().
     
@@ -687,26 +662,18 @@ class AggregateErrorModel(BaseErrorModel):
     @log_arguments
     def __init__(
         self, 
-        error_models: List[BaseErrorModel], 
+        *error_models: BaseErrorModel, 
         reduction: BaseReduction = FactorAnalysis(n_components = 1),
         log=True,
         **kwargs
     ):
-        if not isinstance(error_models, list):
-            raise TypeError("error_models must be a list")
-        self.error_models = error_models
+        self.error_models = list(error_models)
         self.reduction = reduction
         super().__init__(log=False, **kwargs)
 
-    def build(
-        self,
-        model: BaseModel,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-    ):
+    def _build(self, **kwargs):
         for error_model in self.error_models:
-            error_model.build(model, X, y)
-        super().build(model, X, y)
+            error_model.build(self.model, self.X_train, self.y_train)
 
     def fit(self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y: Union[np.ndarray, list, pd.Series], **kwargs):
         """Fits confidence scores to an external dataset
@@ -714,16 +681,69 @@ class AggregateErrorModel(BaseErrorModel):
         Args:
             X (array-like): features, smiles
             y (array-like): true values
+        
+        Returns:
+            plotly figure of fitted model against validation dataset
         """
         y_pred = np.array(self.model.predict(X)).flatten()
         scores = [error_model.calculate(X, y_pred) for error_model in self.error_models]
         scores = np.transpose(np.stack(scores))
+        
         self.reduction.fit(scores)
-
+        aggregate_scores = self.reduction.transform(scores).flatten()
         residuals = np.abs(np.array(y) - y_pred)
-        scores = self.reduction.transform(scores)
+        self.fit_scores = scores
 
-        self._fit(residuals, scores, **kwargs)
+        return self._fit(residuals, aggregate_scores, **kwargs)
+
+    def fit_cv(self, n_splits: int = 5, **kwargs):
+        """Fits confidence scores to the training dataset via cross validation.
+
+        Args:
+            n_splits (int): Number of cross validation splits, default 5
+
+        Returns:
+            plotly figure of fitted model against validation dataset
+        """
+        from sklearn.model_selection import KFold
+
+        self.X_train = np.array(self.X_train).flatten()
+
+        residuals = None
+        scores = None
+        kf = KFold(n_splits=n_splits)
+
+        split = 1
+        for train_index, test_index in kf.split(self.X_train):
+            print('evaluating split {} of {}'.format(split, n_splits))
+            split += 1
+
+            X_train, X_test = self.X_train[train_index], self.X_train[test_index]
+            y_train, y_test = self.y_train[train_index], self.y_train[test_index]
+            model = self.model.copy()
+            model.fit(X_train, y_train)
+            
+            y_pred_test = np.array(model.predict(X_test)).flatten()
+            pred_error = np.abs(y_test - y_pred_test)
+            if residuals is None:
+                residuals = pred_error
+            else:
+                residuals = np.concatenate((residuals, pred_error))
+
+            for error_model in self.error_models:
+                error_model.build(model, X_train, y_train)
+            scores_fold = [error_model.calculate(X_test, y_pred_test) for error_model in self.error_models]
+            scores_fold = np.transpose(np.stack(scores_fold))
+            if scores is None:
+                scores = scores_fold
+            else:
+                scores = np.concatenate((scores, scores_fold))
+        
+        self.reduction.fit(scores)
+        aggregate_scores = self.reduction.transform(scores).flatten()
+        self.fit_scores = scores
+
+        return self._fit(residuals, aggregate_scores, **kwargs)
 
     def calculate(
         self, X: Union[pd.DataFrame, np.ndarray, list, pd.Series], y_pred: np.ndarray
@@ -738,3 +758,15 @@ class AggregateErrorModel(BaseErrorModel):
         scores = np.transpose(np.stack(scores))
 
         return self.reduction.transform(scores)
+    
+    def _save(self) -> dict:
+        d = super()._save()
+        if hasattr(self, "fit_scores"):
+            d.update({"fit_scores": self.fit_scores})
+        return d
+
+    def _load(self, d) -> None:
+        super()._load(d)
+        if "fit_scores" in d.keys():
+            self.fit_scores = d["fit_scores"]
+            self.reduction.fit(self.fit_scores)
