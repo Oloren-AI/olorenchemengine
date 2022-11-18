@@ -360,7 +360,6 @@ class BaseModel(BaseClass):
             self.name = name
 
         self.calibrator = None
-        self.em_status = None
 
     def preprocess(self, X, y, fit=False):
         """
@@ -473,7 +472,6 @@ class BaseModel(BaseClass):
         if not error_model is None:
             error_model.build(self, X_train_original, y_train_original)
             self.error_model = error_model
-            self.em_status = "built"
 
     def calibrate(self, X_valid, y_valid):
         y_pred_valid = self.predict(X_valid)
@@ -594,7 +592,7 @@ class BaseModel(BaseClass):
             if self.calibrator is not None:
                 result = self.calibrator.predict(result.reshape(-1, 1)).reshape(-1)
             if return_ci or return_vis:
-                assert self.em_status == "fitted", "error model not fit"
+                assert hasattr(self.error_model, "reg"), "error model not fit"
                 result = pd.DataFrame({"predicted": result})
                 errors = self.error_model.score(X_original)
                 if return_ci:
@@ -632,6 +630,7 @@ class BaseModel(BaseClass):
         error_model: BaseErrorModel = None,
         ci: float = 0.8,
         scoring: str = None,
+        **kwargs
     ):
         """Trains a production-ready model.
 
@@ -691,17 +690,17 @@ class BaseModel(BaseClass):
 
             if hasattr(self, "error_model") and self.setting == "regression":
                 y_pred_test = np.array(y_pred_test).flatten()
-                error_model = type(self.error_model)(
+                em = type(self.error_model)(
                     *self.error_model.args, **self.error_model.kwargs
                 )
-                error_model.build(model, X_train, y_train)
-                new_scores = error_model.calculate(X_test, y_pred_test)
+                em.build(model, X_train, y_train)
+                scores_fold = em.calculate(X_test, y_pred_test)
                 if scores is None:
                     pred = y_pred_test
                     true = y_test
-                    scores = new_scores
+                    scores = scores_fold
                 else:
-                    scores = np.concatenate((scores, new_scores))
+                    scores = np.concatenate((scores, scores_fold))
                     pred = np.concatenate((pred, y_pred_test))
                     true = np.concatenate((true, y_test))
             elif self.setting == "classification":
@@ -730,8 +729,7 @@ class BaseModel(BaseClass):
             true = true.reshape(-1)
             residuals = np.abs(pred - true)
             if hasattr(self, "error_model"):
-                self.error_model._fit(residuals, scores)
-                self.em_status = "fitted"
+                self.error_model._fit(residuals, scores, **kwargs)
         elif self.setting == "classification":
             self.calibrator = LinearRegression()
             self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
@@ -758,7 +756,6 @@ class BaseModel(BaseClass):
         """
         if fit_error_model and hasattr(self, "error_model"):
             self.error_model.fit(X, y)
-            self.em_status = "fitted"
 
         import json
 
@@ -839,7 +836,6 @@ class BaseModel(BaseClass):
         model.error_model.score(test["Drug"])
         ------------------------------
         """
-        self.em_status = "fitted"
         self.error_model = type(error_model)(**kwargs)
         self.error_model.build(self, X_train, y_train)
         if X_valid is None or y_valid is None:
@@ -858,8 +854,6 @@ class BaseModel(BaseClass):
             d.update({"calibrator": self.calibrator._save()})
         if hasattr(self, "error_model"):
             d.update({"error_model": saves(self.error_model)})
-        if hasattr(self, "em_status"):
-            d.update({"em_status": self.em_status})
         if hasattr(self, "normalization") and issubclass(
             type(self.normalization), BasePreprocessor
         ):
@@ -876,10 +870,11 @@ class BaseModel(BaseClass):
             self.calibrator = LinearRegression()
             self.calibrator._load(d["calibrator"])
         if "error_model" in d.keys():
-            self.error_model = loads(d["error_model"])
-            self.error_model.model = self
-        if "em_status" in d.keys():
-            self.em_status = d["em_status"]
+            error_model = loads(d["error_model"])
+            error_model.model = self
+            error_model._build()
+            error_model._fit(error_model.residuals, error_model.scores)
+            self.error_model = error_model
         if "normalization" in d.keys():
             self.normalization._load(d["normalization"])
 
@@ -1119,10 +1114,11 @@ class BaseErrorModel(BaseClass):
 
     Methods:
         build: builds the error model from a trained BaseModel and dataset
-        calculate: calculates confidence scores from inputs
+        _build: optionally implemented, error model-specific computations
         fit: fits confidence scores to a trained model and external dataset
         fit_cv: fits confidence scores to k-fold cross validation on the training dataset
         _fit: fits confidence scores to residuals
+        calculate: calculates confidence scores from inputs
         score: returns confidence intervals on a dataset
     """
 
@@ -1145,6 +1141,7 @@ class BaseErrorModel(BaseClass):
         model: BaseModel,
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
         y: Union[np.ndarray, list, pd.Series],
+        **kwargs
     ):
         """Builds the error model with a trained model and training dataset
 
@@ -1157,21 +1154,10 @@ class BaseErrorModel(BaseClass):
         self.X_train = X
         self.y_train = np.array(y).flatten()
         self.y_pred_train = np.array(self.model.predict(self.X_train)).flatten()
-
-    @abstractmethod
-    def calculate(
-        self,
-        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y_pred: np.ndarray,
-    ) -> np.ndarray:
-        """To be implemented by the child class; calculates confidence scores from inputs.
-
-        Args:
-            X: features, list of SMILES
-            y_pred (1-dimensional np.ndarray): predicted values
-
-        Returns:
-            scores (1-dimensional np.ndarray)
+        self._build(**kwargs)
+    
+    def _build(self, **kwargs):
+        """Optionally implemented by child class; builds the error model to prepare it for fitting.
         """
         pass
 
@@ -1215,7 +1201,7 @@ class BaseErrorModel(BaseClass):
 
         residuals = None
         scores = None
-        kf = KFold(n_splits=n_splits)
+        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
 
         split = 1
         for train_index, test_index in kf.split(self.X_train):
@@ -1248,7 +1234,6 @@ class BaseErrorModel(BaseClass):
         self,
         residuals: np.ndarray,
         scores: np.ndarray,
-        filename: str = "figure.html",
     ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to residuals.
 
@@ -1256,32 +1241,40 @@ class BaseErrorModel(BaseClass):
             residuals (1-dimensional np.ndarray): array of residuals
             scores (1-dimensional np.ndarray): array of confidence scores
             quantile (float): confidence interval quantile to capture during fitting
-            filename (str): save destination of the fitted plot
 
         Returns:
             plotly figure of fitted model against validation dataset
         """
+        self.residuals = residuals
+        self.scores = scores
+
         if self.method == "bin":
-            bin_labels = pd.cut(scores, self.bins, labels=False)
-            X = [np.mean(scores[bin_labels == i]) for i in range(self.bins)]
-            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(self.bins)]
+            bins = min(len(np.unique(scores)), self.bins)
+            bin_labels = pd.cut(scores, bins, labels=False)
+            labels = np.unique(bin_labels)
+            X = [np.mean(scores[bin_labels == i]) for i in labels]
+            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in labels]
         elif self.method == "qbin":
-            bin_labels = pd.qcut(scores, self.bins, labels=False, duplicates="drop")
-            n_labels = int(max(bin_labels) + 1)
-            X = [np.mean(scores[bin_labels == i]) for i in range(n_labels)]
-            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in range(n_labels)]
+            bins = min(len(np.unique(scores)), self.bins)
+            bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
+            labels = np.unique(bin_labels)
+            X = [np.mean(scores[bin_labels == i]) for i in labels]
+            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in labels]
         elif self.method == "roll":
+            window = min(len(scores), self.window)
             idxs = np.argsort(scores)
             scores, residuals = scores[idxs], residuals[idxs]
-            X = pd.Series(scores).rolling(self.window).mean()
-            y = pd.Series(residuals).rolling(self.window).quantile(self.ci)
-            X = X[~np.isnan(X)]
-            y = y[~np.isnan(X)]
+            X = pd.Series(scores).rolling(window).mean()[window-1:]
+            y = pd.Series(residuals).rolling(window).quantile(self.ci)[window-1:]
         else:
             raise NameError("method {} is not recognized".format(self.method))
         
         X = np.array(X)
         y = np.array(y)
+        if len(X) == 1:
+            print("WARNING: Only one unique score computed. Please decrease bin/window size or use a larger dataset.")
+            self.reg = np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan)
+            return None
 
         import plotly.express as px
         import plotly.graph_objects as go
@@ -1294,12 +1287,12 @@ class BaseErrorModel(BaseClass):
             lambda x, a, b, c: a * x ** b + c,
             lambda x, a, b: a * x + b
         ]
-
+        
         min_mse = None
         for func in funcs:
             try:
                 popt = curve_fit(func, X, y)[0]
-            except RuntimeError:
+            except (RuntimeError, TypeError):
                 continue
             y_pred = func(X, *popt)
             try:
@@ -1311,9 +1304,6 @@ class BaseErrorModel(BaseClass):
                 opt_popt = popt
                 min_mse = mse
         
-        self.residuals = residuals
-        self.scores = scores
-        self.filename = filename
         self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), max(residuals)), min(residuals)))
         
         t = np.linspace(min(scores), max(scores), 100)
@@ -1324,8 +1314,24 @@ class BaseErrorModel(BaseClass):
         fig2.update_traces(hovertemplate=None, hoverinfo='x+y')
         fig3.update_traces(hovertemplate=None, hoverinfo='skip')
         fig = go.Figure(data=fig1.data + fig2.data + fig3.data)
-        fig.write_html(filename, auto_open=True)
         return fig
+
+    @abstractmethod
+    def calculate(
+        self,
+        X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
+        y_pred: np.ndarray,
+    ) -> np.ndarray:
+        """To be implemented by the child class; calculates confidence scores from inputs.
+
+        Args:
+            X: features, list of SMILES
+            y_pred (1-dimensional np.ndarray): predicted values
+
+        Returns:
+            scores (1-dimensional np.ndarray)
+        """
+        pass
 
     def score(
         self,
@@ -1370,11 +1376,6 @@ class BaseErrorModel(BaseClass):
         if hasattr(self, "residuals"):
             d.update({"residuals": self.residuals})
             d.update({"scores": self.scores})
-            d.update({"method": self.method})
-            d.update({"bins": self.bins})
-            d.update({"window": self.window})
-            d.update({"ci": self.ci})
-            d.update({"filename": self.filename})
         return d
 
     def _load(self, d) -> None:
@@ -1384,13 +1385,10 @@ class BaseErrorModel(BaseClass):
             self.X_train = d["X_train"]
             self.y_train = d["y_train"]
             self.y_pred_train = d["y_pred_train"]
+            if hasattr(self, "model"):
+                self._build()
         if "residuals" in d.keys():
             self.residuals = d["residuals"]
             self.scores = d["scores"]
-            self.method = d["method"]
-            self.bins = d["bins"]
-            self.window = d["window"]
-            self.ci = d["ci"]
-            self.filename = d["filename"]
-
-            self._fit(self.residuals, self.scores)
+            if hasattr(self, "model"):
+                self._fit(self.residuals, self.scores)
