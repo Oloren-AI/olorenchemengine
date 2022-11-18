@@ -472,7 +472,7 @@ class ADAN(BaseErrorModel):
             self.reduction.fit(self.X_rep, self.y_train)
             x_var = self.reduction.explained_variance_ratio_
         else:
-            raise NameError("dim_reduction {} is not recognized".format(self.dim_reduction))
+            raise NameError("dim_reduction {} is not recognized. Valid inputs are 'pls' and 'pca'.".format(self.dim_reduction))
 
         if np.sum(x_var) > self.explvar:
             self.n_components = np.where(np.cumsum(x_var) > self.explvar)[0][0] + 1
@@ -561,7 +561,7 @@ class ADAN(BaseErrorModel):
             indices = nbrs.kneighbors(Xp)[1]
             dist = np.abs(y_pred - self.y_train[indices.flatten()])
         else:
-            raise NameError("criterion {} is not recognized".format(criterion))
+            raise NameError("Criterion {} is not recognized.".format(criterion))
 
         if len(criterion) > 1:
             if standardize:

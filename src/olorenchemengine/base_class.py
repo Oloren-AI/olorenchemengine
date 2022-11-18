@@ -592,7 +592,7 @@ class BaseModel(BaseClass):
             if self.calibrator is not None:
                 result = self.calibrator.predict(result.reshape(-1, 1)).reshape(-1)
             if return_ci or return_vis:
-                assert hasattr(self.error_model, "reg"), "error model not fit"
+                assert hasattr(self.error_model, "reg"), "Error model is not fitted yet."
                 result = pd.DataFrame({"predicted": result})
                 errors = self.error_model.score(X_original)
                 if return_ci:
@@ -1267,7 +1267,7 @@ class BaseErrorModel(BaseClass):
             X = pd.Series(scores).rolling(window).mean()[window-1:]
             y = pd.Series(residuals).rolling(window).quantile(self.ci)[window-1:]
         else:
-            raise NameError("method {} is not recognized".format(self.method))
+            raise NameError("Method {} is not recognized. Valid inputs are 'bin', 'qbin', and 'roll'.".format(self.method))
         
         X = np.array(X)
         y = np.array(y)
@@ -1345,7 +1345,7 @@ class BaseErrorModel(BaseClass):
         Returns:
             a list of confidence intervals for each input
         """
-        assert hasattr(self, "reg"), "error model not yet fitted"
+        assert hasattr(self, "reg"), "Error model not fitted yet."
 
         y_pred = np.array(self.model.predict(X)).flatten()
         scores = self.calculate(X, y_pred)
