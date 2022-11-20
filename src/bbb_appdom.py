@@ -25,7 +25,6 @@ def train_bbb_baselines():
     
     model_dict = {}
     for MODEL in models:
-        print(f"__________________________")
         group = admet_group(path = 'data/')
         completed = None
         for seed in tqdm([1, 2, 3, 4, 5]):
