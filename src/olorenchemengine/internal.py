@@ -707,13 +707,13 @@ class RemoteObj(BaseRemoteSymbol):
         self.REMOTE_ID = remote_id
 
 
-def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
+def parameterize(object: Union[BaseClass, list, dict, int, float, str, None]) -> dict:
     """parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
 
     Note that only objects which are instances of subclasses of BaseClass can be parameterized, other supported objects are to enable to recursive use of parameterize but cannot themselves be parameterized.
 
     Args:
-        object (Union[BaseClass, list, int, float, str, None]): parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
+        object (Union[BaseClass, list, dict, int, float, str, None]): parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
 
     Raises:
         ValueError: Object is not of type that can be parameterized
@@ -740,6 +740,8 @@ def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
         return object
     elif issubclass(type(object), list):
         return [parameterize(x) for x in object]
+    elif issubclass(type(object), dict):
+        return {parameterize(k): parameterize(v) for k, v in object.items()}
     else:
         raise ValueError(f"Invalid object {object}")
 
@@ -845,6 +847,14 @@ def create_BC(d: dict) -> BaseClass:
                         else x
                         for x in arg
                     ]
+                elif isinstance(arg, dict):
+                    arg = {
+                        k: create_BC(v)
+                        if isinstance(v, dict)
+                        and ("BC_class_name" in v.keys() or "REMOTE_ID" in v.keys())
+                        else v
+                        for k, v in arg.items()
+                    }
                 args.append(arg)
 
     kwargs = {}
