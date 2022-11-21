@@ -1,6 +1,6 @@
 import olorenchemengine as oce
 import numpy as np
-import pandas as np
+import pandas as pd
 from tqdm import tqdm
 from tdc.benchmark_group import admet_group
     
@@ -42,25 +42,60 @@ def train_bbb_baselines():
 def baselines_vs_b3db():
     model_dict = train_bbb_baselines()
     TASK_NAME = 'bbb_martins'
-
-
-
-    results_dict = {}
-    for MODEL in model_dict.keys():
+    
+    results_dict = {'DATASET':        [],
+                    'BBB_TDC AUROC':  [],
+                    'BBB_TDC Error':  [],
+                    'BBB_1040 AUROC': [],
+                    'BBB_1040 Error': [],
+                    'BBB_455 AUROC':  [],
+                    'BBB_455 Error':  [],
+                    'BBB_1209 AUROC': [],
+                    'BBB_1209 Error': [],
+    }
+    res_table = pd.DataFrame(results_dict)
+    DATASET_LIST = ['R6', 'R7', 'R9', 'R10', 'R13', 
+                    'R14', 'R15', 'R16', 'R19', 'R23', 
+                    'R24', 'R26', 'R27', 'R28', 'R29', 
+                    'R30', 'R36', 'R37', 'R50']
+    DATA_PATH = 'b3db_class_data/'
+    for model in model_dict.keys():
         print(f"__________________________")
         group = admet_group(path = 'data/')
-        predictions_list = []
-        for seed in tqdm([1, 2, 3, 4, 5]):
+        for DATASET in DATASET_LIST:
+            if DATASET == 'R7': break
             benchmark = group.get(TASK_NAME) 
             predictions = {}
             name = benchmark['name']
-            train, test = benchmark['train_val'], benchmark['test']
-            model = model_from_dict(model_dict[MODEL])
-            model.fit(train['Drug'], train['Y'])
-            y_pred_test = model.predict(test['Drug'])
-            oce.save(model, MODEL)
-            predictions[name] = y_pred_test
-            predictions_list.append(predictions)
-        results = group.evaluate_many(predictions_list)
-        results_dict[MODEL] = results[TASK_NAME]
-    print(results_dict)
+            curr_dataset = pd.read_csv(f"{DATA_PATH}{DATASET}/{DATASET}_cleaned.csv")
+            predictions_list = []
+            for seed in tqdm([1, 2, 3, 4, 5]):
+                y_pred_test = model.predict(curr_dataset['Drug'])
+                predictions[name] = y_pred_test
+                predictions_list.append(predictions)
+            results = group.evaluate_many(predictions_list)
+
+            AUROC = results[0]
+            ERROR = results[1]
+            if model == 'BBB_TDC':
+                res_table.append({'DATASET': DATASET,
+                                  'BBB_TDC AUROC': AUROC,
+                                  'BBB_TDC Error': ERROR})
+            if model == 'BBB_1040':
+                res_table.append({'DATASET': DATASET,
+                                  'BBB_1040 AUROC': AUROC,
+                                  'BBB_1040 Error': ERROR})
+            if model == 'BBB_455':
+                res_table.append({'DATASET': DATASET,
+                                  'BBB_455 AUROC': AUROC,
+                                  'BBB_455 Error': ERROR})
+            if model == 'BBB_1209':
+                res_table.append({'DATASET': DATASET,
+                                  'BBB_1209 AUROC': AUROC,
+                                  'BBB_1209 Error': ERROR})
+    res_table.to_csv(f"{DATA_PATH}generalizability_pred.csv")
+
+if __name__ == '__main__':
+    baselines_vs_b3db()
+
+
