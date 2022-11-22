@@ -522,6 +522,25 @@ class TorchMLP(BaseModel):
 
         self.network = torch.load(io.BytesIO(d["save"]))
 
+class XGBRegressor(BaseEstimator):
+
+    """Wrapper for xgboost XGBRegressor"""
+
+    @log_arguments
+    def __init__(self, *args, **kwargs):
+        from xgboost import XGBRegressor
+
+        self.obj = XGBRegressor(*args, **kwargs)
+
+class XGBClassifier(BaseEstimator):
+
+    """Wrapper for xgboost XGBRegressor"""
+
+    @log_arguments
+    def __init__(self, *args, **kwargs):
+        from xgboost import XGBClassifier
+
+        self.obj = XGBClassifier(*args, **kwargs)
 
 class XGBoostModel(BaseSKLearnModel, BaseObject):
     """XGBoost model
@@ -555,7 +574,6 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
         colsample_bytree=0.8,
         **kwargs
     ):
-        from xgboost import XGBClassifier, XGBRegressor
         import torch
 
         regressor = XGBRegressor(

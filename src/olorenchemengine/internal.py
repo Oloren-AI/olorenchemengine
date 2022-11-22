@@ -741,7 +741,7 @@ def parameterize(object: Union[BaseClass, list, dict, int, float, str, None]) ->
     elif issubclass(type(object), list):
         return [parameterize(x) for x in object]
     elif issubclass(type(object), dict):
-        return {parameterize(k): parameterize(v) for k, v in object.items()}
+        return {k: parameterize(v) for k, v in object.items()}
     else:
         raise ValueError(f"Invalid object {object}")
 
@@ -1006,6 +1006,20 @@ def json_params_str(base: Union[BaseClass, dict]) -> str:
         .replace("None", "null")
     )
 
+def package_available(package_name: str) -> bool:
+    """Checks if a package is available.
+
+    Args:
+        package_name (str): the name of the package to check for
+
+    Returns:
+        bool: True if the package is available, False otherwise
+    """
+    try:
+        __import__(package_name)
+        return True
+    except ImportError:
+        return False
 
 def install_with_permission(package_name: str):
     inp = input(
@@ -1018,7 +1032,6 @@ def install_with_permission(package_name: str):
             f"Stopping program. You can install the package manually with: \n >> pip install {package_name}"
         )
         os._exit(1)
-
 
 def import_or_install(package_name: str, statement: str = None, scope: dict = None):
     if scope is None:
