@@ -839,12 +839,13 @@ class DescriptastorusDescriptor(BaseCompoundVecRepresentation):
 
     def _convert(self, smiles, y=None):
         results = self.generator.process(smiles)
-        
-        if results is None: 
-            print("ERROR: %s" % smiles)
-            return None
 
-        processed, features = results[0], np.nan_to_num(results[1:], nan=0)
+        try: 
+            processed, features = results[0], np.nan_to_num(results[1:], nan=0)
+        except Exception as e:
+            print(e)
+            print("ERROR ON %s" % smiles)
+            return None
 
         if processed is None:
             print("ERROR: %s" % smiles)
