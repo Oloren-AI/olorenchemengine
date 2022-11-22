@@ -2,6 +2,7 @@ import olorenchemengine as oce
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from tdc import Evaluator
 from tdc.benchmark_group import admet_group
     
 
@@ -21,78 +22,54 @@ def train_bbb_baselines():
     'BBB_455': "{'BC_class_name': 'RandomForestModel', 'args': [{'BC_class_name': 'DescriptastorusDescriptor', 'args': ['rdkit2dnormalized'], 'kwargs': {'log': True, 'scale': None}}], 'kwargs': {'n_estimators': 2000, 'max_features': 'log2', 'max_depth': None, 'criterion': 'entropy', 'class_weight': None, 'bootstrap': True}}",
     'BBB_1209':"{'BC_class_name': 'ChemPropModel', 'args': [], 'kwargs': {'epochs': 100, 'dropout_rate': 0.0, 'batch_size': 50, 'lr': 0.001, 'hidden_size': 300, 'depth': 3}}"
     }
+
     print("____TRAINING BASELINES_____")
-    
     model_dict = {}
     for MODEL in models:
         group = admet_group(path = 'data/')
         completed = None
-        for seed in tqdm([1, 2, 3, 4, 5]):
-            benchmark = group.get(TASK_NAME) 
-            train = benchmark['train_val']
-            model = model_from_dict(MODEL)
-            model.fit(train['Drug'], train['Y'])
-            completed = model
+        benchmark = group.get(TASK_NAME) 
+        train = benchmark['train_val']
+        model = model_from_dict(models[MODEL])
+        model.fit(train['Drug'], train['Y'])
+        completed = model
         model_dict[MODEL] = completed
     print("____TRAINING COMPLETED_____")
+
     return model_dict
 
     
 
 def baselines_vs_b3db():
     model_dict = train_bbb_baselines()
-    TASK_NAME = 'bbb_martins'
-    
-    results_dict = {'DATASET':        [],
-                    'BBB_TDC AUROC':  [],
-                    'BBB_TDC Error':  [],
-                    'BBB_1040 AUROC': [],
-                    'BBB_1040 Error': [],
-                    'BBB_455 AUROC':  [],
-                    'BBB_455 Error':  [],
-                    'BBB_1209 AUROC': [],
-                    'BBB_1209 Error': [],
+
+    results_dict = {'DATASET':  [],
+                    'BBB_TDC':  [],
+                    'BBB_1040': [],
+                    'BBB_455':  [],
+                    'BBB_1209': [],
     }
     res_table = pd.DataFrame(results_dict)
-    DATASET_LIST = ['R6', 'R7', 'R9', 'R10', 'R13', 
+    DATASET_LIST = ['R6',  'R7',  'R9',  'R10', 'R13', 
                     'R14', 'R15', 'R16', 'R19', 'R23', 
                     'R24', 'R26', 'R27', 'R28', 'R29', 
                     'R30', 'R36', 'R37', 'R50']
     DATA_PATH = 'b3db_class_data/'
-    for model in model_dict.keys():
+    for MODEL in model_dict.keys():
         print(f"__________________________")
         group = admet_group(path = 'data/')
         for DATASET in DATASET_LIST:
             if DATASET == 'R7': break
-            benchmark = group.get(TASK_NAME) 
-            predictions = {}
-            name = benchmark['name']
+            print(MODEL, DATASET)
             curr_dataset = pd.read_csv(f"{DATA_PATH}{DATASET}/{DATASET}_cleaned.csv")
-            predictions_list = []
-            for seed in tqdm([1, 2, 3, 4, 5]):
-                y_pred_test = model.predict(curr_dataset['Drug'])
-                predictions[name] = y_pred_test
-                predictions_list.append(predictions)
-            results = group.evaluate_many(predictions_list)
+            y_pred_test = model_dict[MODEL].predict(curr_dataset['Drug'])
+            calculate_auroc = Evaluator(name = 'ROC-AUC')
+            AUROC = calculate_auroc(curr_dataset["Y"], y_pred_test)
+            res_table = res_table.append({'DATASET': DATASET,
+                                              MODEL: AUROC},
+                                          ignore_index=True
+                                          )
 
-            AUROC = results[0]
-            ERROR = results[1]
-            if model == 'BBB_TDC':
-                res_table.append({'DATASET': DATASET,
-                                  'BBB_TDC AUROC': AUROC,
-                                  'BBB_TDC Error': ERROR})
-            if model == 'BBB_1040':
-                res_table.append({'DATASET': DATASET,
-                                  'BBB_1040 AUROC': AUROC,
-                                  'BBB_1040 Error': ERROR})
-            if model == 'BBB_455':
-                res_table.append({'DATASET': DATASET,
-                                  'BBB_455 AUROC': AUROC,
-                                  'BBB_455 Error': ERROR})
-            if model == 'BBB_1209':
-                res_table.append({'DATASET': DATASET,
-                                  'BBB_1209 AUROC': AUROC,
-                                  'BBB_1209 Error': ERROR})
     res_table.to_csv(f"{DATA_PATH}generalizability_pred.csv")
 
 if __name__ == '__main__':
