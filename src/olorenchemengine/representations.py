@@ -843,9 +843,7 @@ class DescriptastorusDescriptor(BaseCompoundVecRepresentation):
         try: 
             processed, features = results[0], np.nan_to_num(results[1:], nan=0)
         except Exception as e:
-            print(e)
-            print("ERROR ON %s" % smiles)
-            return None
+            raise ValueError("%s can not be converted" % smiles)
 
         if processed is None:
             print("ERROR: %s" % smiles)
