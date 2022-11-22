@@ -27,50 +27,47 @@ def train_bbb_baselines():
     model_dict = {}
     for MODEL in models:
         group = admet_group(path = 'data/')
-        completed = None
         benchmark = group.get(TASK_NAME) 
         train = benchmark['train_val']
         model = model_from_dict(models[MODEL])
         model.fit(train['Drug'], train['Y'])
-        completed = model
-        model_dict[MODEL] = completed
+        model_dict[MODEL] = model
     print("____TRAINING COMPLETED_____")
 
     return model_dict
 
-    
 
 def baselines_vs_b3db():
     model_dict = train_bbb_baselines()
 
-    results_dict = {'DATASET':  [],
+    results_dict = {
+                    'DATASET':  [],
                     'BBB_TDC':  [],
                     'BBB_1040': [],
                     'BBB_455':  [],
                     'BBB_1209': [],
     }
-    res_table = pd.DataFrame(results_dict)
+    
     DATASET_LIST = ['R6',  'R7',  'R9',  'R10', 'R13', 
                     'R14', 'R15', 'R16', 'R19', 'R23', 
                     'R24', 'R26', 'R27', 'R28', 'R29', 
                     'R30', 'R36', 'R37', 'R50']
-    DATA_PATH = 'b3db_class_data/'
-    for MODEL in model_dict.keys():
-        print(f"__________________________")
-        group = admet_group(path = 'data/')
-        for DATASET in DATASET_LIST:
-            if DATASET == 'R7': break
+
+    DATA_FOLDER= 'b3db_class_data'
+    for DATASET in DATASET_LIST:
+        results_dict['DATASET'].append(DATASET)
+        curr_dataset = pd.read_csv(f"{DATA_FOLDER}/{DATASET}/{DATASET}_cleaned.csv")
+        print(f"___________________________")
+        for MODEL in model_dict.keys():
             print(MODEL, DATASET)
-            curr_dataset = pd.read_csv(f"{DATA_PATH}{DATASET}/{DATASET}_cleaned.csv")
             y_pred_test = model_dict[MODEL].predict(curr_dataset['Drug'])
             calculate_auroc = Evaluator(name = 'ROC-AUC')
             AUROC = calculate_auroc(curr_dataset["Y"], y_pred_test)
-            res_table = res_table.append({'DATASET': DATASET,
-                                              MODEL: AUROC},
-                                          ignore_index=True
-                                          )
-
-    res_table.to_csv(f"{DATA_PATH}generalizability_pred.csv")
+            AUROC = round(AUROC, 3)
+            results_dict[MODEL].append(AUROC)
+            print(results_dict[MODEL])
+    res_table = pd.DataFrame(results_dict)
+    res_table.to_csv(f"{DATA_FOLDER}/generalizability_pred.csv")
 
 if __name__ == '__main__':
     baselines_vs_b3db()
