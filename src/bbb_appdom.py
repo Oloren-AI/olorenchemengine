@@ -1,12 +1,14 @@
 import olorenchemengine as oce
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 from tdc import Evaluator
 from tdc.benchmark_group import admet_group
     
 
 def model_from_dict(s):
+    """
+        Given a model dictionar, it returns a model for use.
+    """
     s = s.replace("'", "\"").replace("True", "true").replace("False", "false").replace("None", "null")
     model = oce.create_BC(s)
     return model
@@ -36,8 +38,24 @@ def train_bbb_baselines():
 
     return model_dict
 
+def calculate_avg_rocauc(models: list, results_dict: dict):
+    """
+        Averages all the ROC-AUC values for each column in output table
+    """
+    averages = ['AVG ROC-AUC']
+    for MODEL in models:
+        ys = results_dict[MODEL]
+        avg = round(np.sum(ys) / len(ys), 3)
+        averages.append(avg)
+    return averages
+
+
 
 def baselines_vs_b3db():
+    """
+        Trains baseline models and tests them on the b3db classification
+        data.
+    """
     model_dict = train_bbb_baselines()
 
     results_dict = {
@@ -46,7 +64,7 @@ def baselines_vs_b3db():
                     'BBB_1040': [],
                     'BBB_455':  [],
                     'BBB_1209': [],
-    }
+                    }
     
     DATASET_LIST = ['R6',  'R7',  'R9',  'R10', 'R13', 
                     'R14', 'R15', 'R16', 'R19', 'R23', 
@@ -54,6 +72,7 @@ def baselines_vs_b3db():
                     'R30', 'R36', 'R37', 'R50']
 
     DATA_FOLDER= 'b3db_class_data'
+    calculate_auroc = Evaluator(name = 'ROC-AUC')
     for DATASET in DATASET_LIST:
         # R26 is only one type of class data, so ROC-AUC is not defined.
         if (DATASET == 'R26' or DATASET == 'R37'): continue
@@ -63,18 +82,11 @@ def baselines_vs_b3db():
         for MODEL in model_dict.keys():
             print(MODEL, DATASET)
             y_pred_test = model_dict[MODEL].predict(curr_dataset['Drug'])
-            calculate_auroc = Evaluator(name = 'ROC-AUC')
             AUROC = calculate_auroc(curr_dataset['Y'], y_pred_test)
             AUROC = round(AUROC, 3)
             results_dict[MODEL].append(AUROC)
-            print(results_dict[MODEL])
     res_table = pd.DataFrame(results_dict)
-    averages = ['AVG ROC-AUC']
-    for MODEL in model_dict.keys():
-        ys = results_dict[MODEL]
-        avg = round(np.sum(ys) / len(ys), 3)
-        averages.append(avg)
-    res_table.loc[len(res_table.index)] = averages
+    res_table.loc[len(res_table.index)] = calculate_avg_rocauc(model_dict.keys(), results_dict)
     res_table.to_csv(f"{DATA_FOLDER}/generalizability_pred.csv")
 
 if __name__ == '__main__':
