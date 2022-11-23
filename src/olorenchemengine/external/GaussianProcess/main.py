@@ -228,6 +228,8 @@ if package_available("gpflow"):
     import tensorflow_probability.python.bijectors as bijectors
 
     class GPFlow_Parameter(BaseClass):
+        """A wrapper for GPFlow parameters that makes it possible to save a load
+        gpflow.Parameter classes."""
 
         @log_arguments
         def __init__(self, log=True):
@@ -253,6 +255,13 @@ if package_available("gpflow"):
             self.d = d
 
     class GPFlowEstimator(BaseEstimator):
+        """Base class for GPFlow estimators. This class is not meant to be used directly.
+        Use one of the derived classes instead. Derived classes implement the
+        abstract method get_GPFlowModel, which returns a GPFlow model consstructed
+        from a passed X_train and y_train.
+        
+        Requires installing GPFlow and TensorFlow.
+        """
 
         @log_arguments
         def __init__(self, maxiter = 100, log=True):
@@ -298,6 +307,13 @@ if package_available("gpflow"):
             gpflow.utilities.multiple_assign(self.m, parameter_dict_new)
 
     class TanimotoGPRegressor(GPFlowEstimator):
+         """
+        Estimator for a GP regressor using the Tanimoto kernel.
+        
+        Adapted from Pat Walters github.com/PatWalters/yamc under the MIT license which in turn states:
+        A minor refactoring of code from Ryan Rhys-Griffiths
+        https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb.
+        """
 
         def get_GPFlowModel(self, X_train, y_train):
             k = Tanimoto()
@@ -308,6 +324,14 @@ if package_available("gpflow"):
             return m
 
     class TanimotoGPClassifier(GPFlowEstimator):
+        """
+        Estimator for a GP classifier using the Tanimoto kernel.
+        Requires installing GPFlow and TensorFlow.
+        
+        Adapted from Pat Walters github.com/PatWalters/yamc under the MIT license which in turn states:
+        A minor refactoring of code from Ryan Rhys-Griffiths
+        https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb.
+        """
 
         def get_GPFlowModel(self, X_train, y_train):
             k = Tanimoto()
@@ -318,9 +342,19 @@ if package_available("gpflow"):
             return m
 
     class TanimotoGPModel(BaseSKLearnModel):
+        """
+        Gaussian Process model using the Tanimoto kernel implemented with GPFlow. 
+        Requires installing GPFlow and TensorFlow.
+        
+        Adapted from Pat Walters github.com/PatWalters/yamc under the MIT license which in turn states:
+        A minor refactoring of code from Ryan Rhys-Griffiths
+        https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb.
+        
+        Parameters:
+            representation (BaseVecRepresentation): The representation to use."""
 
         @log_arguments
-        def __init__(self, representation, log=True, **kwargs):
+        def __init__(self, representation: BaseVecRepresentation, log=True, **kwargs):
             classifier = TanimotoGPClassifier()
             regressor = TanimotoGPRegressor()
             super().__init__(representation, regressor, classifier, log=False, **kwargs)
