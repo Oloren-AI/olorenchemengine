@@ -114,8 +114,9 @@ class BaseStacking(BaseModel):
         models: List[BaseModel],
         stacker_model: BaseModel,
         n: int = 1,
+        oof: bool = False,
+        split: float = 0.0,
         log: bool = True,
-        oof=False,
         nfolds=5,
         **kwargs
     ):
@@ -136,6 +137,7 @@ class BaseStacking(BaseModel):
             for model in models:
                 self.models.append(model)
         self.stacker_model = stacker_model
+        self.split = split
         self.oof = oof
         self.nfolds = nfolds
         super().__init__(log=False, **kwargs)
@@ -169,11 +171,19 @@ class BaseStacking(BaseModel):
         return data
 
     def _fit(self, X, y, valid=None):
+        
+        # split data into train and test using sklearn
+        if self.split > 0:
+            from sklearn.model_selection import train_test_split
+            X, X_test, y, y_test = train_test_split(X, y, test_size=self.split, random_state=42)
+            valid = (X_test, y_test)
+            
         if not self.oof:
             for model in self.models:
                 if issubclass(type(model), BaseModel):
                     model.fit(X, y)
             if valid is None:
+                print("Using valid set for stacking")
                 data = self.featurize(X)
                 self.stacker_model.fit(data, y)
             else:
@@ -253,7 +263,7 @@ class BestStacker(BaseStacking):
 
     @log_arguments
     def __init__(
-        self, models: List[BaseModel], n: int = 1, k: int = 1, log: bool = True
+        self, models: List[BaseModel], n: int = 1, k: int = 1, log: bool = True, **kwargs
     ):
         """BestStacker constructor
 
@@ -262,7 +272,7 @@ class BestStacker(BaseStacking):
             n (int, optional): Number of times to repeat the given models. Defaults to 1.
             k (int, optional): Number of "best" models to choose for the stacking. Defaults to 1."""
 
-        super().__init__(models, KBestLinearRegression(k=k), n=n, log=False)
+        super().__init__(models, KBestLinearRegression(k=k), n=n, log=False, **kwargs)
 
 
 class LinearRegressionStacker(BaseStacking):
@@ -289,7 +299,7 @@ class LinearRegressionStacker(BaseStacking):
     """
 
     @log_arguments
-    def __init__(self, models: List[BaseModel], n: int = 1, log: bool = True):
+    def __init__(self, models: List[BaseModel], n: int = 1, log: bool = True, **kwargs):
         """LinearRegressionStacker constructor
 
         Args:
@@ -297,7 +307,7 @@ class LinearRegressionStacker(BaseStacking):
             n (int, optional): Number of times to repeat the given models. Defaults to 1.
             log (bool, optional): Whether or not to log the arguments of this constructor,
         """
-        super().__init__(models, LinearRegression(), n=n, log=False)
+        super().__init__(models, LinearRegression(), n=n, log=False, **kwargs)
 
 
 class SKLearnStacker(BaseSKLearnModel):
@@ -319,6 +329,7 @@ class SKLearnStacker(BaseSKLearnModel):
         classification_stacker_model: BaseEstimator,
         n: int = 1,
         log: bool = True,
+        **kwargs
     ):
         """SKLearnStacker constructor
 
@@ -331,7 +342,7 @@ class SKLearnStacker(BaseSKLearnModel):
                 should be True only for unnested classes. Defaults to True."""
         self.reg_stack = BaseStacking(models, regression_stacker_model, n=n)
         self.class_stack = BaseStacking(models, classification_stacker_model, n=n)
-        super().__init__(None, self.reg_stack, self.class_stack, log=False)
+        super().__init__(None, self.reg_stack, self.class_stack, log=False, **kwargs)
 
 
 class RFStacker(SKLearnStacker):
@@ -366,6 +377,7 @@ class RFStacker(SKLearnStacker):
         n_estimators: int = 100,
         n: int = 1,
         log: bool = True,
+        **kwargs
     ):
         """RFStacker constructor
 
@@ -391,7 +403,7 @@ class RFStacker(SKLearnStacker):
             class_weight="balanced_subsample",
         )
 
-        super().__init__(models, rf_regressor, rf_classifier, n=n, log=False)
+        super().__init__(models, rf_regressor, rf_classifier, n=n, log=False, **kwargs)
 
 
 class MLPStacker(SKLearnStacker):
@@ -438,6 +450,7 @@ class MLPStacker(SKLearnStacker):
         verbose=0,
         n=1,
         log=True,
+        **kwargs,
     ):
 
         super().__init__(
@@ -460,6 +473,7 @@ class MLPStacker(SKLearnStacker):
             ),
             n=n,
             log=False,
+            **kwargs
         )
 
 
