@@ -55,6 +55,8 @@ def baselines_vs_b3db():
 
     DATA_FOLDER= 'b3db_class_data'
     for DATASET in DATASET_LIST:
+        # R26 is only one type of class data, so ROC-AUC is not defined.
+        if (DATASET == 'R26' or DATASET == 'R37'): continue
         results_dict['DATASET'].append(DATASET)
         curr_dataset = pd.read_csv(f"{DATA_FOLDER}/{DATASET}/{DATASET}_cleaned.csv")
         print(f"___________________________")
@@ -62,11 +64,17 @@ def baselines_vs_b3db():
             print(MODEL, DATASET)
             y_pred_test = model_dict[MODEL].predict(curr_dataset['Drug'])
             calculate_auroc = Evaluator(name = 'ROC-AUC')
-            AUROC = calculate_auroc(curr_dataset["Y"], y_pred_test)
+            AUROC = calculate_auroc(curr_dataset['Y'], y_pred_test)
             AUROC = round(AUROC, 3)
             results_dict[MODEL].append(AUROC)
             print(results_dict[MODEL])
     res_table = pd.DataFrame(results_dict)
+    averages = ['AVG ROC-AUC']
+    for MODEL in model_dict.keys():
+        ys = results_dict[MODEL]
+        avg = round(np.sum(ys) / len(ys), 3)
+        averages.append(avg)
+    res_table.loc[len(res_table.index)] = averages
     res_table.to_csv(f"{DATA_FOLDER}/generalizability_pred.csv")
 
 if __name__ == '__main__':
