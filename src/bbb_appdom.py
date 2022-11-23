@@ -49,8 +49,6 @@ def calculate_avg_rocauc(models: list, results_dict: dict):
         averages.append(avg)
     return averages
 
-
-
 def baselines_vs_b3db():
     """
         Trains baseline models and tests them on the b3db classification
