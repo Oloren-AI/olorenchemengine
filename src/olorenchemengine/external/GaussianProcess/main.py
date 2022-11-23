@@ -173,7 +173,8 @@ class GaussianProcessModel(BaseSKLearnModel):
         )
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
 
-if package_available("gplflow"):
+if package_available("gpflow"):
+    from abc import abstractproperty
     import gpflow
     import tensorflow as tf
     import numpy as np
@@ -181,6 +182,11 @@ if package_available("gplflow"):
     from sklearn.preprocessing import StandardScaler
     from gpflow.utilities import positive
     from gpflow.utilities.ops import broadcasting_elementwise
+
+    import os
+    from os import listdir
+    import zipfile
+    import io
 
     # A minor refactoring of code from
     # https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb
@@ -219,48 +225,102 @@ if package_available("gplflow"):
             :return: N x 1 array
             """
             return tf.fill(tf.shape(X)[:-1], tf.squeeze(self.variance))
+    import tensorflow_probability.python.bijectors as bijectors
 
+    class GPFlow_Parameter(BaseClass):
 
-    class TanimotoGPRegressor:
-        def __init__(self, maxiter=100):
-            self.m = None
-            self.maxiter = maxiter
-
-        def objective_closure(self):
-            return -self.m.log_marginal_likelihood()
-
-        def fit(self, X_train, y_train):
-            k = Tanimoto()
-            self.m = gpflow.models.GPR(data=(X_train.astype(np.float64), y_train),
-                                       mean_function=Constant(np.mean(y_train)),
-                                       kernel=k,
-                                       noise_variance=1)
-            opt = gpflow.optimizers.Scipy()
-            opt.minimize(self.objective_closure, self.m.trainable_variables, options=dict(maxiter=self.maxiter))
-
-        def predict(self, X_test):
-            y_pred, y_var = self.m.predict_f(X_test.astype(np.float64))
-            return y_pred.flatten()
+        @log_arguments
+        def __init__(self, log=True):
+            pass
         
-        def _save(self):
-            return {}
-    
-    class TanimotoGPClassifier:
-        def __init__(self, maxiter=100):
-            self.m = None
-            self.maxiter = maxiter
+        def set(self, parameter: gpflow.Parameter):
+            self.d = {
+                "value": parameter.numpy(),
+                "name": parameter.name,
+                "transform": parameter.transform.__class__.__name__,
+            }
+            return self
 
+        def get(self):
+            return gpflow.Parameter(self.d["value"], 
+                                    name=self.d["name"],
+                                    transform=getattr(bijectors, self.d["transform"])())
+
+        def _save(self):
+            return self.d
+
+        def _load(self, d: dict):
+            self.d = d
+
+    class GPFlowEstimator(BaseEstimator):
+
+        @log_arguments
+        def __init__(self, maxiter = 100, log=True):
+            self.maxiter = maxiter
+            self.m = None
+
+        @abstractmethod
+        def get_GPFlowModel(self, X_train, y_train):
+            pass
+        
         def fit(self, X_train, y_train):
-            k = Tanimoto()
-            self.m = gpflow.models.VGP(data=(X_train.astype(np.float64), y_train),
-                                       mean_function=Constant(np.mean(y_train)),
-                                       kernel=k,
-                                       noise_variance=1,
-                                       likelihood=gpflow.likelihoods.Bernoulli())
+            self.X_train = X_train
+            self.y_train = y_train
+
+            self.m = self.get_GPFlowModel(X_train, y_train)
+
             opt = gpflow.optimizers.Scipy()
+
             opt.minimize(self.m.training_loss, self.m.trainable_variables, 
                          options=dict(maxiter=self.maxiter))
 
         def predict(self, X_test):
             y_pred, y_var = self.m.predict_f(X_test.astype(np.float64))
-            return y_pred.flatten()
+            return y_pred.numpy().flatten()
+
+        def _save(self):
+            parameter_dict_org = gpflow.utilities.parameter_dict(self.m)
+            parameter_dict_new = {k: GPFlow_Parameter().set(v) for k, v in parameter_dict_org.items()}
+            d = {"parameter_dict": {k: v._save() for k, v in parameter_dict_new.items()},
+                 "x_train": self.X_train.tolist(),
+                 "y_train": self.y_train.tolist()}
+
+            return d
+
+        def _load(self, d):
+            self.X_train = np.array(d["x_train"])
+            self.y_train = np.array(d["y_train"])
+            self.m = self.get_GPFlowModel(self.X_train, self.y_train)
+            parameter_dict_new = {k: GPFlow_Parameter() for k, v in d["parameter_dict"].items()}
+            for k, v in d["parameter_dict"].items():
+                parameter_dict_new[k]._load(v)
+            parameter_dict_new = {k: v.get() for k, v in parameter_dict_new.items()}
+            gpflow.utilities.multiple_assign(self.m, parameter_dict_new)
+
+    class TanimotoGPRegressor(GPFlowEstimator):
+
+        def get_GPFlowModel(self, X_train, y_train):
+            k = Tanimoto()
+            m = gpflow.models.GPR(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
+                                    mean_function=Constant(np.mean(y_train)),
+                                    kernel=k,
+                                    noise_variance=1)
+            return m
+
+    class TanimotoGPClassifier(BaseEstimator):
+
+        def get_GPFlowModel(self, X_train, y_train):
+            k = Tanimoto()
+            m = gpflow.models.VGP(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
+                                   mean_function=Constant(np.mean(y_train)),
+                                   kernel=k,
+                                   likelihood=gpflow.likelihoods.Bernoulli())
+            return m
+
+    class TanimotoGPModel(BaseSKLearnModel):
+
+        @log_arguments
+        def __init__(self, representation, log=True, **kwargs):
+            classifier = TanimotoGPClassifier()
+            regressor = TanimotoGPRegressor()
+            super().__init__(representation, regressor, classifier, log=False, **kwargs)
