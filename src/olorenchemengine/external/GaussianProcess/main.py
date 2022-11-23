@@ -307,7 +307,7 @@ if package_available("gpflow"):
                                     noise_variance=1)
             return m
 
-    class TanimotoGPClassifier(BaseEstimator):
+    class TanimotoGPClassifier(GPFlowEstimator):
 
         def get_GPFlowModel(self, X_train, y_train):
             k = Tanimoto()
