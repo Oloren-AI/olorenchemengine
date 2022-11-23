@@ -307,14 +307,13 @@ if package_available("gpflow"):
             gpflow.utilities.multiple_assign(self.m, parameter_dict_new)
 
     class TanimotoGPRegressor(GPFlowEstimator):
-         """
+        """
         Estimator for a GP regressor using the Tanimoto kernel.
         
         Adapted from Pat Walters github.com/PatWalters/yamc under the MIT license which in turn states:
         A minor refactoring of code from Ryan Rhys-Griffiths
         https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb.
         """
-
         def get_GPFlowModel(self, X_train, y_train):
             k = Tanimoto()
             m = gpflow.models.GPR(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
