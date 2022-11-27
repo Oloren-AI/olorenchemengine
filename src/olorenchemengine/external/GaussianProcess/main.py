@@ -264,24 +264,30 @@ if package_available("gpflow"):
         """
 
         @log_arguments
-        def __init__(self, maxiter = 100, log=True):
+        def __init__(self, maxiter = 100, objective = "log_marginal_likelihood", log=True):
             self.maxiter = maxiter
             self.m = None
+            self.objective = objective
 
         @abstractmethod
         def get_GPFlowModel(self, X_train, y_train):
             pass
         
+        def get_objective(self):
+            if self.objective == "log_marginal_likelihood":
+                return -self.m.log_marginal_likelihood()
+            else:
+                return self.m.training_loss()
+        
         def fit(self, X_train, y_train):
             self.X_train = X_train
             self.y_train = y_train
-
+            
             self.m = self.get_GPFlowModel(X_train, y_train)
-
             opt = gpflow.optimizers.Scipy()
-
-            opt.minimize(self.m.training_loss, self.m.trainable_variables, 
+            opt.minimize(self.get_objective, self.m.trainable_variables, 
                          options=dict(maxiter=self.maxiter))
+            tf.keras.backend.clear_session()
 
         def predict(self, X_test):
             y_pred, y_var = self.m.predict_f(X_test.astype(np.float64))
@@ -353,7 +359,7 @@ if package_available("gpflow"):
             representation (BaseVecRepresentation): The representation to use."""
 
         @log_arguments
-        def __init__(self, representation: BaseVecRepresentation, log=True, **kwargs):
-            classifier = TanimotoGPClassifier()
-            regressor = TanimotoGPRegressor()
+        def __init__(self, representation: BaseVecRepresentation, objective = "log_marginal_likelihood",log=True, **kwargs):
+            classifier = TanimotoGPClassifier(objective=objective)
+            regressor = TanimotoGPRegressor(objective=objective)
             super().__init__(representation, regressor, classifier, log=False, **kwargs)
