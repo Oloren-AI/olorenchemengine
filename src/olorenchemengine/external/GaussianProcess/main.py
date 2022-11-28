@@ -264,18 +264,24 @@ if package_available("gpflow"):
         """
 
         @log_arguments
-        def __init__(self, maxiter = 100, objective = "log_marginal_likelihood", log=True):
+        def __init__(self, maxiter = 100, objective = "log_marginal_likelihood",
+                     inducing_points = float('inf'), setting="regression", log=True):
             self.maxiter = maxiter
             self.m = None
             self.objective = objective
+            self.setting = setting
+            self.inducing_points = inducing_points
 
         @abstractmethod
         def get_GPFlowModel(self, X_train, y_train):
             pass
         
         def get_objective(self):
-            if self.objective == "log_marginal_likelihood":
-                return -self.m.log_marginal_likelihood()
+            if self.objective == "log_marginal_likelihood" and self.setting == "regression":
+                try:
+                    return -self.m.log_marginal_likelihood()
+                except:
+                    return self.m.training_loss()
             else:
                 return self.m.training_loss()
         
@@ -283,10 +289,18 @@ if package_available("gpflow"):
             self.X_train = X_train
             self.y_train = y_train
             
-            self.m = self.get_GPFlowModel(X_train, y_train)
             opt = gpflow.optimizers.Scipy()
-            opt.minimize(self.get_objective, self.m.trainable_variables, 
-                         options=dict(maxiter=self.maxiter))
+
+            if X_train.shape[0] <= self.inducing_points:
+                self.m = self.get_GPFlowModel(X_train, y_train)
+                opt.minimize(self.get_objective, self.m.trainable_variables, 
+                            options=dict(maxiter=self.maxiter))
+            else:
+                rng = np.random.default_rng(1234)
+                inducing_variable = rng.choice(X_train, size=self.inducing_points, replace=False)
+                self.m = self.get_GPFlowModel(X_train, y_train, inducing_variable = inducing_variable)
+                opt.minimize(self.get_objective, self.m.trainable_variables, 
+                            options=dict(maxiter=self.maxiter))
             tf.keras.backend.clear_session()
 
         def predict(self, X_test):
@@ -298,13 +312,17 @@ if package_available("gpflow"):
             parameter_dict_new = {k: GPFlow_Parameter().set(v) for k, v in parameter_dict_org.items()}
             d = {"parameter_dict": {k: v._save() for k, v in parameter_dict_new.items()},
                  "x_train": self.X_train.tolist(),
-                 "y_train": self.y_train.tolist()}
+                 "y_train": self.y_train.tolist(),
+                 "inducing_variable": (self.inducing_variable.tolist() if self.inducing_variable is not None else None),
+                 "inducing_points": self.inducing_points,}
 
             return d
 
         def _load(self, d):
             self.X_train = np.array(d["x_train"])
             self.y_train = np.array(d["y_train"])
+            self.inducing_points = d["inducing_points"]
+            self.inducing_variable = (np.array(d["inducing_variable"]) if d["inducing_variable"] is not None else None)
             self.m = self.get_GPFlowModel(self.X_train, self.y_train)
             parameter_dict_new = {k: GPFlow_Parameter() for k, v in d["parameter_dict"].items()}
             for k, v in d["parameter_dict"].items():
@@ -320,12 +338,19 @@ if package_available("gpflow"):
         A minor refactoring of code from Ryan Rhys-Griffiths
         https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb.
         """
-        def get_GPFlowModel(self, X_train, y_train):
+        def get_GPFlowModel(self, X_train, y_train, inducing_variable = None):
             k = Tanimoto()
-            m = gpflow.models.GPR(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
+            if inducing_variable is None:
+                m = gpflow.models.GPR(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
                                     mean_function=Constant(np.mean(y_train)),
                                     kernel=k,
                                     noise_variance=1)
+            else:
+                m = gpflow.models.SGPR(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
+                                    mean_function=Constant(np.mean(y_train)),
+                                    kernel = k,
+                                    noise_variance = 1,
+                                    inducing_variable = inducing_variable)
             return m
 
     class TanimotoGPClassifier(GPFlowEstimator):
@@ -338,12 +363,19 @@ if package_available("gpflow"):
         https://github.com/Ryan-Rhys/The-Photoswitch-Dataset/blob/master/examples/gp_regression_on_molecules.ipynb.
         """
 
-        def get_GPFlowModel(self, X_train, y_train):
+        def get_GPFlowModel(self, X_train, y_train, inducing_variable = None):
             k = Tanimoto()
-            m = gpflow.models.VGP(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
+            if inducing_variable is None:
+                m = gpflow.models.VGP(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
                                    mean_function=Constant(np.mean(y_train)),
                                    kernel=k,
                                    likelihood=gpflow.likelihoods.Bernoulli())
+            else:
+                m = gpflow.models.SVGP(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
+                                   mean_function=Constant(np.mean(y_train)),
+                                   kernel=k,
+                                   likelihood=gpflow.likelihoods.Bernoulli(),
+                                   inducing_variable=inducing_variable)
             return m
 
     class TanimotoGPModel(BaseSKLearnModel):
@@ -359,7 +391,8 @@ if package_available("gpflow"):
             representation (BaseVecRepresentation): The representation to use."""
 
         @log_arguments
-        def __init__(self, representation: BaseVecRepresentation, objective = "log_marginal_likelihood",log=True, **kwargs):
-            classifier = TanimotoGPClassifier(objective=objective)
-            regressor = TanimotoGPRegressor(objective=objective)
+        def __init__(self, representation: BaseVecRepresentation, inducing_points = float('inf'),
+                     objective = "log_marginal_likelihood",log=True, **kwargs):
+            classifier = TanimotoGPClassifier(objective=objective, inducing_points = inducing_points, setting="classification")
+            regressor = TanimotoGPRegressor(objective=objective, inducing_points = inducing_points, setting="regression")
             super().__init__(representation, regressor, classifier, log=False, **kwargs)
