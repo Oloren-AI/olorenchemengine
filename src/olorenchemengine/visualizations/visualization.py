@@ -1469,14 +1469,16 @@ class VisualizeModelSim(CompoundScatterPlot):
             visualization will only select the set specified by eval_set.
         model (BaseModel): Model to visualize.
         eval_set (str): Subset of dataset to visualize, either 'train', 'test',
-            or 'valid'."""
+            or 'valid'.
+        x_transform (str): Transform to apply to x-axis, either 'quantile' or 'none'."""
 
     @log_arguments
     def __init__(
         self,
         dataset: BaseDataset,
         model: BaseModel,
-        eval_set="test",
+        eval_set: str = "test",
+        mode: str = "none",
         *args,
         log=True,
         **kwargs,
@@ -1511,11 +1513,17 @@ class VisualizeModelSim(CompoundScatterPlot):
         self.sim = np.array(
             [max(DataStructs.BulkTanimotoSimilarity(fp, train_fps)) for fp in eval_fps]
         )
-
+        self.mode = mode
+        if self.mode == "none":
+            Y = self.model.predict(self.eval_set[0])
+        else:
+            from sklearn.preprocessing import QuantileTransformer
+            qt = QuantileTransformer()
+            Y = qt.fit_transform(model.predict(self.eval_set[0]).reshape(-1,1)).reshape(-1).tolist()
         self.df = pd.DataFrame(
             {
                 "X": self.eval_set[1],
-                "Y": self.model.predict(self.eval_set[0]),
+                "Y": Y,
                 "SMILES": self.eval_set[0][self.dataset.structure_col],
                 "color": self.sim,
             }
@@ -1534,18 +1542,20 @@ class VisualizeModelSim(CompoundScatterPlot):
     def get_data(self) -> dict:
         d = super().get_data()
         d["color"] = self.sim.tolist()
-        d["trace_update"] = {
-            "x": [
-                0.9 * min(self.df["X"].min(), self.df["Y"].min()),
-                1.1 * max(self.df["X"].max(), self.df["Y"].max()),
-            ],
-            "y": [
-                0.9 * min(self.df["X"].min(), self.df["Y"].min()),
-                1.1 * max(self.df["X"].max(), self.df["Y"].max()),
-            ],
-            "mode": "line",
-            "type": "scatter",
-        }
+        
+        if self.mode == "none":
+            d["trace_update"] = {
+                "x": [
+                    0.9 * min(self.df["X"].min(), self.df["Y"].min()),
+                    1.1 * max(self.df["X"].max(), self.df["Y"].max()),
+                ],
+                "y": [
+                    0.9 * min(self.df["X"].min(), self.df["Y"].min()),
+                    1.1 * max(self.df["X"].max(), self.df["Y"].max()),
+                ],
+                "mode": "line",
+                "type": "scatter",
+            }
         return d
 
     @staticmethod
