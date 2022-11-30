@@ -59,36 +59,58 @@ if ("points" in data) {
 }
 
 var plot_data = [trace, trace2]
+
+var my_shapes = [
+    {
+        type: 'rect',
+        xref: 'x',
+        yref: 'paper',
+        x0: data.value - data.error,
+        y0: 0,
+        x1: data.value + data.error,
+        y1: 1,
+        fillcolor: '#bebada',
+        opacity: 0.5,
+        line: {
+            width: 0
+        }
+    },
+    {
+        type: 'line',
+        xref: 'x',
+        yref: 'paper',
+        x0: data.value,
+        y0: 0,
+        x1: data.value,
+        y1: 1,
+        line: {
+            color: '#bebada',
+            width: 3
+        }
+    },
+]
+
+if ("true" in data) {
+    my_shapes.push({
+        name: "True Value",
+        showlegend: true,
+        type: 'line',
+        xref: 'x',
+        yref: 'paper',
+        x0: data.true,
+        y0: 0,
+        x1: data.true,
+        y1: 1,
+        line: {
+            color: '#D1AF94',
+            width: 3,
+            dash: "dash"
+        }
+    })
+}
+
 var layout = {
-    shapes: [
-        {
-            type: 'rect',
-            xref: 'x',
-            yref: 'paper',
-            x0: data.value - data.error,
-            y0: 0,
-            x1: data.value + data.error,
-            y1: 1,
-            fillcolor: '#bebada',
-            opacity: 0.5,
-            line: {
-                width: 0
-            }
-        },
-        {
-            type: 'line',
-            xref: 'x',
-            yref: 'paper',
-            x0: data.value,
-            y0: 0,
-            x1: data.value,
-            y1: 1,
-            line: {
-                color: '#bebada',
-                width: 3
-            }
-        },
-    ],
+    shapes: my_shapes,
     title: data.title,
     xaxis: {
         title: data.xaxis_title,

@@ -281,6 +281,7 @@ class VisualizeError(BaseVisualization):
         dataset: Union[BaseDataset, list, pd.Series, np.ndarray],
         value: Union[int, float, np.ndarray],
         error: Union[int, float, np.ndarray],
+        true=None,
         ci=None,
         box=False,
         points=True,
@@ -329,6 +330,8 @@ class VisualizeError(BaseVisualization):
 
         if not ci is None:
             self.ci = int(ci * 100)
+        if not true is None:
+            self.true = true
 
         self.title = title
         self.width = width
@@ -353,7 +356,9 @@ class VisualizeError(BaseVisualization):
             d["points"] = " "
         if hasattr(self, "ci"):
             d["ci"] = self.ci
-
+        if hasattr(self, "true"):
+            d["true"] = self.true
+        
         return d
 
 
