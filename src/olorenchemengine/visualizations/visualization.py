@@ -959,7 +959,6 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
                 rep,
                 *args,
                 title=title,
-                dim_reduction="tsne",
                 opacity=self.opacity,
                 log=False,
                 **kwargs,
@@ -972,7 +971,6 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
                 rep,
                 *args,
                 title=title,
-                dim_reduction="tsne",
                 opacity=self.opacity,
                 log=False,
                 **kwargs,
@@ -983,12 +981,12 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
 
         if self.model is None:
             d["color"] = [
-                "red" if x == "train" else "blue"
+                "red" if x == "train" else "blue" if x == "test" else "green"
                 for x in self.dataset.entire_dataset_split
             ]
         else:
             d["outline"] = [
-                "red" if x == "train" else "blue"
+                "red" if x == "train" else "blue" if x == "test" else "green"
                 for x in self.dataset.entire_dataset_split
             ]
 
