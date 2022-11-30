@@ -935,6 +935,7 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         model: BaseModel = None,
         res_lim: float = None,
         opacity: float = 0.4,
+        title=None,
         *args,
         **kwargs,
     ):
@@ -951,22 +952,26 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
 
         # Either visualize residual magnitudes or not
         if model is None:
+            if title is None:
+                title = "Dataset Visualization<br><sub>Red outline is train; Blue outline is test</sub>"
             super().__init__(
                 dataset,
                 rep,
                 *args,
-                title="Dataset Visualization<br><sub>Red outline is train; Blue outline is test</sub>",
+                title=title,
                 dim_reduction="tsne",
                 opacity=self.opacity,
                 log=False,
                 **kwargs,
             )
         else:
+            if title is None:
+                title ="Model Residual Visualization<br><sub>Red outline is train; Blue outline is test; Marker size is residual magnitude</sub>"
             super().__init__(
                 dataset,
                 rep,
                 *args,
-                title="Model Residual Visualization<br><sub>Red outline is train; Blue outline is test; Marker size is residual magnitude</sub>",
+                title=title,
                 dim_reduction="tsne",
                 opacity=self.opacity,
                 log=False,
