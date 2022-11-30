@@ -563,6 +563,7 @@ class CompoundScatterPlot(BaseVisualization):
         opacity: float = 1,
         width: int = 800,
         height: int = 600,
+        jitter: float = 0.0,
         log: bool = True,
         **kwargs,
     ):
@@ -619,12 +620,18 @@ class CompoundScatterPlot(BaseVisualization):
         self.height = height
         self.opacity = opacity
         self.title = title
+        self.jitter = jitter
 
         # Create DataFrame
         self.df = self.df.dropna(subset=["X", "Y"])
         cols = ["SMILES", "X", "Y"]
         if "color" in self.df.columns:
             cols += ["color"]
+        if self.jitter > 0:
+            self.df["X"] = self.df["X"] + np.random.uniform(-self.jitter*(self.df["X"].max()-self.df["X"].min()), 
+                self.jitter*(self.df["X"].max()-self.df["X"].min()), size=self.df.shape[0])
+            self.df["Y"] = self.df["Y"] + np.random.uniform(-self.jitter*(self.df["Y"].max()-self.df["Y"].min()),
+                self.jitter*(self.df["Y"].max()-self.df["Y"].min()), size=self.df.shape[0])
         self.df = self.df[cols]
 
         super().__init__(log=False, **kwargs)
@@ -936,14 +943,16 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         res_lim: float = None,
         opacity: float = 0.4,
         title=None,
+        colors=["red", "green", "blue"],
         *args,
         **kwargs,
     ):
         # Set visualization instance variables
-        self.dataset = dataset
+        self.dataset = dataset.copy()
         self.model = model
         self.res_lim = res_lim
         self.opacity = opacity
+        self.colors = colors
         if not type(dataset) is BaseDataset:
             raise TypeError(
                 "dataset must be a BaseDataset. Consider using df.to_csv() in the"
@@ -981,12 +990,12 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
 
         if self.model is None:
             d["color"] = [
-                "red" if x == "train" else "blue" if x == "test" else "green"
+                self.colors[0] if x == "train" else self.colors[2] if x == "test" else self.colors[1]
                 for x in self.dataset.entire_dataset_split
             ]
         else:
             d["outline"] = [
-                "red" if x == "train" else "blue" if x == "test" else "green"
+                self.colors[0] if x == "train" else self.colors[2] if x == "test" else self.colors[1]
                 for x in self.dataset.entire_dataset_split
             ]
 
