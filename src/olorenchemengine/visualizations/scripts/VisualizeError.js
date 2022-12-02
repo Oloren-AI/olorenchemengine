@@ -91,9 +91,24 @@ var my_shapes = [
 ]
 
 if ("true" in data) {
-    my_shapes.push({
+    plot_data.push({
         name: "True Value",
         showlegend: true,
+        visible: "legendonly",
+        type: 'line',
+        xref: 'x',
+        yref: 'paper',
+        shape: "",
+        x: [data.true,data.true],
+        y0: " ",
+        line: {
+            color: '#D1AF94',
+            width: 3,
+            dash: "dash"
+        }
+    })
+
+    my_shapes.push({
         type: 'line',
         xref: 'x',
         yref: 'paper',
