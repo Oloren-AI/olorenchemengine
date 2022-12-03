@@ -7,7 +7,7 @@ from tdc.benchmark_group import admet_group
 
 def model_from_dict(s):
     """
-        Given a model dictionar, it returns a model for use.
+        Given a model dictionary, it returns a model for use.
     """
     s = s.replace("'", "\"").replace("True", "true").replace("False", "false").replace("None", "null")
     model = oce.create_BC(s)
@@ -15,7 +15,7 @@ def model_from_dict(s):
 
 def train_bbb_baselines():
     """ 
-        Returns tuple of 4 trained BBB models on TDC data.
+        Returns dictionary of trained BBB models on TDC data.
     """
     TASK_NAME = 'bbb_martins'
     models = {
