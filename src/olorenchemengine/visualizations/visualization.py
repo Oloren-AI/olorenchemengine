@@ -283,7 +283,7 @@ class VisualizeError(BaseVisualization):
         self,
         dataset: Union[BaseDataset, list, pd.Series, np.ndarray],
         value: Union[int, float, np.ndarray],
-        error: Union[int, float, np.ndarray],
+        error: Union[tuple, list, np.ndarray],
         ci=None,
         box=False,
         points=True,
@@ -294,7 +294,7 @@ class VisualizeError(BaseVisualization):
         height=600,
         **kwargs,
     ):
-        assert error >= 0, "error must be nonnegative"
+        assert error[1] >= error[0], "Error tuple must be increasing."
 
         if box:
             self.box = box
@@ -314,10 +314,8 @@ class VisualizeError(BaseVisualization):
             assert len(value) == 1, "value length must be 1"
             value = value[0]
         self.value = value
-        if isinstance(error, np.ndarray):
-            assert len(error) == 1, "error length must be 1"
-            error = error[0]
-        self.error = error
+        self.lower_error = error[0]
+        self.upper_error = error[1]
 
         if xaxis_title is None:
             if hasattr(dataset, "property_col"):
@@ -343,7 +341,8 @@ class VisualizeError(BaseVisualization):
         d = {
             "reference": self.reference,
             "value": self.value,
-            "error": self.error,
+            "lower_error": self.lower_error,
+            "upper_error": self.upper_error,
             "title": self.title,
             "xaxis_title": self.xaxis_title,
             "yaxis_title": self.yaxis_title,
