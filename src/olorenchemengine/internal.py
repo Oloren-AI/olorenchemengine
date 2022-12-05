@@ -707,13 +707,13 @@ class RemoteObj(BaseRemoteSymbol):
         self.REMOTE_ID = remote_id
 
 
-def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
+def parameterize(object: Union[BaseClass, list, dict, int, float, str, None]) -> dict:
     """parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
 
     Note that only objects which are instances of subclasses of BaseClass can be parameterized, other supported objects are to enable to recursive use of parameterize but cannot themselves be parameterized.
 
     Args:
-        object (Union[BaseClass, list, int, float, str, None]): parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
+        object (Union[BaseClass, list, dict, int, float, str, None]): parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
 
     Raises:
         ValueError: Object is not of type that can be parameterized
@@ -740,6 +740,8 @@ def parameterize(object: Union[BaseClass, list, int, float, str, None]) -> dict:
         return object
     elif issubclass(type(object), list):
         return [parameterize(x) for x in object]
+    elif issubclass(type(object), dict):
+        return {k: parameterize(v) for k, v in object.items()}
     else:
         raise ValueError(f"Invalid object {object}")
 
@@ -845,6 +847,14 @@ def create_BC(d: dict) -> BaseClass:
                         else x
                         for x in arg
                     ]
+                elif isinstance(arg, dict):
+                    arg = {
+                        k: create_BC(v)
+                        if isinstance(v, dict)
+                        and ("BC_class_name" in v.keys() or "REMOTE_ID" in v.keys())
+                        else v
+                        for k, v in arg.items()
+                    }
                 args.append(arg)
 
     kwargs = {}
@@ -996,6 +1006,20 @@ def json_params_str(base: Union[BaseClass, dict]) -> str:
         .replace("None", "null")
     )
 
+def package_available(package_name: str) -> bool:
+    """Checks if a package is available.
+
+    Args:
+        package_name (str): the name of the package to check for
+
+    Returns:
+        bool: True if the package is available, False otherwise
+    """
+    try:
+        __import__(package_name)
+        return True
+    except ImportError:
+        return False
 
 def install_with_permission(package_name: str):
     inp = input(
@@ -1008,7 +1032,6 @@ def install_with_permission(package_name: str):
             f"Stopping program. You can install the package manually with: \n >> pip install {package_name}"
         )
         os._exit(1)
-
 
 def import_or_install(package_name: str, statement: str = None, scope: dict = None):
     if scope is None:

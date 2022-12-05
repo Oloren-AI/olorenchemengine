@@ -626,9 +626,9 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
 
     Example
     ------------------------------
-    import olorenautoml as oam
-    combo_rep = oam.MorganVecRepresentation(radius=2, nbits=2048) + oam.Mol2Vec()
-    model = oam.RandomForestModel(representation = combo_rep, n_estimators = 1000)
+    import olorenchemengine as oce
+    combo_rep = oce.MorganVecRepresentation(radius=2, nbits=2048) + oce.Mol2Vec()
+    model = oce.RandomForestModel(representation = combo_rep, n_estimators = 1000)
 
     model.fit(train['Drug'], train['Y'])
     model.predict(test['Drug'])
@@ -678,8 +678,8 @@ class NoisyVec(BaseVecRepresentation):
 
     Example
     ------------------------------
-    import olorenautoml as oam
-    model = oam.RandomForestModel(representation = oam.'''BaseCompoundVecRepresentation(Params)''', n_estimators=1000)
+    import olorenchemengine as oce
+    model = oce.RandomForestModel(representation = oce.'''BaseCompoundVecRepresentation(Params)''', n_estimators=1000)
 
     model.fit(train['Drug'], train['Y'])
     model.predict(test['Drug'])
@@ -839,7 +839,11 @@ class DescriptastorusDescriptor(BaseCompoundVecRepresentation):
 
     def _convert(self, smiles, y=None):
         results = self.generator.process(smiles)
-        processed, features = results[0], np.nan_to_num(results[1:], nan=0)
+
+        try: 
+            processed, features = results[0], np.nan_to_num(results[1:], nan=0)
+        except Exception as e:
+            raise ValueError("%s can not be converted" % smiles)
 
         if processed is None:
             print("ERROR: %s" % smiles)
@@ -1143,10 +1147,10 @@ from rdkit.Chem import AllChem
 
 class MorganVecRepresentation(BaseCompoundVecRepresentation):
     @log_arguments
-    def __init__(self, radius=2, nbits=1024, log=True, **kwargs):
+    def __init__(self, radius=2, nbits=1024, scale =None, log=True, **kwargs):
         self.radius = radius
         self.nbits = nbits
-        super().__init__(log=False, **kwargs)
+        super().__init__(scale=None, log=False, **kwargs)
 
     def _convert(self, smiles):
         m = Chem.MolFromSmiles(smiles)

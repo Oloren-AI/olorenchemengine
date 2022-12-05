@@ -59,6 +59,7 @@ class BaseVisualization(BaseClass):
         "d3": "https://d3js.org/d3.v4.js",
         "plotly": "https://cdn.plot.ly/plotly-2.14.0.min.js",
         "olorenrenderer": "https://unpkg.com/olorenrenderer@1.0.0-c/dist/oloren-renderer.min.js",
+        "smilesdrawer": "https://unpkg.com/smiles-drawer@1.0.10/dist/smiles-drawer.min.js",
         "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
     }
 
@@ -121,6 +122,8 @@ class BaseVisualization(BaseClass):
         <!DOCTYPE html>
         <head>
         <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         </head>
 
         <html style="height: 100%;">
@@ -629,7 +632,7 @@ class CompoundScatterPlot(BaseVisualization):
         super().__init__(log=False, **kwargs)
 
         # Add packages to import for JavaScript
-        self.packages += ["plotly", "olorenrenderer"]
+        self.packages += ["plotly", "smilesdrawer"]
 
     @property
     def JS_NAME(self) -> str:
@@ -1078,7 +1081,7 @@ class MorganContributions(BaseVisualization):
         self.original_prediction, self.predictions = self._make_predictions(self.smiles)
         self.args = args
         self.kwargs = kwargs
-        self.packages = ["plotly", "rdkit", "olorenrenderer"]
+        self.packages = ["plotly", "rdkit", "smilesdrawer"]
 
     def _train_model(self):
         """Train random forest model based on the morgan vec representation"""
