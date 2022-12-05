@@ -872,7 +872,9 @@ class BaseModel(BaseClass):
         if "error_model" in d.keys():
             error_model = loads(d["error_model"])
             error_model.model = self
+            print("Rebuilding error model...")
             error_model._build()
+            print("Refitting error model...")
             error_model._fit(error_model.residuals, error_model.scores)
             self.error_model = error_model
         if "normalization" in d.keys():
@@ -1099,7 +1101,24 @@ class BaseSKLearnReduction(BaseReduction):
     def transform(self, X):
         return self.obj.transform(X)
 
-    
+# List of regression functions for fitting error models.
+regression_functions = {
+    "logistic":     lambda x, a, b, c, d, e: (a - b) / (1 + np.exp(-c * (x - d))) ** e + b,
+    "exponential":  lambda x, a, b, c: a * np.exp(b * x) + c,
+    "logarithmic":  lambda x, a, b, c: a * np.log(b * x + c),
+    "power":        lambda x, a, b, c: a * x ** b + c,
+    "linear":       lambda x, a, b: a * x + b,
+}
+
+# List of regression function initializations.
+regression_init = {
+    "logistic":     lambda X, y: [np.max(y), np.min(y), 1, (np.max(X) + np.min(X)) / 2, 1],
+    "exponential":  lambda X, y: [1, 1, np.min(y)],
+    "logarithmic":  lambda X, y: [1, 1, 1],
+    "power":        lambda X, y: [1, 1, np.min(y)],
+    "linear":       lambda X, y: [1, 1],
+}
+
 class BaseErrorModel(BaseClass):
     """Base class for error models.
 
@@ -1111,6 +1130,8 @@ class BaseErrorModel(BaseClass):
             quantile binning, or rolling quantile
         bins (int): number of bins for binned quantiles
         window (int): window size for rolling quantiles
+        regression (str): function used for regression. If `auto`, the function is 
+            chosen automatically to minimize the mse.
 
     Methods:
         build: builds the error model from a trained BaseModel and dataset
@@ -1128,13 +1149,17 @@ class BaseErrorModel(BaseClass):
         method: str = "qbin",
         window: int = 50,
         bins: int = 20,
+        regression: str = "auto",
         log=True, 
         **kwargs):
-        
+
+        assert regression == "auto" or regression in regression_functions, "Regression function `{}` is invalid. Please choose one of `{}`, or `auto`.".format(regression, "`, `".join(regression_functions.keys()))
+
         self.ci = ci
         self.method = method
         self.window = window
         self.bins = bins
+        self.regression = regression
         
     def build(
         self,
@@ -1164,8 +1189,7 @@ class BaseErrorModel(BaseClass):
     def fit(
         self,
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
-        y: Union[np.ndarray, list, pd.Series],
-        **kwargs,
+        y: Union[np.ndarray, list, pd.Series]
     ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to an external dataset
 
@@ -1177,15 +1201,14 @@ class BaseErrorModel(BaseClass):
             plotly figure of fitted model against validation dataset
         """ 
         y_pred = np.array(self.model.predict(X)).flatten()
-        residuals = np.abs(np.array(y) - y_pred)
+        residuals = np.array(y) - y_pred
         scores = self.calculate(X, y_pred)
 
-        return self._fit(residuals, scores, **kwargs)
+        return self._fit(residuals, scores)
 
     def fit_cv(
         self,
-        n_splits: int = 5,
-        **kwargs
+        n_splits: int = 5
     ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to the training dataset via cross validation.
 
@@ -1228,12 +1251,12 @@ class BaseErrorModel(BaseClass):
             else:
                 scores = np.concatenate((scores, scores_fold))
 
-        return self._fit(residuals, scores, **kwargs)
+        return self._fit(residuals, scores)
 
     def _fit(
         self,
         residuals: np.ndarray,
-        scores: np.ndarray,
+        scores: np.ndarray
     ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to residuals.
 
@@ -1267,7 +1290,7 @@ class BaseErrorModel(BaseClass):
             X = pd.Series(scores).rolling(window).mean()[window-1:]
             y = pd.Series(residuals).rolling(window).quantile(self.ci)[window-1:]
         else:
-            raise NameError("Method {} is not recognized. Valid inputs are 'bin', 'qbin', and 'roll'.".format(self.method))
+            raise NameError("Method {} is not recognized. Valid inputs are \"bin\", \"qbin\", and \"roll\".".format(self.method))
         
         X = np.array(X)
         y = np.array(y)
@@ -1276,44 +1299,48 @@ class BaseErrorModel(BaseClass):
             self.reg = np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan)
             return None
 
+        from scipy.optimize import curve_fit
+        
+        if self.regression == "auto":
+            min_mse = None
+            for reg in regression_functions:
+                func = regression_functions[reg]
+                init = regression_init[reg](X, y)
+                try:
+                    params = curve_fit(func, X, y, p0=init, maxfev = 500 * len(init))[0]
+                    y_pred = func(X, *params)
+                    mse = mean_squared_error(y, y_pred)
+                except (RuntimeError, TypeError, ValueError):
+                    continue
+                if min_mse is None or mse < min_mse:
+                    opt_func = func
+                    opt_params = params
+                    min_mse = mse
+            assert min_mse is not None, "Curve fit failed to find a suitable regression model."
+        else:
+            opt_func = regression_functions[self.regression]
+            init = regression_init[self.regression](X, y)
+            try:
+                opt_params = curve_fit(opt_func, X, y, p0=init, maxfev = 500 * len(init))[0]
+            except (RuntimeError, TypeError, ValueError):
+                raise RuntimeError("Curve fit failed to fit regression model.")
+        
+        max_ci = np.max(y)
+        min_ci = np.min(y)
+        self.reg = lambda X: np.maximum(np.minimum(opt_func(X, *opt_params), max_ci), min_ci)
+        
         import plotly.express as px
         import plotly.graph_objects as go
-        from scipy.optimize import curve_fit
 
-        funcs = [
-            lambda x, a, b, c: a * np.exp(b * x) + c,
-            lambda x, a, b, c: (a * x + b) / (1 + c * x),
-            lambda x, a, b, c: a * np.log(b * x + c),
-            lambda x, a, b, c: a * x ** b + c,
-            lambda x, a, b: a * x + b
-        ]
-        
-        min_mse = None
-        for func in funcs:
-            try:
-                popt = curve_fit(func, X, y)[0]
-            except (RuntimeError, TypeError):
-                continue
-            y_pred = func(X, *popt)
-            try:
-                mse = mean_squared_error(y, y_pred)
-            except ValueError:
-                continue
-            if min_mse is None or mse < min_mse:
-                opt_func = func
-                opt_popt = popt
-                min_mse = mse
-        
-        self.reg = np.vectorize(lambda x: max(min(opt_func(x, *opt_popt), max(residuals)), min(residuals)))
-        
         t = np.linspace(min(scores), max(scores), 100)
-        fig1 = px.scatter(x = X, y = y, color = ["#636EFA"] * len(y), color_discrete_map="identity", size=[1] * len(y))
-        fig2 = px.line(x=t, y=self.reg(t), color = ["#EF553B"] * len(t), color_discrete_map="identity")
-        fig3 = px.scatter(x = scores, y = residuals, color = ["#00CC96"] * len(residuals), color_discrete_map="identity", opacity=0.2)
-        fig1.update_traces(hovertemplate=None, hoverinfo='x+y')
-        fig2.update_traces(hovertemplate=None, hoverinfo='x+y')
-        fig3.update_traces(hovertemplate=None, hoverinfo='skip')
-        fig = go.Figure(data=fig1.data + fig2.data + fig3.data)
+        fig1 = px.scatter(x = X, y = y)
+        fig2 = px.line(x=t, y=self.reg(t))
+        fig3 = px.scatter(x = scores, y = residuals)
+        fig1.update_traces(hovertemplate=None, hoverinfo="x+y", marker=dict(color="#0072B2", size=7))
+        fig2.update_traces(hovertemplate=None, hoverinfo="x+y", line=dict(color="#D55E00"))
+        fig3.update_traces(hovertemplate=None, hoverinfo="skip", marker=dict(color="#009E73", size=2))
+        fig = go.Figure(data=fig3.data + fig2.data + fig1.data)
+
         return fig
 
     @abstractmethod
@@ -1386,9 +1413,11 @@ class BaseErrorModel(BaseClass):
             self.y_train = d["y_train"]
             self.y_pred_train = d["y_pred_train"]
             if hasattr(self, "model"):
+                print("Rebuilding error model...")
                 self._build()
         if "residuals" in d.keys():
             self.residuals = d["residuals"]
             self.scores = d["scores"]
             if hasattr(self, "model"):
+                print("Refitting error model...")
                 self._fit(self.residuals, self.scores)

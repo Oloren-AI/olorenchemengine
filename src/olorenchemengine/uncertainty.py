@@ -1,4 +1,4 @@
-""" Techniques for quantifying uncertainty and estimating confidence intervals for all oce models.
+"""Techniques for quantifying uncertainty and estimating confidence intervals for all oce models.
 """
 
 import numpy as np
@@ -14,115 +14,17 @@ from .dataset import *
 from .representations import *
 from .reduction import *
 
-class BaseEnsembleModel(BaseErrorModel):
-    """ BaseEnsembleModel is the base class for error models that estimate
-        uncertainty based on the variance of an ensemble of models.
-    """
-
-    @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 16, log=True, **kwargs):      
-        self.ensemble_model = ensemble_model
-        self.n_ensembles = n_ensembles
-        super().__init__(log=False, **kwargs)
-
-    def _build(self, **kwargs):
-        if self.ensemble_model is None:
-            self.ensemble_model = self.model.copy()
-        self.ensembles = []
-    
-    def calculate(self, X, y_pred):
-        predictions = np.stack([model.predict(X) for model in tqdm(self.ensembles)])
-        return np.var(predictions, axis=0)
-
-    def _save(self) -> dict:
-        d = super()._save()
-        if hasattr(self, "ensembles"):
-            d.update({"ensembles": [saves(model) for model in self.ensembles]})
-        return d
-
-    def _load(self, d) -> None:
-        super()._load(d)
-        if "ensembles" in d.keys():
-            self.ensembles = [loads(model) for model in d["ensembles"]]
-    
-class BootstrapEnsemble(BaseEnsembleModel):
-    """ BootstrapEnsemble estimates uncertainty based on the variance of several
-        models trained on bootstrapped samples of the training data.
-
-        Parameters:
-            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
-            n_ensembles (int): Number of ensembles
-            bootstrap_size (float): Proportion of training data to train each ensemble model
-    
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.BootstrapEnsemble(n_ensembles = 10))
-    model.predict(test["Drug"], return_ci = True)
-    ------------------------------
-    """
-    
-    @log_arguments
-    def __init__(self, ensemble_model = None, n_ensembles = 12, bootstrap_size = 0.25, log=True, **kwargs):
-        self.bootstrap_size = bootstrap_size
-        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles, log=False, **kwargs)
-
-    def _build(self, **kwargs):
-        super()._build()
-
-        from sklearn.model_selection import train_test_split
-        
-        for _ in tqdm(range(self.n_ensembles)):
-            X_train, X_test, y_train, y_test = train_test_split(
-                self.X_train, self.y_train, train_size=self.bootstrap_size
-            )
-            ensemble_model = self.ensemble_model.copy()
-            ensemble_model.fit(X_train, y_train)
-            self.ensembles.append(ensemble_model)
-
-class RandomForestEnsemble(BaseEnsembleModel):
-    """ RandomForestEnsemble estimates uncertainty based on the variance of several
-        random forest models initialized to different random states.
-
-        Parameters:
-            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
-            n_ensembles (int): Number of ensembles
-    
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestEnsemble(n_ensembles = 10))
-    model.predict(test["Drug"], return_ci = True)
-    ------------------------------
-    """
-
-    @log_arguments
-    def __init__(self, log=True, **kwargs):      
-        super().__init__(log=False, **kwargs)
-    
-    def _build(self, **kwargs):
-        super()._build()
-
-        for n in tqdm(range(self.n_ensembles)):
-            ensemble_model = RandomForestModel(
-                oce.MorganVecRepresentation(radius=2, nbits=2048), 
-                random_state=n, 
-                **kwargs
-            )
-            ensemble_model.fit(self.X_train, self.y_train)
-            self.ensembles.append(ensemble_model)
 
 class BaseFingerprintModel(BaseErrorModel):
-    """ BaseFingerprintModel is the base class for error models that require the
-        computation of Morgan Fingerprints.
+    """Morgan fingerprint-based error models.
+    
+    BaseFingerprintModel is the base class for error models that require the
+    computation of Morgan fingerprints.
     """
 
     @log_arguments
-    def __init__(self, log=True, **kwargs):      
+    def __init__(self, radius=2, log=True, **kwargs):
+        self.radius = radius      
         super().__init__(log=False, **kwargs)
 
     def _build(self, **kwargs):
@@ -132,7 +34,7 @@ class BaseFingerprintModel(BaseErrorModel):
 
     def get_fps(self, smiles: List[str]) -> List:
         smiles = np.array(SMILESRepresentation().convert(smiles))
-        get_fp = lambda smiles: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smiles), 2)
+        get_fp = lambda smi: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smi), self.radius)
         return list(np.vectorize(get_fp)(smiles))
 
     def _save(self) -> dict:
@@ -145,6 +47,77 @@ class BaseFingerprintModel(BaseErrorModel):
         super()._load(d)
         if "train_fps" in d.keys():
             self.train_fps = d["train_fps"]
+
+# List of kernels for kernel error models
+KERNELS = {
+    "sdc":          lambda X, h: np.exp(-h * X / (1 - X)),
+    "uniform":      lambda X, h: h * X < 1,
+    "linear":       lambda X, h: np.maximum(0, 1 - h * X),
+    "parabolic":    lambda X, h: np.maximum(0, 1 - (h * X) ** 2),
+    "power":        lambda X, h: (1 - X) ** h,
+    "gaussian":     lambda X, h: np.exp(-(h * X) ** 2),
+}
+
+# List of predictors for kernel error models
+PREDICTORS = {
+    "property": lambda y, em: em.y_train - y,
+    "error":    lambda y, em: em.y_train - em.y_pred_train,
+}
+
+class KernelError(BaseFingerprintModel):
+    """Kernel error model. 
+    
+    KernelError uses a kernel-weighted average of prediction errors as the
+    covariate for estimating confidence intervals. It is inspired by the 
+    Nadaraya-Watson estimator, which generates a regression using a
+    kernel-weighted average. The distance function used is 1 - Tanimoto
+    Similarity.
+
+    This is the recommended error model for general purposes and models.
+
+    Parameters
+    ------------------------------
+    predictor (str, {"property", "error"}): Error predictor being estimated
+    kernel (str, {"default"}): Kernel used as a weight-function
+    h (int, float): Bandwidth
+
+    Example
+    ------------------------------
+    import olorenchemengine as oce
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.KernelError())
+    model.predict(test["Drug"], return_ci = True)
+    """
+
+    @log_arguments
+    def __init__(self, predictor="property", kernel="sdc", h=3, **kwargs):
+        assert predictor in PREDICTORS, "Predictor `{}` is invalid. Please choose one of `{}`.".format(predictor, "`, `".join(KERNELS.keys()))
+        assert kernel in KERNELS, "Kernel `{}` is invalid. Please choose one of `{}`.".format(kernel, "`, `".join(KERNELS.keys()))
+
+        self.predictor = predictor
+        self.kernel = kernel
+        self.h = h
+        super().__init__(**kwargs)
+
+    def calculate(self, X, y_pred):
+        K = KERNELS[self.kernel]
+        P = PREDICTORS[self.predictor]
+
+        def covariate(smiles, y):
+            mol = Chem.MolFromSmiles(smiles)
+            fp = AllChem.GetMorganFingerprint(mol, 2)
+            TD = 1 - np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            w = K(TD, self.h)
+            p = P(y, self)
+
+            norm = np.sum(w)
+            if norm == 0:
+                return np.mean(p)
+            else:
+                return np.dot(w, p) / norm
+
+        X = np.array(X).flatten()
+        return np.array([covariate(smiles, y) for smiles, y in tqdm(zip(X, y_pred))])
 
 
 class SDC(BaseFingerprintModel):
@@ -313,12 +286,12 @@ class TargetDistKNN(KNNSimilarity):
         def dist(smi, pred):
             mol = Chem.MolFromSmiles(smi)
             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            similarity = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
+            TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
             error = np.abs(self.y_train - pred)
-            idxs = np.argpartition(similarity, self.k)[-self.k:]
-            if np.sum(similarity[idxs]) == 0:
+            idxs = np.argpartition(TS, self.k)[-self.k:]
+            if np.sum(TS[idxs]) == 0:
                 return np.sqrt(np.mean(error[idxs]))
-            return np.sqrt(np.dot(similarity[idxs], error[idxs]) / np.sum(similarity[idxs]))
+            return np.sqrt(np.dot(TS[idxs], error[idxs]) / np.sum(TS[idxs]))
 
         X = np.array(X).flatten()
         return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
@@ -409,6 +382,108 @@ class Naive(BaseErrorModel):
         X: Union[pd.DataFrame, np.ndarray, list, pd.Series],
     ):
         return self.reg(X)
+
+class BaseEnsembleModel(BaseErrorModel):
+    """ BaseEnsembleModel is the base class for error models that estimate
+        uncertainty based on the variance of an ensemble of models.
+    """
+
+    @log_arguments
+    def __init__(self, ensemble_model = None, n_ensembles = 16, log=True, **kwargs):      
+        self.ensemble_model = ensemble_model
+        self.n_ensembles = n_ensembles
+        super().__init__(log=False, **kwargs)
+
+    def _build(self, **kwargs):
+        if self.ensemble_model is None:
+            self.ensemble_model = self.model.copy()
+        self.ensembles = []
+    
+    def calculate(self, X, y_pred):
+        predictions = np.stack([model.predict(X) for model in tqdm(self.ensembles)])
+        return np.var(predictions, axis=0)
+
+    def _save(self) -> dict:
+        d = super()._save()
+        if hasattr(self, "ensembles"):
+            d.update({"ensembles": [saves(model) for model in self.ensembles]})
+        return d
+
+    def _load(self, d) -> None:
+        super()._load(d)
+        if "ensembles" in d.keys():
+            self.ensembles = [loads(model) for model in d["ensembles"]]
+    
+class BootstrapEnsemble(BaseEnsembleModel):
+    """ BootstrapEnsemble estimates uncertainty based on the variance of several
+        models trained on bootstrapped samples of the training data.
+
+        Parameters:
+            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
+            n_ensembles (int): Number of ensembles
+            bootstrap_size (float): Proportion of training data to train each ensemble model
+    
+    Example
+    ------------------------------
+    import olorenchemengine as oce
+
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.BootstrapEnsemble(n_ensembles = 10))
+    model.predict(test["Drug"], return_ci = True)
+    ------------------------------
+    """
+    
+    @log_arguments
+    def __init__(self, ensemble_model = None, n_ensembles = 12, bootstrap_size = 0.25, log=True, **kwargs):
+        self.bootstrap_size = bootstrap_size
+        super().__init__(ensemble_model = ensemble_model, n_ensembles = n_ensembles, log=False, **kwargs)
+
+    def _build(self, **kwargs):
+        super()._build()
+
+        from sklearn.model_selection import train_test_split
+        
+        for _ in tqdm(range(self.n_ensembles)):
+            X_train, X_test, y_train, y_test = train_test_split(
+                self.X_train, self.y_train, train_size=self.bootstrap_size
+            )
+            ensemble_model = self.ensemble_model.copy()
+            ensemble_model.fit(X_train, y_train)
+            self.ensembles.append(ensemble_model)
+
+class RandomForestEnsemble(BaseEnsembleModel):
+    """ RandomForestEnsemble estimates uncertainty based on the variance of several
+        random forest models initialized to different random states.
+
+        Parameters:
+            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
+            n_ensembles (int): Number of ensembles
+    
+    Example
+    ------------------------------
+    import olorenchemengine as oce
+
+    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+    model.fit_cv(train["Drug"], train["Y"], error_model = oce.RandomForestEnsemble(n_ensembles = 10))
+    model.predict(test["Drug"], return_ci = True)
+    ------------------------------
+    """
+
+    @log_arguments
+    def __init__(self, log=True, **kwargs):      
+        super().__init__(log=False, **kwargs)
+    
+    def _build(self, **kwargs):
+        super()._build()
+
+        for n in tqdm(range(self.n_ensembles)):
+            ensemble_model = RandomForestModel(
+                oce.MorganVecRepresentation(radius=2, nbits=2048), 
+                random_state=n, 
+                **kwargs
+            )
+            ensemble_model.fit(self.X_train, self.y_train)
+            self.ensembles.append(ensemble_model)
 
 class ADAN(BaseErrorModel):
     """ ADAN is an error model that predicts error bars based on one or
