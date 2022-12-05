@@ -1270,8 +1270,9 @@ class BaseErrorModel(BaseClass):
         self.residuals = residuals
         self.scores = scores
 
-        self.upper_reg, X_upper, y_upper = self._fit_regression(0.5 + self.ci / 2)
-        self.lower_reg, X_lower, y_lower = self._fit_regression(0.5 - self.ci / 2)
+        self._upper_reg, X_upper, y_upper = self._fit_regression(0.5 + self.ci / 2)
+        self._lower_reg, X_lower, y_lower = self._fit_regression(0.5 - self.ci / 2)
+        self.reg = lambda X: list(zip(self._lower_reg(X), self._upper_reg(X)))
         
         import plotly.express as px
         import plotly.graph_objects as go
@@ -1280,8 +1281,8 @@ class BaseErrorModel(BaseClass):
 
         upper_points = px.scatter(x = X_upper, y = y_upper)
         lower_points = px.scatter(x = X_lower, y = y_lower)
-        upper_line = px.line(x=t, y=self.upper_reg(t))
-        lower_line = px.line(x=t, y=self.lower_reg(t))
+        upper_line = px.line(x=t, y=self._upper_reg(t))
+        lower_line = px.line(x=t, y=self._lower_reg(t))
         all_points = px.scatter(x = scores, y = residuals)
 
         upper_points.update_traces(hovertemplate=None, hoverinfo="x+y", marker=dict(color="#0072B2", size=7))
@@ -1328,7 +1329,7 @@ class BaseErrorModel(BaseClass):
 
         if len(X) == 1:
             print("WARNING: Only one unique score computed. Please decrease bin/window size or use a larger dataset.")
-            return np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan)
+            return np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan), X, y
 
         from scipy.optimize import curve_fit
         
@@ -1356,8 +1357,8 @@ class BaseErrorModel(BaseClass):
             except (RuntimeError, TypeError, ValueError):
                 raise RuntimeError("Curve fit failed to fit regression model.")
         
-        #lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
-        return lambda x: opt_func(x, *opt_params), X, y
+        reg = lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
+        return reg, X, y
 
     @abstractmethod
     def calculate(
@@ -1388,12 +1389,12 @@ class BaseErrorModel(BaseClass):
         Returns:
             a list of confidence intervals as tuples for each input
         """
-        assert hasattr(self, "lower_reg") and hasattr(self, "upper_reg"), "Error model not fitted yet."
+        assert hasattr(self, "reg"), "Error model not fitted yet."
 
         y_pred = np.array(self.model.predict(X)).flatten()
         scores = self.calculate(X, y_pred)
 
-        return list(zip(self.lower_reg(scores), self.upper_reg(scores)))
+        return self.reg(scores)
 
     def copy(self) -> BaseErrorModel:
         """returns a copy of itself

@@ -90,14 +90,14 @@ class KernelError(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, predictor="property", kernel="sdc", h=3, **kwargs):
+    def __init__(self, predictor="property", kernel="sdc", h=3, log=True, **kwargs):
         assert predictor in PREDICTORS, "Predictor `{}` is invalid. Please choose one of `{}`.".format(predictor, "`, `".join(KERNELS.keys()))
         assert kernel in KERNELS, "Kernel `{}` is invalid. Please choose one of `{}`.".format(kernel, "`, `".join(KERNELS.keys()))
 
         self.predictor = predictor
         self.kernel = kernel
         self.h = h
-        super().__init__(**kwargs)
+        super().__init__(log=False, **kwargs)
 
     def calculate(self, X, y_pred):
         K = KERNELS[self.kernel]
