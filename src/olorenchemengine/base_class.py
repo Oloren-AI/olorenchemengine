@@ -607,7 +607,7 @@ class BaseModel(BaseClass):
                         VisualizeError(
                             self.error_model.y_train,
                             float(result["predicted"][i]),
-                            float(errors[i]),
+                            errors[i],
                             ci=ci,
                         )
                         for i in range(len(errors))
@@ -1130,7 +1130,7 @@ class BaseErrorModel(BaseClass):
             quantile binning, or rolling quantile
         bins (int): number of bins for binned quantiles
         window (int): window size for rolling quantiles
-        regression (str): function used for regression. If `auto`, the function is 
+        curvetype (str): function used for regression. If `auto`, the function is 
             chosen automatically to minimize the mse.
 
     Methods:
@@ -1149,17 +1149,17 @@ class BaseErrorModel(BaseClass):
         method: str = "qbin",
         window: int = 50,
         bins: int = 20,
-        regression: str = "auto",
+        curvetype: str = "auto",
         log=True, 
         **kwargs):
 
-        assert regression == "auto" or regression in regression_functions, "Regression function `{}` is invalid. Please choose one of `{}`, or `auto`.".format(regression, "`, `".join(regression_functions.keys()))
+        assert curvetype == "auto" or curvetype in regression_functions, "Regression function `{}` is invalid. Please choose one of `{}`, or `auto`.".format(curvetype, "`, `".join(regression_functions.keys()))
 
         self.ci = ci
         self.method = method
         self.window = window
         self.bins = bins
-        self.regression = regression
+        self.curvetype = curvetype
         
     def build(
         self,
@@ -1263,7 +1263,6 @@ class BaseErrorModel(BaseClass):
         Args:
             residuals (1-dimensional np.ndarray): array of residuals
             scores (1-dimensional np.ndarray): array of confidence scores
-            quantile (float): confidence interval quantile to capture during fitting
 
         Returns:
             plotly figure of fitted model against validation dataset
@@ -1271,37 +1270,69 @@ class BaseErrorModel(BaseClass):
         self.residuals = residuals
         self.scores = scores
 
+        self.upper_reg, X_upper, y_upper = self._fit_regression(0.5 + self.ci / 2)
+        self.lower_reg, X_lower, y_lower = self._fit_regression(0.5 - self.ci / 2)
+        
+        import plotly.express as px
+        import plotly.graph_objects as go
+
+        t = np.linspace(min(self.scores), max(self.scores), 100)
+
+        upper_points = px.scatter(x = X_upper, y = y_upper)
+        lower_points = px.scatter(x = X_lower, y = y_lower)
+        upper_line = px.line(x=t, y=self.upper_reg(t))
+        lower_line = px.line(x=t, y=self.lower_reg(t))
+        all_points = px.scatter(x = scores, y = residuals)
+
+        upper_points.update_traces(hovertemplate=None, hoverinfo="x+y", marker=dict(color="#0072B2", size=7))
+        lower_points.update_traces(hovertemplate=None, hoverinfo="x+y", marker=dict(color="#0072B2", size=7))
+        upper_line.update_traces(hovertemplate=None, hoverinfo="x+y", line=dict(color="#D55E00"))
+        lower_line.update_traces(hovertemplate=None, hoverinfo="x+y", line=dict(color="#D55E00"))
+        all_points.update_traces(hovertemplate=None, hoverinfo="skip", marker=dict(color="#009E73", size=2))
+
+        fig = go.Figure(data=all_points.data + upper_line.data + lower_line.data + upper_points.data + lower_points.data)
+
+        return fig
+
+    def _fit_regression(self, quantile):
+        """Fits a regression curve to a quantile of the fitting data.
+
+        Args:
+            quantile (float): fraction of data below the regression function
+
+        Returns:
+            X and y coordinates for regression and regression function
+        """
         if self.method == "bin":
-            bins = min(len(np.unique(scores)), self.bins)
-            bin_labels = pd.cut(scores, bins, labels=False)
+            bins = min(len(np.unique(self.scores)), self.bins)
+            bin_labels = pd.cut(self.scores, bins, labels=False)
             labels = np.unique(bin_labels)
-            X = [np.mean(scores[bin_labels == i]) for i in labels]
-            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in labels]
+            X = [np.mean(self.scores[bin_labels == i]) for i in labels]
+            y = [np.quantile(self.residuals[bin_labels == i], quantile) for i in labels]
         elif self.method == "qbin":
-            bins = min(len(np.unique(scores)), self.bins)
-            bin_labels = pd.qcut(scores, bins, labels=False, duplicates="drop")
+            bins = min(len(np.unique(self.scores)), self.bins)
+            bin_labels = pd.qcut(self.scores, bins, labels=False, duplicates="drop")
             labels = np.unique(bin_labels)
-            X = [np.mean(scores[bin_labels == i]) for i in labels]
-            y = [np.quantile(residuals[bin_labels == i], self.ci) for i in labels]
+            X = [np.mean(self.scores[bin_labels == i]) for i in labels]
+            y = [np.quantile(self.residuals[bin_labels == i], quantile) for i in labels]
         elif self.method == "roll":
-            window = min(len(scores), self.window)
-            idxs = np.argsort(scores)
-            scores, residuals = scores[idxs], residuals[idxs]
-            X = pd.Series(scores).rolling(window).mean()[window-1:]
-            y = pd.Series(residuals).rolling(window).quantile(self.ci)[window-1:]
+            window = min(len(self.scores), self.window)
+            idxs = np.argsort(self.scores)
+            X = pd.Series(self.scores[idxs]).rolling(window).mean()[window-1:]
+            y = pd.Series(self.residuals[idxs]).rolling(window).quantile(quantile)[window-1:]
         else:
             raise NameError("Method {} is not recognized. Valid inputs are \"bin\", \"qbin\", and \"roll\".".format(self.method))
         
         X = np.array(X)
         y = np.array(y)
+
         if len(X) == 1:
             print("WARNING: Only one unique score computed. Please decrease bin/window size or use a larger dataset.")
-            self.reg = np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan)
-            return None
+            return np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan)
 
         from scipy.optimize import curve_fit
         
-        if self.regression == "auto":
+        if self.curvetype == "auto":
             min_mse = None
             for reg in regression_functions:
                 func = regression_functions[reg]
@@ -1318,30 +1349,15 @@ class BaseErrorModel(BaseClass):
                     min_mse = mse
             assert min_mse is not None, "Curve fit failed to find a suitable regression model."
         else:
-            opt_func = regression_functions[self.regression]
-            init = regression_init[self.regression](X, y)
+            opt_func = regression_functions[self.curvetype]
+            init = regression_init[self.curvetype](X, y)
             try:
                 opt_params = curve_fit(opt_func, X, y, p0=init, maxfev = 500 * len(init))[0]
             except (RuntimeError, TypeError, ValueError):
                 raise RuntimeError("Curve fit failed to fit regression model.")
         
-        max_ci = np.max(y)
-        min_ci = np.min(y)
-        self.reg = lambda X: np.maximum(np.minimum(opt_func(X, *opt_params), max_ci), min_ci)
-        
-        import plotly.express as px
-        import plotly.graph_objects as go
-
-        t = np.linspace(min(scores), max(scores), 100)
-        fig1 = px.scatter(x = X, y = y)
-        fig2 = px.line(x=t, y=self.reg(t))
-        fig3 = px.scatter(x = scores, y = residuals)
-        fig1.update_traces(hovertemplate=None, hoverinfo="x+y", marker=dict(color="#0072B2", size=7))
-        fig2.update_traces(hovertemplate=None, hoverinfo="x+y", line=dict(color="#D55E00"))
-        fig3.update_traces(hovertemplate=None, hoverinfo="skip", marker=dict(color="#009E73", size=2))
-        fig = go.Figure(data=fig3.data + fig2.data + fig1.data)
-
-        return fig
+        #lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
+        return lambda x: opt_func(x, *opt_params), X, y
 
     @abstractmethod
     def calculate(
@@ -1370,14 +1386,14 @@ class BaseErrorModel(BaseClass):
             X (array-like): target dataset, list of SMILES
 
         Returns:
-            a list of confidence intervals for each input
+            a list of confidence intervals as tuples for each input
         """
-        assert hasattr(self, "reg"), "Error model not fitted yet."
+        assert hasattr(self, "lower_reg") and hasattr(self, "upper_reg"), "Error model not fitted yet."
 
         y_pred = np.array(self.model.predict(X)).flatten()
         scores = self.calculate(X, y_pred)
 
-        return self.reg(scores)
+        return list(zip(self.lower_reg(scores), self.upper_reg(scores)))
 
     def copy(self) -> BaseErrorModel:
         """returns a copy of itself

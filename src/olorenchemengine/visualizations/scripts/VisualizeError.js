@@ -42,7 +42,7 @@ var trace2 = {
     x: [data.value],
     orientation: "h",
     span: [
-        data.value - data.error, data.value + data.error
+        data.value + data.lower_error, data.value + data.upper_error
     ],
 }
 
@@ -65,9 +65,9 @@ var layout = {
             type: 'rect',
             xref: 'x',
             yref: 'paper',
-            x0: data.value - data.error,
+            x0: data.value + data.lower_error,
             y0: 0,
-            x1: data.value + data.error,
+            x1: data.value + data.upper_error,
             y1: 1,
             fillcolor: '#bebada',
             opacity: 0.5,
