@@ -3,6 +3,7 @@
 
 import io
 import json
+import torch
 from tempfile import NamedTemporaryFile
 
 import joblib
@@ -375,7 +376,7 @@ class plMLP(pl.LightningModule):
         self.layers = nn.Sequential(*layers)
         if setting == "classification":
             self.layers.append(nn.Sigmoid())
-            self.loss = nn.CrossEntropyLoss()
+            self.loss = nn.BCEWithLogitsLoss()
         else:
             self.loss = nn.MSELoss()
 
@@ -386,7 +387,8 @@ class plMLP(pl.LightningModule):
         x, y = batch
         x = x.view(x.size(0), -1)
         y_hat = self.layers(x)
-        loss = self.loss(y_hat, y)
+        loss = self.loss(y_hat.flatten(), y.float())
+       
         self.log("train_loss", loss)
         return loss
 
