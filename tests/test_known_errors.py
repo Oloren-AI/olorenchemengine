@@ -49,3 +49,25 @@ def test_TorchGeometric(example_data1):
 def test_ConcatMol2Vec():
     oce.DescriptastorusDescriptor("morgan3counts") + oce.Mol2Vec()
     oce.Mol2Vec() + oce.DescriptastorusDescriptor("morgan3counts")
+
+def test_mlp_class():
+    from tdc.single_pred import ADME
+
+    data = ADME(name = "cyp3a4_substrate_carbonmangels")
+    split = data.get_split()  
+    train = split['train']
+
+    params = {'BC_class_name': 'MLP',
+     'args': [{'BC_class_name': 'DescriptastorusDescriptor',
+       'args': ['rdkit2dnormalized'],
+       'kwargs': {'log': True, 'scale': None}}],
+     'kwargs': {'activation': 'leakyrelu',
+      'batch_size': 16,
+      'dropout': 0.1,
+      'epochs': 100,
+      'kernel_regularizer': 0.0001,
+      'layer_dims': [2048, 512, 128],
+      'lr': 0.0005}}
+    model = oce.create_BC(params)
+
+    model.fit(train["Drug"], train["Y"])
