@@ -6,14 +6,6 @@ import numpy as np
 import olorenchemengine as oce
 
 
-def remote(func):
-    def wrapper(*args, **kwargs):
-        with oce.Remote("http://api.oloren.ai:5000") as remote:
-            func(*args, **kwargs)
-
-    return wrapper
-
-
 def get_model_for_testing(name):
     path = oce.download_public_file(f"test_models/{name}.oam")
     return oce.load(path)
