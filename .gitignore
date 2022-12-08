@@ -90,3 +90,4 @@ src/olorenchemengine/*.json
 tests/*.png
 
 .firebase
+data/*

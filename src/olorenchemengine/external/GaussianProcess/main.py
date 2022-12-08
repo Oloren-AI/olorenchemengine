@@ -271,6 +271,7 @@ if package_available("gpflow"):
             self.objective = objective
             self.setting = setting
             self.inducing_points = inducing_points
+            self.inducing_variable = None
 
         @abstractmethod
         def get_GPFlowModel(self, X_train, y_train):
@@ -297,8 +298,8 @@ if package_available("gpflow"):
                             options=dict(maxiter=self.maxiter))
             else:
                 rng = np.random.default_rng(1234)
-                inducing_variable = rng.choice(X_train, size=self.inducing_points, replace=False)
-                self.m = self.get_GPFlowModel(X_train, y_train, inducing_variable = inducing_variable)
+                self.inducing_variable = rng.choice(X_train, size=self.inducing_points, replace=False)
+                self.m = self.get_GPFlowModel(X_train, y_train, inducing_variable = self.inducing_variable)
                 opt.minimize(self.get_objective, self.m.trainable_variables, 
                             options=dict(maxiter=self.maxiter))
             tf.keras.backend.clear_session()
@@ -323,7 +324,7 @@ if package_available("gpflow"):
             self.y_train = np.array(d["y_train"])
             self.inducing_points = d["inducing_points"]
             self.inducing_variable = (np.array(d["inducing_variable"]) if d["inducing_variable"] is not None else None)
-            self.m = self.get_GPFlowModel(self.X_train, self.y_train)
+            self.m = self.get_GPFlowModel(self.X_train, self.y_train, inducing_variable = self.inducing_variable)
             parameter_dict_new = {k: GPFlow_Parameter() for k, v in d["parameter_dict"].items()}
             for k, v in d["parameter_dict"].items():
                 parameter_dict_new[k]._load(v)
