@@ -64,6 +64,7 @@ https://oloren-ai.notion.site/Oloren-ChemEngine-Installation-FAQ-f2edec771a7f435
 .. code-block:: bash
 
   pip install --upgrade "olorenchemengine[full] @ git+https://github.com/Oloren-AI/olorenchemengine.git"
+
 _______________________________
 Docker
 _______________________________
@@ -159,3 +160,4 @@ collaborators and contributors ahead, who we're excited meet and work with.
 Third, huge gratitude goes to our investors, clients, and customers who've been
 ever patient and ever gracious, who've provided us with the opportunity to bring
 something we believe to be truly valuable into the world.
+

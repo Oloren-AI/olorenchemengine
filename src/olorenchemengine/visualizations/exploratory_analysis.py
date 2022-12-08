@@ -28,7 +28,7 @@ class VisualizeFeatures(BaseVisualization):
     def __init__(self, dataset: BaseDataset, features: list = [], log=True, **kwargs):
         self.dataset = dataset
         self.features = dataset.feature_cols + features
-        self.packages = ["plotly", "olorenrenderer"]
+        self.packages = ["plotly", "smilesdrawer"]
         self.data = {
             "SMILES": self.dataset.data[self.dataset.structure_col].tolist(),
             self.dataset.property_col: self.dataset.data[

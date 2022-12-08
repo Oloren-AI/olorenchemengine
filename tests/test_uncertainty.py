@@ -102,7 +102,7 @@ Basic tests
 """
 
 def test_basic_build(example_model, example_data):
-    error_model = SDC()
+    error_model = KernelError()
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     assert len(X_train) == len(error_model.X_train)
@@ -111,7 +111,7 @@ def test_basic_build(example_model, example_data):
 
 
 def test_basic_fit_bin1(example_model, example_data):
-    error_model = SDC(method='bin')
+    error_model = KernelError(method='bin')
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -121,7 +121,7 @@ def test_basic_fit_bin1(example_model, example_data):
 
 
 def test_basic_fit_bin2(example_model2, example_data2):
-    error_model = SDC(method='bin')
+    error_model = KernelError(method='bin')
     X_train, X_test, y_train, y_test = example_data2
     error_model.build(example_model2, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -131,7 +131,7 @@ def test_basic_fit_bin2(example_model2, example_data2):
 
 
 def test_basic_fit_bin3(example_model3, example_data3):
-    error_model = SDC(method='bin')
+    error_model = KernelError(method='bin')
     X_train, X_test, y_train, y_test = example_data3
     error_model.build(example_model3, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -141,7 +141,7 @@ def test_basic_fit_bin3(example_model3, example_data3):
 
 
 def test_basic_fit_qbin1(example_model, example_data):
-    error_model = SDC(method='qbin')
+    error_model = KernelError(method='qbin')
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -151,7 +151,7 @@ def test_basic_fit_qbin1(example_model, example_data):
 
 
 def test_basic_fit_qbin2(example_model2, example_data2):
-    error_model = SDC(method='qbin')
+    error_model = KernelError(method='qbin')
     X_train, X_test, y_train, y_test = example_data2
     error_model.build(example_model2, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -161,7 +161,7 @@ def test_basic_fit_qbin2(example_model2, example_data2):
 
 
 def test_basic_fit_qbin3(example_model3, example_data3):
-    error_model = SDC(method='qbin')
+    error_model = KernelError(method='qbin')
     X_train, X_test, y_train, y_test = example_data3
     error_model.build(example_model3, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -171,7 +171,7 @@ def test_basic_fit_qbin3(example_model3, example_data3):
 
 
 def test_basic_fit_roll1(example_model, example_data):
-    error_model = SDC(method='roll', window=2)
+    error_model = KernelError(method='roll', window=2)
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -181,7 +181,7 @@ def test_basic_fit_roll1(example_model, example_data):
 
 
 def test_basic_fit_roll2(example_model2, example_data2):
-    error_model = SDC(method='roll', window=2)
+    error_model = KernelError(method='roll', window=2)
     X_train, X_test, y_train, y_test = example_data2
     error_model.build(example_model2, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -191,7 +191,7 @@ def test_basic_fit_roll2(example_model2, example_data2):
 
 
 def test_basic_fit_roll3(example_model3, example_data3):
-    error_model = SDC(method='roll', window=2)
+    error_model = KernelError(method='roll', window=2)
     X_train, X_test, y_train, y_test = example_data3
     error_model.build(example_model3, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -201,7 +201,7 @@ def test_basic_fit_roll3(example_model3, example_data3):
 
 
 def test_basic_fit_cv(example_model, example_data):
-    error_model = SDC()
+    error_model = KernelError()
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit_cv(n_splits=2)
@@ -211,7 +211,7 @@ def test_basic_fit_cv(example_model, example_data):
 
 
 def test_basic_score(example_model, example_data):
-    error_model = SDC()
+    error_model = KernelError()
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -220,43 +220,89 @@ def test_basic_score(example_model, example_data):
 
 
 def test_basic_sl1(example_model, example_data):
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     fit_score_sl(error_model, example_model, example_data)
 
 
 def test_basic_sl2(example_model2, example_data2):
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     fit_score_sl(error_model, example_model2, example_data2)
 
 
 def test_basic_sl3(example_model3, example_data3):
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     fit_score_sl(error_model, example_model3, example_data3)
 
 
 def test_basic_slf1(example_model, example_data):
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     fit_score_slf(error_model, example_model, example_data)
 
 
 def test_basic_slf2(example_model2, example_data2):
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     fit_score_slf(error_model, example_model2, example_data2)
 
 
 def test_basic_slf3(example_model3, example_data3):
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     fit_score_slf(error_model, example_model3, example_data3)
+
+
+def test_basic_curvetype(example_model, example_data):
+    error_model = KernelError(ci=0.5, curvetype = "linear")
+    fit_score_sl(error_model, example_model, example_data)
+
+
+def test_basic_curvetype(example_model2, example_data2):
+    error_model = KernelError(ci=0.5, curvetype = "linear")
+    fit_score_sl(error_model, example_model2, example_data2)
+
+
+def test_basic_curvetype(example_model3, example_data3):
+    error_model = KernelError(ci=0.5, curvetype = "linear")
+    fit_score_sl(error_model, example_model3, example_data3)
 
 """
 Fingerprint models
 """
 
 def test_fingerprint_build(example_model, example_data):
-    error_model = SDC()
+    error_model = KernelError()
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     assert len(X_train) == len(error_model.train_fps)
+
+
+def test_Kernel1(example_model, example_data):
+    error_model = KernelError(predictor="error", kernel="parabolic", h=1)
+    fit_score_sl(error_model, example_model, example_data)
+
+
+def test_Kernel2(example_model2, example_data2):
+    error_model = KernelError(predictor="error", kernel="parabolic", h=1)
+    fit_score_sl(error_model, example_model2, example_data2)
+
+
+def test_Kernel3(example_model3, example_data3):
+    error_model = KernelError(predictor="error", kernel="parabolic", h=1)
+    fit_score_sl(error_model, example_model3, example_data3)
+
+
+def test_Kernel_file1(example_model, example_data):
+    error_model = KernelError(predictor="error", kernel="parabolic", h=1)
+    fit_score_slf(error_model, example_model, example_data)
+
+
+def test_Kernel_file2(example_model2, example_data2):
+    error_model = KernelError(predictor="error", kernel="parabolic", h=1)
+    fit_score_slf(error_model, example_model2, example_data2)
+
+
+def test_Kernel_file3(example_model3, example_data3):
+    error_model = KernelError(predictor="error", kernel="parabolic", h=1)
+    fit_score_slf(error_model, example_model3, example_data3)
+
 
 def test_SDC1(example_model, example_data):
     error_model = SDC(a=1)
@@ -661,7 +707,7 @@ def test_create1(example_data):
         n_estimators=10,
     )
     model.fit(X_train, y_train)
-    model.create_error_model(SDC(), X_train, y_train, X_test, y_test)
+    model.create_error_model(KernelError(ci=0.5), X_train, y_train, X_test, y_test)
     assert hasattr(model, "error_model")
     assert hasattr(model.error_model, "reg")
 
@@ -676,7 +722,7 @@ def test_create2(example_data2):
         n_estimators=10,
     )
     model.fit(X_train, y_train)
-    model.create_error_model(SDC(), X_train, y_train, X_test, y_test)
+    model.create_error_model(KernelError(ci=0.5), X_train, y_train, X_test, y_test)
     assert hasattr(model, "error_model")
     assert hasattr(model.error_model, "reg")
 
@@ -690,7 +736,7 @@ def test_concurrent1(example_data):
         ),
         n_estimators=10,
     )
-    error_model = SDC()
+    error_model = KernelError(ci=0.5)
     model.fit(X_train, y_train, error_model=error_model)
 
     assert hasattr(model, "error_model")
@@ -711,7 +757,7 @@ def test_concurrent2(example_data2):
         ),
         n_estimators=10,
     )
-    error_model = SDC()
+    error_model = KernelError(ci=0.5)
     model.fit(X_train, y_train, error_model=error_model)
 
     assert hasattr(model, "error_model")
@@ -725,65 +771,77 @@ def test_concurrent2(example_data2):
 
 def test_model_sl1(example_model, example_data):
     X_train, X_test, y_train, y_test = example_data
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     example_model.create_error_model(error_model, X_train, y_train, X_test, y_test)
     p1 = example_model.predict(X_test, return_ci=True)
     save = saves(example_model)
     model2 = loads(save)
     p2 = model2.predict(X_test, return_ci=True)
-    assert np.allclose(p1, p2, equal_nan=True)
+    assert np.allclose(p1['predicted'], p2['predicted'], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[0], list(zip(p2['ci']))[0], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[1], list(zip(p2['ci']))[1], equal_nan=True)
 
 
 def test_model_sl2(example_model2, example_data2):
     X_train, X_test, y_train, y_test = example_data2
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     example_model2.create_error_model(error_model, X_train, y_train, X_test, y_test)
     p1 = example_model2.predict(X_test, return_ci=True)
     save = saves(example_model2)
     model2 = loads(save)
     p2 = model2.predict(X_test, return_ci=True)
-    assert np.allclose(p1, p2, equal_nan=True)
+    assert np.allclose(p1['predicted'], p2['predicted'], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[0], list(zip(p2['ci']))[0], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[1], list(zip(p2['ci']))[1], equal_nan=True)
 
 
 def test_model_sl3(example_model3, example_data3):
     X_train, X_test, y_train, y_test = example_data3
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     example_model3.create_error_model(error_model, X_train, y_train, X_test, y_test)
     p1 = example_model3.predict(X_test, return_ci=True)
     save = saves(example_model3)
     model2 = loads(save)
     p2 = model2.predict(X_test, return_ci=True)
-    assert np.allclose(p1, p2, equal_nan=True)
+    assert np.allclose(p1['predicted'], p2['predicted'], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[0], list(zip(p2['ci']))[0], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[1], list(zip(p2['ci']))[1], equal_nan=True)
 
 
 def test_model_slf1(example_model, example_data):
     X_train, X_test, y_train, y_test = example_data
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     example_model.create_error_model(error_model, X_train, y_train, X_test, y_test)
     p1 = example_model.predict(X_test, return_ci=True)
     save(example_model, "tmp.oce")
     model2 = load("tmp.oce")
     p2 = model2.predict(X_test, return_ci=True)
-    assert np.allclose(p1, p2, equal_nan=True)
+    assert np.allclose(p1['predicted'], p2['predicted'], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[0], list(zip(p2['ci']))[0], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[1], list(zip(p2['ci']))[1], equal_nan=True)
 
 
 def test_model_slf2(example_model2, example_data2):
     X_train, X_test, y_train, y_test = example_data2
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     example_model2.create_error_model(error_model, X_train, y_train, X_test, y_test)
     p1 = example_model2.predict(X_test, return_ci=True)
     save(example_model2, "tmp.oce")
     model2 = load("tmp.oce")
     p2 = model2.predict(X_test, return_ci=True)
-    assert np.allclose(p1, p2, equal_nan=True)
+    assert np.allclose(p1['predicted'], p2['predicted'], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[0], list(zip(p2['ci']))[0], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[1], list(zip(p2['ci']))[1], equal_nan=True)
 
 
 def test_model_slf3(example_model3, example_data3):
     X_train, X_test, y_train, y_test = example_data3
-    error_model = SDC(ci=0.5)
+    error_model = KernelError(ci=0.5)
     example_model3.create_error_model(error_model, X_train, y_train, X_test, y_test)
     p1 = example_model3.predict(X_test, return_ci=True)
     save(example_model3, "tmp.oce")
     model2 = load("tmp.oce")
     p2 = model2.predict(X_test, return_ci=True)
-    assert np.allclose(p1, p2, equal_nan=True)
+    assert np.allclose(p1['predicted'], p2['predicted'], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[0], list(zip(p2['ci']))[0], equal_nan=True)
+    assert np.allclose(list(zip(p1['ci']))[1], list(zip(p2['ci']))[1], equal_nan=True)

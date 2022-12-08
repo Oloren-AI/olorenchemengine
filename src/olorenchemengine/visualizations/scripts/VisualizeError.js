@@ -42,7 +42,7 @@ var trace2 = {
     x: [data.value],
     orientation: "h",
     span: [
-        data.value - data.error, data.value + data.error
+        data.value + data.lower_error, data.value + data.upper_error
     ],
 }
 
@@ -125,7 +125,35 @@ if ("true" in data) {
 }
 
 var layout = {
-    shapes: my_shapes,
+    shapes: [
+        {
+            type: 'rect',
+            xref: 'x',
+            yref: 'paper',
+            x0: data.value + data.lower_error,
+            y0: 0,
+            x1: data.value + data.upper_error,
+            y1: 1,
+            fillcolor: '#bebada',
+            opacity: 0.5,
+            line: {
+                width: 0
+            }
+        },
+        {
+            type: 'line',
+            xref: 'x',
+            yref: 'paper',
+            x0: data.value,
+            y0: 0,
+            x1: data.value,
+            y1: 1,
+            line: {
+                color: '#bebada',
+                width: 3
+            }
+        },
+    ],
     title: data.title,
     xaxis: {
         title: data.xaxis_title,

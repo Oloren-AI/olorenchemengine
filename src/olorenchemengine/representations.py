@@ -839,7 +839,11 @@ class DescriptastorusDescriptor(BaseCompoundVecRepresentation):
 
     def _convert(self, smiles, y=None):
         results = self.generator.process(smiles)
-        processed, features = results[0], np.nan_to_num(results[1:], nan=0)
+
+        try: 
+            processed, features = results[0], np.nan_to_num(results[1:], nan=0)
+        except Exception as e:
+            raise ValueError("%s can not be converted" % smiles)
 
         if processed is None:
             print("ERROR: %s" % smiles)
