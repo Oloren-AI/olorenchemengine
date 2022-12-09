@@ -283,7 +283,8 @@ class VisualizeError(BaseVisualization):
         self,
         dataset: Union[BaseDataset, list, pd.Series, np.ndarray],
         value: Union[int, float, np.ndarray],
-        error: Union[tuple, list, np.ndarray],
+        error: Union[int, float, np.ndarray],
+        true=None,
         ci=None,
         box=False,
         points=True,
@@ -330,6 +331,8 @@ class VisualizeError(BaseVisualization):
 
         if not ci is None:
             self.ci = int(ci * 100)
+        if not true is None:
+            self.true = true
 
         self.title = title
         self.width = width
@@ -355,7 +358,9 @@ class VisualizeError(BaseVisualization):
             d["points"] = " "
         if hasattr(self, "ci"):
             d["ci"] = self.ci
-
+        if hasattr(self, "true"):
+            d["true"] = self.true
+        
         return d
 
 
@@ -565,6 +570,7 @@ class CompoundScatterPlot(BaseVisualization):
         opacity: float = 1,
         width: int = 800,
         height: int = 600,
+        jitter: float = 0.0,
         log: bool = True,
         **kwargs,
     ):
@@ -621,12 +627,18 @@ class CompoundScatterPlot(BaseVisualization):
         self.height = height
         self.opacity = opacity
         self.title = title
+        self.jitter = jitter
 
         # Create DataFrame
         self.df = self.df.dropna(subset=["X", "Y"])
         cols = ["SMILES", "X", "Y"]
         if "color" in self.df.columns:
             cols += ["color"]
+        if self.jitter > 0:
+            self.df["X"] = self.df["X"] + np.random.uniform(-self.jitter*(self.df["X"].max()-self.df["X"].min()), 
+                self.jitter*(self.df["X"].max()-self.df["X"].min()), size=self.df.shape[0])
+            self.df["Y"] = self.df["Y"] + np.random.uniform(-self.jitter*(self.df["Y"].max()-self.df["Y"].min()),
+                self.jitter*(self.df["Y"].max()-self.df["Y"].min()), size=self.df.shape[0])
         self.df = self.df[cols]
 
         super().__init__(log=False, **kwargs)
@@ -937,14 +949,17 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         model: BaseModel = None,
         res_lim: float = None,
         opacity: float = 0.4,
+        title=None,
+        colors=["red", "green", "blue"],
         *args,
         **kwargs,
     ):
         # Set visualization instance variables
-        self.dataset = dataset
+        self.dataset = dataset.copy()
         self.model = model
         self.res_lim = res_lim
         self.opacity = opacity
+        self.colors = colors
         if not type(dataset) is BaseDataset:
             raise TypeError(
                 "dataset must be a BaseDataset. Consider using df.to_csv() in the"
@@ -953,23 +968,25 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
 
         # Either visualize residual magnitudes or not
         if model is None:
+            if title is None:
+                title = "Dataset Visualization<br><sub>Red outline is train; Blue outline is test</sub>"
             super().__init__(
                 dataset,
                 rep,
                 *args,
-                title="Dataset Visualization<br><sub>Red outline is train; Blue outline is test</sub>",
-                dim_reduction="tsne",
+                title=title,
                 opacity=self.opacity,
                 log=False,
                 **kwargs,
             )
         else:
+            if title is None:
+                title ="Model Residual Visualization<br><sub>Red outline is train; Blue outline is test; Marker size is residual magnitude</sub>"
             super().__init__(
                 dataset,
                 rep,
                 *args,
-                title="Model Residual Visualization<br><sub>Red outline is train; Blue outline is test; Marker size is residual magnitude</sub>",
-                dim_reduction="tsne",
+                title=title,
                 opacity=self.opacity,
                 log=False,
                 **kwargs,
@@ -980,12 +997,12 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
 
         if self.model is None:
             d["color"] = [
-                "red" if x == "train" else "blue"
+                self.colors[0] if x == "train" else self.colors[2] if x == "test" else self.colors[1]
                 for x in self.dataset.entire_dataset_split
             ]
         else:
             d["outline"] = [
-                "red" if x == "train" else "blue"
+                self.colors[0] if x == "train" else self.colors[2] if x == "test" else self.colors[1]
                 for x in self.dataset.entire_dataset_split
             ]
 
@@ -1459,14 +1476,16 @@ class VisualizeModelSim(CompoundScatterPlot):
             visualization will only select the set specified by eval_set.
         model (BaseModel): Model to visualize.
         eval_set (str): Subset of dataset to visualize, either 'train', 'test',
-            or 'valid'."""
+            or 'valid'.
+        x_transform (str): Transform to apply to x-axis, either 'quantile' or 'none'."""
 
     @log_arguments
     def __init__(
         self,
         dataset: BaseDataset,
         model: BaseModel,
-        eval_set="test",
+        eval_set: str = "test",
+        mode: str = "none",
         *args,
         log=True,
         **kwargs,
@@ -1501,11 +1520,17 @@ class VisualizeModelSim(CompoundScatterPlot):
         self.sim = np.array(
             [max(DataStructs.BulkTanimotoSimilarity(fp, train_fps)) for fp in eval_fps]
         )
-
+        self.mode = mode
+        if self.mode == "none":
+            Y = self.model.predict(self.eval_set[0])
+        else:
+            from sklearn.preprocessing import QuantileTransformer
+            qt = QuantileTransformer()
+            Y = qt.fit_transform(model.predict(self.eval_set[0]).reshape(-1,1)).reshape(-1).tolist()
         self.df = pd.DataFrame(
             {
                 "X": self.eval_set[1],
-                "Y": self.model.predict(self.eval_set[0]),
+                "Y": Y,
                 "SMILES": self.eval_set[0][self.dataset.structure_col],
                 "color": self.sim,
             }
@@ -1524,18 +1549,20 @@ class VisualizeModelSim(CompoundScatterPlot):
     def get_data(self) -> dict:
         d = super().get_data()
         d["color"] = self.sim.tolist()
-        d["trace_update"] = {
-            "x": [
-                0.9 * min(self.df["X"].min(), self.df["Y"].min()),
-                1.1 * max(self.df["X"].max(), self.df["Y"].max()),
-            ],
-            "y": [
-                0.9 * min(self.df["X"].min(), self.df["Y"].min()),
-                1.1 * max(self.df["X"].max(), self.df["Y"].max()),
-            ],
-            "mode": "line",
-            "type": "scatter",
-        }
+        
+        if self.mode == "none":
+            d["trace_update"] = {
+                "x": [
+                    0.9 * min(self.df["X"].min(), self.df["Y"].min()),
+                    1.1 * max(self.df["X"].max(), self.df["Y"].max()),
+                ],
+                "y": [
+                    0.9 * min(self.df["X"].min(), self.df["Y"].min()),
+                    1.1 * max(self.df["X"].max(), self.df["Y"].max()),
+                ],
+                "mode": "line",
+                "type": "scatter",
+            }
         return d
 
     @staticmethod
