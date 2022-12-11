@@ -688,21 +688,25 @@ class BaseModel(BaseClass):
             model.fit(X_train, y_train)
             y_pred_test = model.predict(X_test)
 
-            if hasattr(self, "error_model") and self.setting == "regression":
+            if self.setting == "regression":
                 y_pred_test = np.array(y_pred_test).flatten()
-                em = type(self.error_model)(
-                    *self.error_model.args, **self.error_model.kwargs
-                )
-                em.build(model, X_train, y_train)
-                scores_fold = em.calculate(X_test, y_pred_test)
-                if scores is None:
+                if pred is None:
                     pred = y_pred_test
                     true = y_test
-                    scores = scores_fold
                 else:
-                    scores = np.concatenate((scores, scores_fold))
                     pred = np.concatenate((pred, y_pred_test))
                     true = np.concatenate((true, y_test))
+                
+                if hasattr(self, "error_model"):
+                    em = type(self.error_model)(
+                        *self.error_model.args, **self.error_model.kwargs
+                    )
+                    em.build(model, X_train, y_train)
+                    scores_fold = em.calculate(X_test, y_pred_test)
+                    if scores is None:
+                        scores = scores_fold
+                    else:
+                        scores = np.concatenate((scores, scores_fold))
             elif self.setting == "classification":
                 prob_pred, prob_true = calibration_curve(
                     y_test, y_pred_test, n_bins=min(len(y_test), 10)
@@ -1128,8 +1132,10 @@ class BaseErrorModel(BaseClass):
         ci (float): desired confidence interval
         method ({'bin','qbin','roll'}): whether to fit the error model via binning, 
             quantile binning, or rolling quantile
-        bins (int): number of bins for binned quantiles
-        window (int): window size for rolling quantiles
+        bins (int): number of bins for binned quantiles. If None, selects the number
+            of points per bins as n^(2/3) / 2.
+        window (int): number of points per window for rolling quantiles. If None,
+            selects the number of points per window as n^(2/3) / 2.
         curvetype (str): function used for regression. If `auto`, the function is 
             chosen automatically to minimize the mse.
 
@@ -1147,9 +1153,9 @@ class BaseErrorModel(BaseClass):
     def __init__(self, 
         ci: float = 0.95, 
         method: str = "qbin",
-        window: int = 50,
-        bins: int = 20,
         curvetype: str = "auto",
+        window: int = None,
+        bins: int = None,
         log=True, 
         **kwargs):
 
@@ -1208,7 +1214,7 @@ class BaseErrorModel(BaseClass):
 
     def fit_cv(
         self,
-        n_splits: int = 5
+        n_splits: int = 10
     ) -> plotly.graph_objects.Figure:
         """Fits confidence scores to the training dataset via cross validation.
 
@@ -1267,6 +1273,10 @@ class BaseErrorModel(BaseClass):
         Returns:
             plotly figure of fitted model against validation dataset
         """
+        if self.bins is None:
+            self.bins = int(np.ceil(2 * len(residuals) ** (1/3)))
+        if self.window is None:
+            self.window = int(np.floor(0.5 * len(residuals) ** (2/3)))
         self.residuals = residuals
         self.scores = scores
 
