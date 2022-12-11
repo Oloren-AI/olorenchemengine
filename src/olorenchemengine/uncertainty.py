@@ -771,7 +771,7 @@ class AggregateErrorModel(BaseErrorModel):
 
         return self._fit(residuals, aggregate_scores, **kwargs)
 
-    def fit_cv(self, n_splits: int = 5, **kwargs):
+    def fit_cv(self, n_splits: int = 10, **kwargs):
         """Fits confidence scores to the training dataset via cross validation.
 
         Args:
