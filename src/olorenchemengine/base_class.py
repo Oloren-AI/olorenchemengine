@@ -628,7 +628,6 @@ class BaseModel(BaseClass):
         y: Union[pd.Series, list, np.ndarray],
         n_splits: int = 5,
         error_model: BaseErrorModel = None,
-        ci: float = 0.8,
         scoring: str = None,
         **kwargs
     ):

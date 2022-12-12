@@ -121,13 +121,16 @@ class KernelError(BaseFingerprintModel):
 
 
 class SDC(BaseFingerprintModel):
-    """ SDC is an error model that predicts error bars based on the Sum of
-        Distance-weighted Contributions: `Molecular Similarity-Based Domain
-        Applicability Metric Efficiently Identifies Out-of-Domain Compounds
-        <http://dx.doi.org/10.1021/acs.jcim.8b00597>`_
+    """Sum of Distance-weighted Contributions
+    
+    SDC is an error model that predicts error bars based on the Sum of
+    Distance-weighted Contributions: `Molecular Similarity-Based Domain
+    Applicability Metric Efficiently Identifies Out-of-Domain Compounds
+    <http://dx.doi.org/10.1021/acs.jcim.8b00597>`_
 
-        Parameters:
-            a (int or float, optional): Value of a in the SDC formula. Default 3.
+    Parameters
+    ------------------------------
+    a (int or float, optional): Value of a in the SDC formula. Default 3.
 
     Example
     ------------------------------
@@ -136,7 +139,6 @@ class SDC(BaseFingerprintModel):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.SDC())
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -155,12 +157,15 @@ class SDC(BaseFingerprintModel):
 
 
 class TargetDistDC(SDC):
-    """ TargetDistDC is an error model that calculates the root-mean-square
-        difference between the predicted activity of the target molecule and
-        the observed activities of all training molecules, weighted by the DC.
+    """Weighted prediction difference
 
-        Parameters:
-            a (int or float, optional): Value of a in the SDC formula. Default 3.
+    TargetDistDC is an error model that calculates the root-mean-square
+    difference between the predicted activity of the target molecule and
+    the observed activities of all training molecules, weighted by the DC.
+
+    Parameters
+    ------------------------------
+    a (int or float, optional): Value of a in the SDC formula. Default 3.
 
     Example
     ------------------------------
@@ -169,7 +174,6 @@ class TargetDistDC(SDC):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistDC())
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -192,12 +196,15 @@ class TargetDistDC(SDC):
 
 
 class TrainDistDC(SDC):
-    """ TrainDistDC is an error model that calculates the root-mean-square
-        difference between the predicted and observed activities of all
-        training molecules, weighted by the DC.
+    """Weighted training error
 
-        Parameters:
-            a (int or float, optional): Value of a in the SDC formula. Default 3.
+    TrainDistDC is an error model that calculates the root-mean-square
+    difference between the predicted and observed activities of all
+    training molecules, weighted by the DC.
+
+    Parameters
+    ------------------------------
+    a (int or float, optional): Value of a in the SDC formula. Default 3.
 
     Example
     ------------------------------
@@ -206,7 +213,6 @@ class TrainDistDC(SDC):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistDC())
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -228,12 +234,15 @@ class TrainDistDC(SDC):
 
 
 class KNNSimilarity(BaseFingerprintModel):
-    """ NNSimilarity is an error model that calculates mean Tanimoto similarity
-        between the target molecule and the k most similar training molecules
-        using a Morgan Fingerprint with a radius of 2 bonds.
+    """Tanimoto similarity to k nearest neighbors
+    
+    NNSimilarity is an error model that calculates mean Tanimoto similarity
+    between the target molecule and the k most similar training molecules
+    using a Morgan Fingerprint with a radius of 2 bonds.
 
-        Parameters:
-            k (int, optional): Number of nearest neighbors to consider. Default 5.
+    Parameters
+    ------------------------------
+    k (int, optional): Number of nearest neighbors to consider. Default 5.
 
     Example
     ------------------------------
@@ -242,7 +251,6 @@ class KNNSimilarity(BaseFingerprintModel):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.KNNSimilarity())
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -260,13 +268,16 @@ class KNNSimilarity(BaseFingerprintModel):
         return np.array([mean_sim(fp) for fp in tqdm(ref_fps)])
 
 class TargetDistKNN(KNNSimilarity):
-    """ TargetDistKNN is an error model that calculates the root-mean-square
-        difference between the predicted activity of the target molecule and
-        the observed activities of the k most similar training molecules,
-        weighted by their similarity.
+    """Prediction difference of k nearest neighbors
+    
+    TargetDistKNN is an error model that calculates the root-mean-square
+    difference between the predicted activity of the target molecule and
+    the observed activities of the k most similar training molecules,
+    weighted by their similarity.
 
-        Parameters:
-            k (int, optional): Number of nearest neighbors to consider. Default 5.
+    Parameters
+    ------------------------------
+    k (int, optional): Number of nearest neighbors to consider. Default 5.
 
     Example
     ------------------------------
@@ -275,7 +286,6 @@ class TargetDistKNN(KNNSimilarity):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistKNN())
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -298,13 +308,16 @@ class TargetDistKNN(KNNSimilarity):
 
 
 class TrainDistKNN(KNNSimilarity):
-    """ TrainDistKNN is an error model that calculates the root-mean-square
-        difference between the predicted and observed activities of the k most
-        similar training molecules to the target molecule, weighted by their
-        similarity.
+    """Training error of k nearest neighbors
+    
+    TrainDistKNN is an error model that calculates the root-mean-square
+    difference between the predicted and observed activities of the k most
+    similar training molecules to the target molecule, weighted by their
+    similarity.
 
-        Parameters:
-            k (int, optional): Number of nearest neighbors to consider. Default 5.
+    Parameters
+    ------------------------------
+    k (int, optional): Number of nearest neighbors to consider. Default 5.
 
     Example
     ------------------------------
@@ -313,7 +326,6 @@ class TrainDistKNN(KNNSimilarity):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistKNN())
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -335,9 +347,11 @@ class TrainDistKNN(KNNSimilarity):
 
 
 class Predicted(BaseErrorModel):
-    """ Predicted is an error model that predicts error bars based on only the
-        predicted value of a molecule. It is best used as part of an aggregate
-        error model rather than by itself.
+    """Predicted value
+    
+    Predicted is an error model that predicts error bars based on only the
+    predicted value of a molecule. It is best used as part of an aggregate
+    error model rather than by itself.
 
     Example
     ------------------------------
@@ -357,9 +371,11 @@ class Predicted(BaseErrorModel):
         return y_pred
 
 class Naive(BaseErrorModel):
-    """ Naive is an error model that predicts a uniform confidence interval
-        based on the errors of the fitting dataset. Used exclusively for
-        benchmarking error models.
+    """Static confidence intervals
+    
+    Naive is an error model that predicts a uniform confidence interval
+    based on the errors of the fitting dataset. Used exclusively for
+    benchmarking error models.
     """
 
     @log_arguments
@@ -415,13 +431,16 @@ class BaseEnsembleModel(BaseErrorModel):
             self.ensembles = [loads(model) for model in d["ensembles"]]
     
 class BootstrapEnsemble(BaseEnsembleModel):
-    """ BootstrapEnsemble estimates uncertainty based on the variance of several
-        models trained on bootstrapped samples of the training data.
+    """Ensemble of bootstrap models variance
+    
+    BootstrapEnsemble estimates uncertainty based on the variance of several
+    models trained on bootstrapped samples of the training data.
 
-        Parameters:
-            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
-            n_ensembles (int): Number of ensembles
-            bootstrap_size (float): Proportion of training data to train each ensemble model
+    Parameters
+    ------------------------------
+    ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
+    n_ensembles (int): Number of ensembles
+    bootstrap_size (float): Proportion of training data to train each ensemble model
     
     Example
     ------------------------------
@@ -430,7 +449,6 @@ class BootstrapEnsemble(BaseEnsembleModel):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.BootstrapEnsemble(n_ensembles = 10))
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
     
     @log_arguments
@@ -452,12 +470,15 @@ class BootstrapEnsemble(BaseEnsembleModel):
             self.ensembles.append(ensemble_model)
 
 class RandomForestEnsemble(BaseEnsembleModel):
-    """ RandomForestEnsemble estimates uncertainty based on the variance of several
-        random forest models initialized to different random states.
+    """Ensemble of random forests
+    
+    RandomForestEnsemble estimates uncertainty based on the variance of several
+    random forest models initialized to different random states.
 
-        Parameters:
-            ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
-            n_ensembles (int): Number of ensembles
+    Parameters
+    ------------------------------
+    ensemble_model (BaseModel): Model used for ensembling. Defaults to the same as the original model.
+    n_ensembles (int): Number of ensembles
     
     Example
     ------------------------------
@@ -486,20 +507,23 @@ class RandomForestEnsemble(BaseEnsembleModel):
             self.ensembles.append(ensemble_model)
 
 class ADAN(BaseErrorModel):
-    """ ADAN is an error model that predicts error bars based on one or
-        multiple ADAN categories: `Applicability Domain Analysis (ADAN): A
-        Robust Method for Assessing the Reliability of Drug Property Predictions
-        <https://doi.org/10.1021/ci500172z>`_
+    """Applicability Domain Analysis
+    
+    ADAN is an error model that predicts error bars based on one or
+    multiple ADAN categories: `Applicability Domain Analysis (ADAN): A
+    Robust Method for Assessing the Reliability of Drug Property Predictions
+    <https://doi.org/10.1021/ci500172z>`_
 
-        Parameters:
-            criterion (str): the ADAN criteria to be considered.
-            rep (BaseCompoundVecRepresentation): the representation to use. By default, 
-                usees the representation of the BaseModel object.
-            dim_reduction ({"pls", "pca"}): the dimensionality reduction to use. 
-            explvar (float): the desired variance to be captured by the dimensionality
-                reduction components as a proportion of total variance.
-            threshold (float): the quantile for a criterion to be considered as out of
-                its standard range.
+    Parameters
+    ------------------------------
+    criterion (str): the ADAN criteria to be considered.
+    rep (BaseCompoundVecRepresentation): the representation to use. By default, 
+        usees the representation of the BaseModel object.
+    dim_reduction ({"pls", "pca"}): the dimensionality reduction to use. 
+    explvar (float): the desired variance to be captured by the dimensionality
+        reduction components as a proportion of total variance.
+    threshold (float): the quantile for a criterion to be considered as out of
+        its standard range.
 
     Example
     ------------------------------
@@ -508,7 +532,6 @@ class ADAN(BaseErrorModel):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.ADAN("E_raw"))
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -716,10 +739,11 @@ class AggregateErrorModel(BaseErrorModel):
     """ AggregateErrorModel estimates uncertainty by aggregating ucertainty scores from
         several different BaseErrorModels.
 
-        Parameters:
-            *error_models (BaseErrorModel): error models to be aggregated
-            reduction (BaseReduction): reduction method used to aggregate uncertainty scores.
-                Must output 1 component. Default FactorAnalysis().
+    Parameters
+    ------------------------------
+    error_models (BaseErrorModel): error models to be aggregated
+    reduction (BaseReduction): reduction method used to aggregate uncertainty scores.
+        Must output 1 component. Default FactorAnalysis().
     
     Example
     ------------------------------
@@ -731,7 +755,6 @@ class AggregateErrorModel(BaseErrorModel):
     error_model.build(model, train["Drug"], train["Y"])
     error_model.fit(valid["Drug"], valid["Y"])
     error_model.score(test["Drug"])
-    ------------------------------
     """
 
     @log_arguments
