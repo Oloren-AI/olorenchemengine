@@ -278,13 +278,23 @@ if package_available("gpflow"):
             pass
         
         def get_objective(self):
-            if self.objective == "log_marginal_likelihood" and self.setting == "regression":
-                try:
-                    return -self.m.log_marginal_likelihood()
-                except:
-                    return self.m.training_loss()
+            if self.objective == "log_marginal_likelihood"
+                if self.setting == "regression":
+                    try:
+                        return -self.m.log_marginal_likelihood()
+                    except:
+                        return self.m.training_loss()
+                else:
+                    raise ValueError("log_marginal_likelihood is only implemented for regression")
             else:
-                return self.m.training_loss()
+                if self.setting == "regression":
+                    return self.m.training_loss()
+                else:
+                    if self.inducing_variable is None:
+                        return self.m.training_loss()
+                    else:
+                        return self.m.training_loss_closure(data=(self.X_train, self.y_train))
+                        
         
         def fit(self, X_train, y_train):
             self.X_train = X_train
@@ -372,8 +382,7 @@ if package_available("gpflow"):
                                    kernel=k,
                                    likelihood=gpflow.likelihoods.Bernoulli())
             else:
-                m = gpflow.models.SVGP(data=(X_train.astype(np.float64), np.reshape(y_train, (-1,1))),
-                                   mean_function=Constant(np.mean(y_train)),
+                m = gpflow.models.SVGP(mean_function=Constant(np.mean(y_train)),
                                    kernel=k,
                                    likelihood=gpflow.likelihoods.Bernoulli(),
                                    inducing_variable=inducing_variable)
