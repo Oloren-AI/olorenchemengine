@@ -264,7 +264,7 @@ if package_available("gpflow"):
         """
 
         @log_arguments
-        def __init__(self, maxiter = 100, objective = "log_marginal_likelihood",
+        def __init__(self, maxiter = 100, objective = "training-loss",
                      inducing_points = float('inf'), setting="regression", log=True):
             self.maxiter = maxiter
             self.m = None
@@ -278,23 +278,13 @@ if package_available("gpflow"):
             pass
         
         def get_objective(self):
-            if self.objective == "log_marginal_likelihood"
+            if self.objective == "log_marginal_likelihood":
                 if self.setting == "regression":
-                    try:
-                        return -self.m.log_marginal_likelihood()
-                    except:
-                        return self.m.training_loss()
+                    return lambda: -self.m.log_marginal_likelihood()
                 else:
                     raise ValueError("log_marginal_likelihood is only implemented for regression")
             else:
-                if self.setting == "regression":
-                    return self.m.training_loss()
-                else:
-                    if self.inducing_variable is None:
-                        return self.m.training_loss()
-                    else:
-                        return self.m.training_loss_closure(data=(self.X_train, self.y_train))
-                        
+                return gpflow.models.training_loss_closure(self.m, (self.X_train.astype(np.float64), np.reshape(self.y_train, (-1,1))))                        
         
         def fit(self, X_train, y_train):
             self.X_train = X_train
@@ -304,13 +294,13 @@ if package_available("gpflow"):
 
             if X_train.shape[0] <= self.inducing_points:
                 self.m = self.get_GPFlowModel(X_train, y_train)
-                opt.minimize(self.get_objective, self.m.trainable_variables, 
+                opt.minimize(self.get_objective(), self.m.trainable_variables, 
                             options=dict(maxiter=self.maxiter))
             else:
                 rng = np.random.default_rng(1234)
-                self.inducing_variable = rng.choice(X_train, size=self.inducing_points, replace=False)
-                self.m = self.get_GPFlowModel(X_train, y_train, inducing_variable = self.inducing_variable)
-                opt.minimize(self.get_objective, self.m.trainable_variables, 
+                self.inducing_variable = rng.choice(X_train.astype(np.float64), size=self.inducing_points, replace=False)
+                self.m = self.get_GPFlowModel(X_train, y_train, inducing_variable = self.inducing_variable.astype(np.float64))
+                opt.minimize(self.get_objective(), self.m.trainable_variables, 
                             options=dict(maxiter=self.maxiter))
             tf.keras.backend.clear_session()
 
@@ -402,7 +392,7 @@ if package_available("gpflow"):
 
         @log_arguments
         def __init__(self, representation: BaseVecRepresentation, inducing_points = float('inf'),
-                     objective = "log_marginal_likelihood",log=True, **kwargs):
+                     objective = "training-loss",log=True, **kwargs):
             classifier = TanimotoGPClassifier(objective=objective, inducing_points = inducing_points, setting="classification")
             regressor = TanimotoGPRegressor(objective=objective, inducing_points = inducing_points, setting="regression")
             super().__init__(representation, regressor, classifier, log=False, **kwargs)
