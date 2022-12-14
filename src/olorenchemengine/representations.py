@@ -1183,20 +1183,14 @@ class MACCSKeys(BaseCompoundVecRepresentation):
 
 
 class PubChemFingerprint(BaseCompoundVecRepresentation):
-    """PubChem Fingerprint.
-    The PubChem fingerprint is a 881 bit structural key,
-    which is used by PubChem for similarity searching.
-    References
-    ----------
-    .. [1] ftp://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_fingerprints.pdf
-    .. [2] https://github.com/deepchem/deepchem/blob/master/deepchem/feat/molecule_featurizers/pubchem_fingerprint.py
-    Note
+    """PubChem Fingerprint
+    
+    Implemented as a fingerprint, which runs locally vs by calling the PubChem
+    Fingerprint (PCFP) webservice, using RDKIT to calculate the fingerprint.
+    
+    Specs described in ftp://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_fingerprints.txt.
+    Search patterns from https://bitbucket.org/caodac/pcfp/src/master/src/tripod/fingerprint/PCFP.java.
     -----
-    PubChemPy uses REST API to get the fingerprint, so you need internet access.
-
-    PubChem fingerprint calculations fail for certain compounds (i.e. 'CCCCCCC[NH+](CC)CCCC(O)c1ccc(NS(C)(=O)=O)cc1').
-    Certain SMILES strings encountered in datasets are not recognized by PubChem.
-    In these cases, the fingerprint is returned with all bits equal to zero.
     """
 
     @log_arguments
@@ -1642,3 +1636,388 @@ class ModelAsRep(BaseCompoundVecRepresentation):
 
     def _load(self, d):
         super()._load(d)
+
+from rdkit.Chem import rdmolops
+
+def isCarbonOnlyRing(mol, atoms):
+    for i in range(len(atoms)):
+        if mol.GetAtomWithIdx(atoms[i]).GetAtomicNum() != 6:
+            return False
+    return True
+
+def isRingSaturated(mol, atoms):
+    for i in range(len(atoms)):
+        for j in range(i+1, len(atoms)):
+            b = mol.GetBondBetweenAtoms(atoms[i], atoms[j])
+            if b is not None and b.GetBondType() == Chem.rdchem.BondType.DOUBLE:
+                return False
+    return True
+
+def isRingUnsaturated(mol, atoms, all_rings):
+    db = 0
+    hetero = 0
+    nitro = 0
+    for i in range(len(atoms)):
+        for j in range(i+1, len(atoms)):
+            b = mol.GetBondBetweenAtoms(atoms[i], atoms[j])
+            if b is not None and b.GetBondType() == Chem.rdchem.BondType.DOUBLE:
+                ring_count_i = [atoms[i] in ring for ring in all_rings]
+                ring_count_j = [atoms[j] in ring for ring in all_rings]
+                if len(ring_count_i) + len(ring_count_j) < 4:
+                    db += 1
+
+        atno = mol.GetAtomWithIdx(atoms[i]).GetAtomicNum()
+        if atno != 6 and atno != 1:
+            if atno == 7:
+                nitro += 1
+            hetero += 1
+
+    if ((db == 1 and len(atoms) == 3)
+        or (db == 2 and (len(atoms) == 4 
+                        or len(atoms) == 5 
+                        or (len(atoms) == 6 and hetero == 1)))
+        or (db == 3 and len(atoms) == 7)
+        or (db > 0 and hetero == 0)):
+        return True
+    return False
+
+def isAromaticRing(mol, atoms):
+    bondsInRing = []
+    for i in range(len(atoms)):
+        a = mol.GetAtomWithIdx(atoms[i])
+        for b in a.GetBonds():
+            if b.GetBeginAtomIdx() in atoms and b.GetEndAtomIdx() in atoms:
+                bondsInRing.append(b)
+
+    for b in bondsInRing:
+        if b.GetBondType() not in [Chem.rdchem.BondType.AROMATIC]:
+            return False
+    return True
+
+def countAnyRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size:
+            count += 1
+    return count
+            
+def countAromaticRing(mol, rings):
+    count = 0
+    for ring in rings:
+        if isAromaticRing(mol, ring):
+            count += 1
+    return count
+
+def countHeteroAromaticRing(mol, rings):
+    count = 0
+    for ring in rings:
+        if isAromaticRing(mol, ring) and not isCarbonOnlyRing(mol, ring):
+            count += 1
+    return count
+
+def countSaturatedOrAromaticCarbonOnlyRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size and (isAromaticRing(mol, ring) or isRingSaturated(mol, ring)) and isCarbonOnlyRing(mol, ring):
+            count += 1
+    return count
+
+def countSaturatedOrAromaticNitrogenContainingRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size and (isAromaticRing(mol, ring) or isRingSaturated(mol, ring)):
+            for i in range(len(ring)):
+                if mol.GetAtomWithIdx(ring[i]).GetAtomicNum() == 7:
+                    count += 1
+                    break
+    return count
+
+def countSaturatedOrAromaticHeteroContainingRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size and (isAromaticRing(mol, ring) or isRingSaturated(mol, ring)):
+            for i in range(len(ring)):
+                if mol.GetAtomWithIdx(ring[i]).GetAtomicNum() != 6:
+                    count += 1
+                    break
+    return count
+
+def countUnsaturatedCarbonOnlyRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size and isRingUnsaturated(mol, ring, rings):
+            count += 1
+    return count
+
+def countUnsaturatedNitrogenContainingRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size and isRingUnsaturated(mol, ring, rings):
+            for i in range(len(ring)):
+                if mol.GetAtomWithIdx(ring[i]).GetAtomicNum() == 7:
+                    count += 1
+                    break
+    return count
+
+def countUnsaturatedHeteroContainingRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size and isRingUnsaturated(mol, ring, rings):
+            for i in range(len(ring)):
+                if mol.GetAtomWithIdx(ring[i]).GetAtomicNum() != 6:
+                    count += 1
+                    break
+    return count
+
+def countNitrogenInRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size:
+            for i in range(len(ring)):
+                if mol.GetAtomWithIdx(ring[i]).GetAtomicNum() == 7:
+                    count += 1
+                    break
+    return count
+
+def countHeteroInRing(mol, rings, size):
+    count = 0
+    for ring in rings:
+        if len(ring) == size:
+            for i in range(len(ring)):
+                if mol.GetAtomWithIdx(ring[i]).GetAtomicNum() != 6:
+                    count += 1
+                    break
+    return count
+
+from itertools import combinations
+
+def get_valid_combinations(sets):
+    valid_combinations = []
+    # get all possible combinations of merging the sets
+    for merge in combinations(sets, 2):
+        # check if there are at least two overlapping elements
+        overlap = set.intersection(*merge)
+        if len(overlap) >= 2:
+            # add the combination to the list of valid combinations
+            valid_combinations.append(set.union(*merge))
+      
+    for merge in combinations(sets, 3):
+        # check if there are at least two overlapping elements
+        overlap = set.intersection(*merge)
+        if len(overlap) >= 2:
+          # add the combination to the list of valid combinations
+          valid_combinations.append(set.union(*merge))
+        
+    return valid_combinations + sets
+
+class PubChemFingerprint_local(BaseCompoundVecRepresentation):
+    """PubChem Fingerprint
+    
+    Implemented as a fingerprint, which runs locally vs by calling the PubChem
+    Fingerprint (PCFP) webservice, using RDKIT to calculate the fingerprint.
+    
+    On a validation set of 400 compounds from the FDA Orange Book, the PubCheFP_local
+    matches the PubChem server-based version on 331/400 compounds, and is within 1 bit
+    on 360/400 compounds. There are however 28/400 compounds where it is between 50
+    and 100 bits off.
+    
+    Specs described in ftp://ftp.ncbi.nlm.nih.gov/pubchem/specifications/pubchem_fingerprints.txt.
+    Search patterns from https://bitbucket.org/caodac/pcfp/src/master/src/tripod/fingerprint/PCFP.java.
+    -----
+    """
+
+    @log_arguments
+    def __init__(self):
+        filepath = oce.download_public_file("pcfp/pcfp-patterns.json")
+        with open(filepath, "r") as f:
+            self.patterns = json.load(f)["SMARTS"]
+        
+        self.smarts = [Chem.MolFromSmarts(x, mergeHs=True) for x in self.patterns]
+        super().__init__(log=False)
+
+    def _convert(self, s: str) -> np.ndarray:
+        m = Chem.MolFromSmiles(s)
+        m = Chem.AddHs(m)
+        
+        rings = [set(x) for x in list(rdmolops.GetSSSR(m))]
+        rings = [list(x) for x in get_valid_combinations(rings)]
+        
+        output = np.zeros(881)
+        
+        # Section 1
+        
+        # get element counts up to uranium 
+        counts = {i: 0 for i in range(1, 93)}
+        for atom in m.GetAtoms():
+            counts[atom.GetAtomicNum()] = counts.get(atom.GetAtomicNum(), 0) + 1
+
+        if counts[1] >= 4: output[0] = 1
+        if counts[1] >= 8: output[1] = 1
+        if counts[1] >= 16: output[2] = 1
+        if counts[1] >= 32: output[3] = 1
+        if counts[3] >= 1: output[4] = 1
+        if counts[3] >= 2: output[5] = 1
+        if counts[5] >= 1: output[6] = 1
+        if counts[5] >= 2: output[7] = 1
+        if counts[5] >= 4: output[8] = 1
+        if counts[6] >= 2: output[9] = 1
+        if counts[6] >= 4: output[10] = 1
+        if counts[6] >= 8: output[11] = 1
+        if counts[6] >= 16: output[12] = 1
+        if counts[6] >= 32: output[13] = 1
+        if counts[7] >= 1: output[14] = 1
+        if counts[7] >= 2: output[15] = 1
+        if counts[7] >= 4: output[16] = 1
+        if counts[7] >= 8: output[17] = 1
+        if counts[8] >= 1: output[18] = 1
+        if counts[8] >= 2: output[19] = 1
+        if counts[8] >= 4: output[20] = 1
+        if counts[8] >= 8: output[21] = 1
+        if counts[8] >= 16: output[22] = 1
+        if counts[9] >= 1: output[23] = 1
+        if counts[9] >= 2: output[24] = 1
+        if counts[9] >= 4: output[25] = 1
+        if counts[11] >= 1: output[26] = 1
+        if counts[11] >= 2: output[27] = 1
+        if counts[14] >= 1: output[28] = 1
+        if counts[14] >= 2: output[29] = 1
+        if counts[15] >= 1: output[30] = 1
+        if counts[15] >= 2: output[31] = 1
+        if counts[15] >= 4: output[32] = 1
+        if counts[16] >= 1: output[33] = 1
+        if counts[16] >= 2: output[34] = 1
+        if counts[16] >= 4: output[35] = 1
+        if counts[16] >= 8: output[36] = 1
+        if counts[17] >= 1: output[37] = 1
+        if counts[17] >= 2: output[38] = 1
+        if counts[17] >= 4: output[39] = 1
+        if counts[17] >= 8: output[40] = 1
+        if counts[19] >= 1: output[41] = 1
+        if counts[19] >= 2: output[42] = 1
+        if counts[35] >= 1: output[43] = 1
+        if counts[35] >= 2: output[44] = 1
+        if counts[35] >= 4: output[45] = 1
+        if counts[53] >= 1: output[46] = 1
+        if counts[53] >= 2: output[47] = 1
+        if counts[53] >= 4: output[48] = 1
+        if counts[4] >= 1: output[49] = 1
+        if counts[12] >= 1: output[50] = 1
+        if counts[13] >= 1: output[51] = 1
+        if counts[20] >= 1: output[52] = 1
+        if counts[21] >= 1: output[53] = 1
+        if counts[22] >= 1: output[54] = 1
+        if counts[23] >= 1: output[55] = 1
+        if counts[24] >= 1: output[56] = 1
+        if counts[25] >= 1: output[57] = 1
+        if counts[26] >= 1: output[58] = 1
+        if counts[27] >= 1: output[59] = 1
+        if counts[28] >= 1: output[60] = 1
+        if counts[29] >= 1: output[61] = 1
+        if counts[30] >= 1: output[62] = 1
+        if counts[31] >= 1: output[63] = 1
+        if counts[32] >= 1: output[64] = 1
+        if counts[33] >= 1: output[65] = 1
+        if counts[34] >= 1: output[66] = 1
+        if counts[36] >= 1: output[67] = 1
+        if counts[37] >= 1: output[68] = 1
+        if counts[38] >= 1: output[69] = 1
+        if counts[39] >= 1: output[70] = 1
+        if counts[40] >= 1: output[71] = 1
+        if counts[41] >= 1: output[72] = 1
+        if counts[42] >= 1: output[73] = 1
+        if counts[44] >= 1: output[74] = 1
+        if counts[45] >= 1: output[75] = 1
+        if counts[46] >= 1: output[76] = 1
+        if counts[47] >= 1: output[77] = 1
+        if counts[48] >= 1: output[78] = 1
+        if counts[49] >= 1: output[79] = 1
+        if counts[50] >= 1: output[80] = 1
+        if counts[51] >= 1: output[81] = 1
+        if counts[52] >= 1: output[82] = 1
+        if counts[54] >= 1: output[83] = 1
+        if counts[55] >= 1: output[84] = 1
+        if counts[56] >= 1: output[85] = 1
+        if counts[71] >= 1: output[86] = 1
+        if counts[72] >= 1: output[87] = 1
+        if counts[73] >= 1: output[88] = 1
+        if counts[74] >= 1: output[89] = 1
+        if counts[75] >= 1: output[90] = 1
+        if counts[76] >= 1: output[91] = 1
+        if counts[77] >= 1: output[92] = 1
+        if counts[78] >= 1: output[93] = 1
+        if counts[79] >= 1: output[94] = 1
+        if counts[80] >= 1: output[95] = 1
+        if counts[81] >= 1: output[96] = 1
+        if counts[82] >= 1: output[97] = 1
+        if counts[83] >= 1: output[98] = 1
+        if counts[57] >= 1: output[99] = 1
+        if counts[58] >= 1: output[100] = 1
+        if counts[59] >= 1: output[101] = 1
+        if counts[60] >= 1: output[102] = 1
+        if counts[61] >= 1: output[103] = 1
+        if counts[62] >= 1: output[104] = 1
+        if counts[63] >= 1: output[105] = 1
+        if counts[64] >= 1: output[106] = 1
+        if counts[65] >= 1: output[107] = 1
+        if counts[66] >= 1: output[108] = 1
+        if counts[67] >= 1: output[109] = 1
+        if counts[68] >= 1: output[110] = 1
+        if counts[69] >= 1: output[111] = 1
+        if counts[70] >= 1: output[112] = 1
+        if counts[43] >= 1: output[113] = 1
+        if counts[92] >= 1: output[114] = 1
+        
+        # Section 2
+        
+        def block(size, count, i):
+            if countAnyRing(m, rings, size) >= count: output[i] = 1
+            if countSaturatedOrAromaticCarbonOnlyRing(m, rings, size) >= count: output[i+1] = 1
+            if countSaturatedOrAromaticNitrogenContainingRing(m, rings, size) >= count: output[i+2] = 1
+            if countSaturatedOrAromaticHeteroContainingRing(m, rings, size) >= count: output[i+3] = 1
+            if countUnsaturatedCarbonOnlyRing(m, rings, size) >= count: output[i+4] = 1
+            if countUnsaturatedNitrogenContainingRing(m, rings, size) >= count: output[i+5] = 1
+            if countUnsaturatedHeteroContainingRing(m, rings, size) >= count: output[i+6] = 1
+        
+        block(3,1,115)
+        block(3,2,122)
+        
+        block(4,1,129)
+        block(4,2,136)
+        
+        block(5,1,143)
+        block(5,2,150)
+        block(5,3,157)
+        block(5,4,164)
+        block(5,5,171)
+        
+        block(6,1,178)
+        block(6,2,185)
+        block(6,3,192)
+        block(6,4,199)
+        block(6,5,206)
+        
+        block(7,1,213)
+        block(7,2,220)
+        
+        block(8,1,227)
+        block(8,2,234)
+        
+        block(9,1,241)
+        
+        block(10,1,248)
+        
+        if countAromaticRing(m, rings) >= 1: output[255] = 1
+        if countHeteroAromaticRing(m, rings) >= 1: output[256] = 1
+        if countAromaticRing(m, rings) >= 2: output[257] = 1
+        if countHeteroAromaticRing(m, rings) >= 2: output[258] = 1
+        if countAromaticRing(m, rings) >= 3: output[259] = 1
+        if countHeteroAromaticRing(m, rings) >= 3: output[260] = 1
+        if countAromaticRing(m, rings) >= 4: output[261] = 1
+        if countHeteroAromaticRing(m, rings) >= 4: output[262] = 1
+        
+        i = 263
+        for smarts in self.smarts:
+            if m.HasSubstructMatch(smarts, recursionPossible=False, useChirality=True, ): output[i] = 1
+            i+=1
+        
+        return output.astype(int)

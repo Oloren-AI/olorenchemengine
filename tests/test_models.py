@@ -328,6 +328,13 @@ def test_mol2vec(example_data):
         n_estimators=10,
     )
     train_predict_slf(model, example_data)
+    
+def test_pcfp_local(example_data):
+    model = oce.RandomForestModel(
+        oce.PubChemFingerprint_local(),
+        n_estimators=10,
+    )
+    train_predict_slf(model, example_data)
 
 def test_tanimotogpmodel(example_data):
     from olorenchemengine.external import TanimotoGPModel
