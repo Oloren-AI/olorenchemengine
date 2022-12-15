@@ -425,6 +425,7 @@ class TorchMLP(BaseModel):
         norm_layer: str = None,
         activation_layer: str = None,
         dropout: float = 0.0,
+        epochs: int = 100,
         log=True,
         **kwargs
     ):
@@ -451,6 +452,7 @@ class TorchMLP(BaseModel):
             self.norm_layer = None
 
         self.dropout = dropout
+        self.epochs = epochs
 
         super().__init__(representation, log=False)
 
@@ -469,6 +471,7 @@ class TorchMLP(BaseModel):
             hidden_layer_sizes=[len(X[0])] + self.hidden_layer_sizes,
             norm_layer=self.norm_layer,
             activation_layer=self.activation_layer,
+            
             setting=self.setting,
         )
 
@@ -487,7 +490,7 @@ class TorchMLP(BaseModel):
             devices=1
             if torch.cuda.is_available()
             else None,  # limiting got iPython runs
-            max_epochs=10,
+            max_epochs=self.epochs,
         )
 
         self.trainer.fit(self.network, loader)
