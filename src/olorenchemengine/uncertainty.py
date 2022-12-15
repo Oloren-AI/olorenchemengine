@@ -37,6 +37,22 @@ class BaseFingerprintModel(BaseErrorModel):
         get_fp = lambda smi: AllChem.GetMorganFingerprint(Chem.MolFromSmiles(smi), self.radius)
         return list(np.vectorize(get_fp)(smiles))
 
+    # helper function for retrieving data
+    def _get_data(self, X, y_pred):
+        def distance(smiles):
+            mol = Chem.MolFromSmiles(smiles)
+            fp = AllChem.GetMorganFingerprint(mol, 2)
+            TD = 1 - np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+            return TD
+        
+        def delta(y):
+            return self.y_train - y
+        
+        tanimoto_distance = np.stack([distance(smiles) for smiles in tqdm(X)])
+        prediction_error = np.stack([delta(y) for y in tqdm(y_pred)])
+
+        return tanimoto_distance, prediction_error
+
     def _save(self) -> dict:
         d = super()._save()
         if hasattr(self, "train_fps"):
@@ -50,18 +66,19 @@ class BaseFingerprintModel(BaseErrorModel):
 
 # List of kernels for kernel error models
 KERNELS = {
-    "sdc":          lambda X, h: np.exp(-h * X / (1 - X)),
-    "uniform":      lambda X, h: h * X < 1,
-    "linear":       lambda X, h: np.maximum(0, 1 - h * X),
-    "parabolic":    lambda X, h: np.maximum(0, 1 - (h * X) ** 2),
-    "power":        lambda X, h: (1 - X) ** h,
-    "gaussian":     lambda X, h: np.exp(-(h * X) ** 2),
+    "sdc": lambda X, h: np.exp(-h * X / (1 - X)),
+    "uniform": lambda X, h: h * X < 1,
+    "linear": lambda X, h: np.maximum(0, 1 - h * X),
+    "parabolic": lambda X, h: np.maximum(0, 1 - (h * X) ** 2),
+    "power": lambda X, h: (1 - X) ** h,
+    "gaussian": lambda X, h: np.exp(-(h * X) ** 2),
+    "nearest_neighbor": lambda X, h: np.partition(X, -h)[-h] 
 }
 
 # List of predictors for kernel error models
 PREDICTORS = {
     "property": lambda y, em: em.y_train - y,
-    "error":    lambda y, em: em.y_train - em.y_pred_train,
+    "residual": lambda y, em: em.y_train - em.y_pred_train,
 }
 
 class KernelError(BaseFingerprintModel):
@@ -77,9 +94,10 @@ class KernelError(BaseFingerprintModel):
 
     Parameters
     ------------------------------
-    predictor (str, {"property", "error"}): Error predictor being estimated
+    predictor (str, {"property", "residual"}): Error predictor being estimated
     kernel (str, {"default"}): Kernel used as a weight-function
-    h (int, float): Bandwidth
+    h (int, float): Bandwidth for most kernels, number of nearest neighbors for
+        `nearest_neighbor` kernel
 
     Example
     ------------------------------
@@ -90,7 +108,7 @@ class KernelError(BaseFingerprintModel):
     """
 
     @log_arguments
-    def __init__(self, predictor="property", kernel="sdc", h=3, log=True, **kwargs):
+    def __init__(self, predictor="residual", kernel="parabolic", h=3, log=True, **kwargs):
         assert predictor in PREDICTORS, "Predictor `{}` is invalid. Please choose one of `{}`.".format(predictor, "`, `".join(KERNELS.keys()))
         assert kernel in KERNELS, "Kernel `{}` is invalid. Please choose one of `{}`.".format(kernel, "`, `".join(KERNELS.keys()))
 
@@ -119,7 +137,6 @@ class KernelError(BaseFingerprintModel):
         X = np.array(X).flatten()
         return np.array([covariate(smiles, y) for smiles, y in tqdm(zip(X, y_pred))])
 
-
 class SDC(BaseFingerprintModel):
     """Sum of Distance-weighted Contributions
     
@@ -130,7 +147,8 @@ class SDC(BaseFingerprintModel):
 
     Parameters
     ------------------------------
-    a (int or float, optional): Value of a in the SDC formula. Default 3.
+    a (int or float, optional): Value of a in the SDC formula; higher values 
+        have a steeper weight drop. Default 3.
 
     Example
     ------------------------------
@@ -154,84 +172,6 @@ class SDC(BaseFingerprintModel):
             return np.sum(np.exp(-self.a * (1 - TS) / TS))
 
         return np.array([sdc(fp) for fp in tqdm(ref_fps)])
-
-
-class TargetDistDC(SDC):
-    """Weighted prediction difference
-
-    TargetDistDC is an error model that calculates the root-mean-square
-    difference between the predicted activity of the target molecule and
-    the observed activities of all training molecules, weighted by the DC.
-
-    Parameters
-    ------------------------------
-    a (int or float, optional): Value of a in the SDC formula. Default 3.
-
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistDC())
-    model.predict(test["Drug"], return_ci = True)
-    """
-
-    @log_arguments
-    def __init__(self, log=True, **kwargs):      
-        super().__init__(log=False, **kwargs)
-
-    def calculate(self, X, y_pred):        
-        def dist(smi, pred):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            DC = np.exp(-self.a * (1 - TS) / TS)
-            error = np.abs(self.y_train - pred)
-            if np.sum(DC) == 0:
-                return np.sqrt(np.mean(error))
-            return np.sqrt(np.dot(DC, error) / np.sum(DC))
-
-        X = np.array(X).flatten()
-        return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
-
-
-class TrainDistDC(SDC):
-    """Weighted training error
-
-    TrainDistDC is an error model that calculates the root-mean-square
-    difference between the predicted and observed activities of all
-    training molecules, weighted by the DC.
-
-    Parameters
-    ------------------------------
-    a (int or float, optional): Value of a in the SDC formula. Default 3.
-
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistDC())
-    model.predict(test["Drug"], return_ci = True)
-    """
-
-    @log_arguments
-    def __init__(self, log=True, **kwargs):      
-        super().__init__(log=False, **kwargs)
-
-    def calculate(self, X, y_pred):
-        residuals = np.abs(self.y_train - self.y_pred_train)
-        ref_fps = self.get_fps(X)
-
-        def dist(fp):
-            TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
-            DC = np.exp(-self.a * (1 - TS) / TS)
-            if np.sum(DC) == 0:
-                return np.sqrt(np.mean(residuals))
-            return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
-
-        return np.array([dist(fp) for fp in tqdm(ref_fps)])
-
 
 class KNNSimilarity(BaseFingerprintModel):
     """Tanimoto similarity to k nearest neighbors
@@ -263,88 +203,9 @@ class KNNSimilarity(BaseFingerprintModel):
 
         def mean_sim(fp):
             similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
-            return np.mean(np.partition(similarity, self.k)[-self.k:])
+            return np.mean(np.partition(similarity, -self.k)[-self.k:])
 
         return np.array([mean_sim(fp) for fp in tqdm(ref_fps)])
-
-class TargetDistKNN(KNNSimilarity):
-    """Prediction difference of k nearest neighbors
-    
-    TargetDistKNN is an error model that calculates the root-mean-square
-    difference between the predicted activity of the target molecule and
-    the observed activities of the k most similar training molecules,
-    weighted by their similarity.
-
-    Parameters
-    ------------------------------
-    k (int, optional): Number of nearest neighbors to consider. Default 5.
-
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistKNN())
-    model.predict(test["Drug"], return_ci = True)
-    """
-
-    @log_arguments
-    def __init__(self, log=True, **kwargs):      
-        super().__init__(log=False, **kwargs)
-
-    def calculate(self, X, y_pred):
-        def dist(smi, pred):
-            mol = Chem.MolFromSmiles(smi)
-            ref_fp = AllChem.GetMorganFingerprint(mol, 2)
-            TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
-            error = np.abs(self.y_train - pred)
-            idxs = np.argpartition(TS, self.k)[-self.k:]
-            if np.sum(TS[idxs]) == 0:
-                return np.sqrt(np.mean(error[idxs]))
-            return np.sqrt(np.dot(TS[idxs], error[idxs]) / np.sum(TS[idxs]))
-
-        X = np.array(X).flatten()
-        return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
-
-
-class TrainDistKNN(KNNSimilarity):
-    """Training error of k nearest neighbors
-    
-    TrainDistKNN is an error model that calculates the root-mean-square
-    difference between the predicted and observed activities of the k most
-    similar training molecules to the target molecule, weighted by their
-    similarity.
-
-    Parameters
-    ------------------------------
-    k (int, optional): Number of nearest neighbors to consider. Default 5.
-
-    Example
-    ------------------------------
-    import olorenchemengine as oce
-
-    model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
-    model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistKNN())
-    model.predict(test["Drug"], return_ci = True)
-    """
-
-    @log_arguments
-    def __init__(self, log=True, **kwargs):      
-        super().__init__(log=False, **kwargs)
-
-    def calculate(self, X, y_pred):
-        residuals = np.abs(self.y_train - self.y_pred_train)
-        ref_fps = self.get_fps(X)
-
-        def dist(fp):
-            similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
-            idxs = np.argpartition(similarity, self.k)[-self.k:]
-            if np.sum(similarity[idxs]) == 0:
-                return np.sqrt(np.mean(residuals[idxs]))
-            return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
-        
-        return np.array([dist(fp) for fp in tqdm(ref_fps)])
-
 
 class Predicted(BaseErrorModel):
     """Predicted value
@@ -360,7 +221,6 @@ class Predicted(BaseErrorModel):
     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
     model.fit_cv(train["Drug"], train["Y"], error_model = oce.AggregateErrorModel([oce.SDC(), oce.Predicted()])
     model.predict(test["Drug"], return_ci = True)
-    ------------------------------
     """
 
     @log_arguments
@@ -789,7 +649,7 @@ class AggregateErrorModel(BaseErrorModel):
         
         self.reduction.fit(scores)
         aggregate_scores = self.reduction.transform(scores).flatten()
-        residuals = np.abs(np.array(y) - y_pred)
+        residuals = np.array(y) - y_pred
         self.fit_scores = scores
 
         return self._fit(residuals, aggregate_scores, **kwargs)
@@ -868,3 +728,165 @@ class AggregateErrorModel(BaseErrorModel):
         if "fit_scores" in d.keys():
             self.fit_scores = d["fit_scores"]
             self.reduction.fit(self.fit_scores)
+
+
+
+# class TargetDistDC(SDC):
+#     """To be depricated; see KernelError for the same functionality
+    
+#     Weighted prediction difference
+
+#     TargetDistDC is an error model that calculates the root-mean-square
+#     difference between the predicted activity of the target molecule and
+#     the observed activities of all training molecules, weighted by the DC.
+
+#     Parameters
+#     ------------------------------
+#     a (int or float, optional): Value of a in the SDC formula. Default 3.
+
+#     Example
+#     ------------------------------
+#     import olorenchemengine as oce
+
+#     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+#     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistDC())
+#     model.predict(test["Drug"], return_ci = True)
+#     """
+
+#     @log_arguments
+#     def __init__(self, log=True, **kwargs):      
+#         super().__init__(log=False, **kwargs)
+
+#     def calculate(self, X, y_pred):        
+#         def dist(smi, pred):
+#             mol = Chem.MolFromSmiles(smi)
+#             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
+#             TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
+#             DC = np.exp(-self.a * (1 - TS) / TS)
+#             error = np.abs(self.y_train - pred)
+#             if np.sum(DC) == 0:
+#                 return np.sqrt(np.mean(error))
+#             return np.sqrt(np.dot(DC, error) / np.sum(DC))
+
+#         X = np.array(X).flatten()
+#         return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
+
+# class TrainDistDC(SDC):
+#     """To be depricated; see KernelError for the same functionality
+    
+#     Weighted training error
+
+#     TrainDistDC is an error model that calculates the root-mean-square
+#     difference between the predicted and observed activities of all
+#     training molecules, weighted by the DC.
+
+#     Parameters
+#     ------------------------------
+#     a (int or float, optional): Value of a in the SDC formula. Default 3.
+
+#     Example
+#     ------------------------------
+#     import olorenchemengine as oce
+
+#     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+#     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistDC())
+#     model.predict(test["Drug"], return_ci = True)
+#     """
+
+#     @log_arguments
+#     def __init__(self, log=True, **kwargs):      
+#         super().__init__(log=False, **kwargs)
+
+#     def calculate(self, X, y_pred):
+#         residuals = np.abs(self.y_train - self.y_pred_train)
+#         ref_fps = self.get_fps(X)
+
+#         def dist(fp):
+#             TS = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+#             DC = np.exp(-self.a * (1 - TS) / TS)
+#             if np.sum(DC) == 0:
+#                 return np.sqrt(np.mean(residuals))
+#             return np.sqrt(np.dot(DC, residuals) / np.sum(DC))
+
+#         return np.array([dist(fp) for fp in tqdm(ref_fps)])
+
+# class TargetDistKNN(KNNSimilarity):
+#     """To be depricated; see KernelError for the same functionality
+    
+#     Prediction difference of k nearest neighbors
+    
+#     TargetDistKNN is an error model that calculates the root-mean-square
+#     difference between the predicted activity of the target molecule and
+#     the observed activities of the k most similar training molecules,
+#     weighted by their similarity.
+
+#     Parameters
+#     ------------------------------
+#     k (int, optional): Number of nearest neighbors to consider. Default 5.
+
+#     Example
+#     ------------------------------
+#     import olorenchemengine as oce
+
+#     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+#     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TargetDistKNN())
+#     model.predict(test["Drug"], return_ci = True)
+#     """
+
+#     @log_arguments
+#     def __init__(self, log=True, **kwargs):      
+#         super().__init__(log=False, **kwargs)
+
+#     def calculate(self, X, y_pred):
+#         def dist(smi, pred):
+#             mol = Chem.MolFromSmiles(smi)
+#             ref_fp = AllChem.GetMorganFingerprint(mol, 2)
+#             TS = np.array(BulkTanimotoSimilarity(ref_fp, self.train_fps))
+#             error = np.abs(self.y_train - pred)
+#             idxs = np.argpartition(TS, -self.k)[-self.k:]
+#             if np.sum(TS[idxs]) == 0:
+#                 return np.sqrt(np.mean(error[idxs]))
+#             return np.sqrt(np.dot(TS[idxs], error[idxs]) / np.sum(TS[idxs]))
+
+#         X = np.array(X).flatten()
+#         return np.array([dist(smi, pred) for smi, pred in tqdm(zip(X, y_pred))])
+
+# class TrainDistKNN(KNNSimilarity):
+#     """To be depricated; see KernelError for the same functionality
+    
+#     Training error of k nearest neighbors
+    
+#     TrainDistKNN is an error model that calculates the root-mean-square
+#     difference between the predicted and observed activities of the k most
+#     similar training molecules to the target molecule, weighted by their
+#     similarity.
+
+#     Parameters
+#     ------------------------------
+#     k (int, optional): Number of nearest neighbors to consider. Default 5.
+
+#     Example
+#     ------------------------------
+#     import olorenchemengine as oce
+
+#     model = oce.RandomForestModel(representation = oce.MorganVecRepresentation(radius=2, nbits=2048), n_estimators = 1000)
+#     model.fit_cv(train["Drug"], train["Y"], error_model = oce.TrainDistKNN())
+#     model.predict(test["Drug"], return_ci = True)
+#     """
+
+#     @log_arguments
+#     def __init__(self, log=True, **kwargs):      
+#         super().__init__(log=False, **kwargs)
+
+#     def calculate(self, X, y_pred):
+#         residuals = np.abs(self.y_train - self.y_pred_train)
+#         ref_fps = self.get_fps(X)
+
+#         def dist(fp):
+#             similarity = np.array(BulkTanimotoSimilarity(fp, self.train_fps))
+#             idxs = np.argpartition(similarity, -self.k)[-self.k:]
+#             if np.sum(similarity[idxs]) == 0:
+#                 return np.sqrt(np.mean(residuals[idxs]))
+#             return np.sqrt(np.dot(similarity[idxs], residuals[idxs]) / np.sum(similarity[idxs]))
+        
+#         return np.array([dist(fp) for fp in tqdm(ref_fps)])

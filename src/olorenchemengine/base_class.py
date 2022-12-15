@@ -1242,7 +1242,7 @@ class BaseErrorModel(BaseClass):
             model.fit(X_train, y_train)
             
             y_pred_test = np.array(model.predict(X_test)).flatten()
-            pred_error = np.abs(y_test - y_pred_test)
+            pred_error = y_test - y_pred_test
             if residuals is None:
                 residuals = pred_error
             else:

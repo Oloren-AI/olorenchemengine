@@ -324,44 +324,44 @@ def test_SDC_file2(example_model2, example_data2):
     fit_score_slf(error_model, example_model2, example_data2)
 
 
-def test_TargetDistDC1(example_model, example_data):
-    error_model = TargetDistDC(a=1)
-    fit_score_sl(error_model, example_model, example_data)
+# def test_TargetDistDC1(example_model, example_data):
+#     error_model = TargetDistDC(a=1)
+#     fit_score_sl(error_model, example_model, example_data)
 
 
-def test_TargetDistDC2(example_model2, example_data2):
-    error_model = TargetDistDC(a=1)
-    fit_score_sl(error_model, example_model2, example_data2)
+# def test_TargetDistDC2(example_model2, example_data2):
+#     error_model = TargetDistDC(a=1)
+#     fit_score_sl(error_model, example_model2, example_data2)
 
 
-def test_TargetDistDC_file1(example_model, example_data):
-    error_model = TargetDistDC(a=1)
-    fit_score_slf(error_model, example_model, example_data)
+# def test_TargetDistDC_file1(example_model, example_data):
+#     error_model = TargetDistDC(a=1)
+#     fit_score_slf(error_model, example_model, example_data)
 
 
-def test_TargetDistDC_file2(example_model2, example_data2):
-    error_model = TargetDistDC(a=1)
-    fit_score_slf(error_model, example_model2, example_data2)
+# def test_TargetDistDC_file2(example_model2, example_data2):
+#     error_model = TargetDistDC(a=1)
+#     fit_score_slf(error_model, example_model2, example_data2)
 
 
-def test_TrainDistDC1(example_model, example_data):
-    error_model = TrainDistDC(a=1)
-    fit_score_sl(error_model, example_model, example_data)
+# def test_TrainDistDC1(example_model, example_data):
+#     error_model = TrainDistDC(a=1)
+#     fit_score_sl(error_model, example_model, example_data)
 
 
-def test_TrainDistDC2(example_model2, example_data2):
-    error_model = TrainDistDC(a=1)
-    fit_score_sl(error_model, example_model2, example_data2)
+# def test_TrainDistDC2(example_model2, example_data2):
+#     error_model = TrainDistDC(a=1)
+#     fit_score_sl(error_model, example_model2, example_data2)
 
 
-def test_TrainDistDC_file1(example_model, example_data):
-    error_model = TrainDistDC(a=1)
-    fit_score_slf(error_model, example_model, example_data)
+# def test_TrainDistDC_file1(example_model, example_data):
+#     error_model = TrainDistDC(a=1)
+#     fit_score_slf(error_model, example_model, example_data)
 
 
-def test_TrainDistDC_file2(example_model2, example_data2):
-    error_model = TrainDistDC(a=1)
-    fit_score_slf(error_model, example_model2, example_data2)
+# def test_TrainDistDC_file2(example_model2, example_data2):
+#     error_model = TrainDistDC(a=1)
+#     fit_score_slf(error_model, example_model2, example_data2)
 
 
 def test_KNNSimilarity1(example_model, example_data):
@@ -384,44 +384,44 @@ def test_KNNSimilarity_file2(example_model2, example_data2):
     fit_score_slf(error_model, example_model2, example_data2)
 
 
-def test_TargetDistKNN1(example_model, example_data):
-    error_model = TargetDistKNN(k=3)
-    fit_score_sl(error_model, example_model, example_data)
+# def test_TargetDistKNN1(example_model, example_data):
+#     error_model = TargetDistKNN(k=3)
+#     fit_score_sl(error_model, example_model, example_data)
 
 
-def test_TargetDistKNN2(example_model2, example_data2):
-    error_model = TargetDistKNN(k=3)
-    fit_score_sl(error_model, example_model2, example_data2)
+# def test_TargetDistKNN2(example_model2, example_data2):
+#     error_model = TargetDistKNN(k=3)
+#     fit_score_sl(error_model, example_model2, example_data2)
 
 
-def test_TargetDistKNN_file1(example_model, example_data):
-    error_model = TargetDistKNN(k=3)
-    fit_score_slf(error_model, example_model, example_data)
+# def test_TargetDistKNN_file1(example_model, example_data):
+#     error_model = TargetDistKNN(k=3)
+#     fit_score_slf(error_model, example_model, example_data)
 
 
-def test_TargetDistKNN_file2(example_model2, example_data2):
-    error_model = TargetDistKNN(k=3)
-    fit_score_slf(error_model, example_model2, example_data2)
+# def test_TargetDistKNN_file2(example_model2, example_data2):
+#     error_model = TargetDistKNN(k=3)
+#     fit_score_slf(error_model, example_model2, example_data2)
 
 
-def test_TrainDistKNN1(example_model, example_data):
-    error_model = TrainDistKNN(k=3)
-    fit_score_sl(error_model, example_model, example_data)
+# def test_TrainDistKNN1(example_model, example_data):
+#     error_model = TrainDistKNN(k=3)
+#     fit_score_sl(error_model, example_model, example_data)
 
 
-def test_TrainDistKNN2(example_model2, example_data2):
-    error_model = TrainDistKNN(k=3)
-    fit_score_sl(error_model, example_model2, example_data2)
+# def test_TrainDistKNN2(example_model2, example_data2):
+#     error_model = TrainDistKNN(k=3)
+#     fit_score_sl(error_model, example_model2, example_data2)
 
 
-def test_TrainDistKNN_file1(example_model, example_data):
-    error_model = TrainDistKNN(k=3)
-    fit_score_slf(error_model, example_model, example_data)
+# def test_TrainDistKNN_file1(example_model, example_data):
+#     error_model = TrainDistKNN(k=3)
+#     fit_score_slf(error_model, example_model, example_data)
 
 
-def test_TrainDistKNN_file2(example_model2, example_data2):
-    error_model = TrainDistKNN(k=3)
-    fit_score_slf(error_model, example_model2, example_data2)
+# def test_TrainDistKNN_file2(example_model2, example_data2):
+#     error_model = TrainDistKNN(k=3)
+#     fit_score_slf(error_model, example_model2, example_data2)
 
 
 """
@@ -632,7 +632,10 @@ Aggregate model
 """
 
 def test_aggregate_fit(example_model, example_data):
-    error_model = AggregateErrorModel(TargetDistKNN(), TrainDistKNN())
+    error_model = AggregateErrorModel(
+        KernelError(predictor="error"), 
+        KernelError(predictor="property")
+    )
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit(X_test, y_test)
@@ -642,7 +645,10 @@ def test_aggregate_fit(example_model, example_data):
 
 
 def test_aggregate_fit_cv(example_model, example_data):
-    error_model = AggregateErrorModel(TargetDistKNN(), TrainDistKNN())
+    error_model = AggregateErrorModel(
+        KernelError(predictor="error"), 
+        KernelError(predictor="property")
+    )
     X_train, X_test, y_train, y_test = example_data
     error_model.build(example_model, X_train, y_train)
     error_model.fit_cv(n_splits=2)
@@ -652,22 +658,34 @@ def test_aggregate_fit_cv(example_model, example_data):
 
 
 def test_aggregate1(example_model, example_data):
-    error_model = AggregateErrorModel(TargetDistKNN(), TrainDistKNN())
+    error_model = AggregateErrorModel(
+        KernelError(predictor="error"), 
+        KernelError(predictor="property")
+    )
     fit_score_sl(error_model, example_model, example_data)
 
 
 def test_aggregate2(example_model2, example_data2):
-    error_model = AggregateErrorModel(TargetDistKNN(), TrainDistKNN())
+    error_model = AggregateErrorModel(
+        KernelError(predictor="error"), 
+        KernelError(predictor="property")
+    )
     fit_score_sl(error_model, example_model2, example_data2)
 
 
 def test_aggregate_file1(example_model, example_data):
-    error_model = AggregateErrorModel(TargetDistKNN(), TrainDistKNN())
+    error_model = AggregateErrorModel(
+        KernelError(predictor="error"), 
+        KernelError(predictor="property")
+    )
     fit_score_slf(error_model, example_model, example_data)
 
 
 def test_aggregate_file2(example_model2, example_data2):
-    error_model = AggregateErrorModel(TargetDistKNN(), TrainDistKNN())
+    error_model = AggregateErrorModel(
+        KernelError(predictor="error"), 
+        KernelError(predictor="property")
+    )
     fit_score_slf(error_model, example_model2, example_data2)
 
 """
