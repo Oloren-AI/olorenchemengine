@@ -65,9 +65,9 @@ var my_shapes = [
         type: 'rect',
         xref: 'x',
         yref: 'paper',
-        x0: data.value - data.error,
+        x0: data.value + data.lower_error,
         y0: 0,
-        x1: data.value + data.error,
+        x1: data.value + data.upper_error,
         y1: 1,
         fillcolor: '#bebada',
         opacity: 0.5,
@@ -125,35 +125,7 @@ if ("true" in data) {
 }
 
 var layout = {
-    shapes: [
-        {
-            type: 'rect',
-            xref: 'x',
-            yref: 'paper',
-            x0: data.value + data.lower_error,
-            y0: 0,
-            x1: data.value + data.upper_error,
-            y1: 1,
-            fillcolor: '#bebada',
-            opacity: 0.5,
-            line: {
-                width: 0
-            }
-        },
-        {
-            type: 'line',
-            xref: 'x',
-            yref: 'paper',
-            x0: data.value,
-            y0: 0,
-            x1: data.value,
-            y1: 1,
-            line: {
-                color: '#bebada',
-                width: 3
-            }
-        },
-    ],
+    shapes: my_shapes,
     title: data.title,
     xaxis: {
         title: data.xaxis_title,
