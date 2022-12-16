@@ -706,7 +706,7 @@ class BaseDepreceated(BaseClass):
     """
     
     @log_arguments
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         raise Exception("This class has been depreceated and will not run, please reach out via email (contact@oloren.ai) or raise an issue on GitHub for more details if you have any questions")
 
 class RemoteObj(BaseRemoteSymbol):
