@@ -730,8 +730,9 @@ class BaseModel(BaseClass):
             self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
             pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
             true = true.reshape(-1)
-            residuals = np.abs(pred - true)
+            residuals = pred - true
             if hasattr(self, "error_model"):
+                self.error_model.build(self, X, y)
                 self.error_model._fit(residuals, scores, **kwargs)
         elif self.setting == "classification":
             self.calibrator = LinearRegression()
