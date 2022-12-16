@@ -268,15 +268,16 @@ offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
 
     message = f"""
         To complete installation of Oloren ChemEngine, either:
-            (1) Run oce.online() to use the demonstration package, Oloren ChemEngine Online,
-            (2) Install the missing dependencies, instructions can be found oce.MISSING_DEPENDENCIES(), or
-            (3) Email contact@oloren.ai with subject "Oloren ChemEngine Enterprise", for a secure privately hosted
+            (1) Install the missing dependencies, instructions can be found oce.MISSING_DEPENDENCIES(), or
+            (2) Email contact@oloren.ai with subject "Oloren ChemEngine Enterprise", for a secure privately hosted
                 Server version.
+            (3) Run oce.online() to use the demonstration package, Oloren ChemEngine Online,
+                Oloren ChemEngine online is the public, dependency-free version of OCE, which compiles OCE code locally for fast,
+                parallelized, remote execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
+                CONFIDENTAIL DATA, and is only intended for demonstration purposes. The securely privately hosted Server version is
+                called Oloren ChemEngine Enterprise.
 
-        Oloren ChemEngine online is the public, dependency-free version of OCE, which compiles OCE code locally for fast,
-        parallelized, remote execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
-        CONFIDENTAIL DATA, and is only intended for demonstration purposes. The securely privately hosted Server version is
-        called Oloren ChemEngine Enterprise.\n"""
+        \n"""
 
     # print(textwrap.fill(textwrap.dedent(message).replace("\n", " ").replace("    (", "\n     ("), 80))
     print(textwrap.dedent(message))
