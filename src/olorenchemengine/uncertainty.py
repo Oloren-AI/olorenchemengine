@@ -718,3 +718,15 @@ class AggregateErrorModel(BaseErrorModel):
         if "fit_scores" in d.keys():
             self.fit_scores = d["fit_scores"]
             self.reduction.fit(self.fit_scores)
+            
+class SDC(BaseDepreceated):
+    pass
+
+class TargetDistDC(BaseDepreceated):
+    pass
+
+class TrainDistDC(BaseDepreceated):
+    pass
+
+class KNNSimilarity(BaseDepreceated):
+    pass

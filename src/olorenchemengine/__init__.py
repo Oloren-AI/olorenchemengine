@@ -252,23 +252,10 @@ def MISSING_DEPENDENCIES():
 
 if len(_mocked_imports) > 0:
     import textwrap
-    message = f"Some missing imports detected: {(','.join(_mocked_imports)[:30])}..." + \
-    f"Automatically triggering online mode, where all OCE code is compiled locally and sent to AWS for execution." + \
-    f"If you would like to use OCE online mode with private data or hosted on your own infrastructure, email." + \
-    f" contact@oloren.ai for enterprise offerings." + \
-    f"To exit online mode, run oce.online_session.__exit__()"
-
-    message = f"""
-Some missing imports detected: {(','.join(_mocked_imports)[:30])}...
-Automatically triggering online mode, where all OCE code is compiled locally
-and sent to AWS for execution. If you would like to use OCE online mode with private
-data or hosted on your own infrastructure, email contact@oloren.ai for enterprise
-offerings. To exit online mode, run olorenchemengine.online_session.__exit__()
-""".replace("\n", " ")
 
     message = f"""
         To complete installation of Oloren ChemEngine, either:
-            (1) Install the missing dependencies, instructions can be found oce.MISSING_DEPENDENCIES(), or
+            (1) Install the missing dependencies, these can be found by calling oce.MISSING_DEPENDENCIES(), or
             (2) Email contact@oloren.ai with subject "Oloren ChemEngine Enterprise", for a secure privately hosted
                 Server version.
             (3) Run oce.online() to use the demonstration package, Oloren ChemEngine Online,

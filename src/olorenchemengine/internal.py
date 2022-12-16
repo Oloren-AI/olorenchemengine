@@ -698,7 +698,16 @@ class BaseClass(BaseRemoteSymbol):
         obj_copy = create_BC(parameterize(self))
         obj_copy._load(self._save())
         return obj_copy
-
+    
+class BaseDepreceated(BaseClass):
+    """BaseDepreceated is a class which is used to deprecate a class.
+    
+    Depreceated classes will raise Exception and will not run.
+    """
+    
+    @log_arguments
+    def __init__(self):
+        raise Exception("This class has been depreceated and will not run, please reach out via email (contact@oloren.ai) or raise an issue on GitHub for more details if you have any questions")
 
 class RemoteObj(BaseRemoteSymbol):
     """Dummy object to represent remote objects."""
