@@ -295,8 +295,6 @@ class VisualizeError(BaseVisualization):
         height=600,
         **kwargs,
     ):
-        assert error[1] >= error[0], "Error tuple must be increasing."
-
         if box:
             self.box = box
         if points:
