@@ -15,6 +15,8 @@ from .dataset import *
 from .representations import DescriptastorusDescriptor
 
 class BaseKFold(BaseDatasetTransform):
+    """Base class for all classes which split the data into KFolds for cross-
+    validation with various strategies."""
     
     @log_arguments
     def __init__(self, n_splits: int = 10, log= True):
@@ -25,9 +27,10 @@ class BaseKFold(BaseDatasetTransform):
         return self.n_splits
     
     @abstractmethod
-    def splits(self):
+    def transform(self, dataset: BaseDataset, *args, **kwargs):
+        """Splits document into folds, identified by 1, ..., n_splits in the 'cv' column."""
         pass
-
+    
 class BaseSplitter(BaseDatasetTransform):
     """Base class for all splitters.
 
