@@ -14,6 +14,19 @@ from .base_class import *
 from .dataset import *
 from .representations import DescriptastorusDescriptor
 
+class BaseKFold(BaseDatasetTransform):
+    
+    @log_arguments
+    def __init__(self, n_splits: int = 10, log= True):
+        self.n_splits = n_splits
+        super().__init__(log = False)
+    
+    def get_n_splits(self):
+        return self.n_splits
+    
+    @abstractmethod
+    def splits(self):
+        pass
 
 class BaseSplitter(BaseDatasetTransform):
     """Base class for all splitters.
