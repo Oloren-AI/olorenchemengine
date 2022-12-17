@@ -27,9 +27,19 @@ class BaseKFold(BaseDatasetTransform):
         return self.n_splits
     
     @abstractmethod
-    def transform(self, dataset: BaseDataset, *args, **kwargs):
+    def transform(self, dataset: BaseDataset, random_state: int = 42, *args, **kwargs):
         """Splits document into folds, identified by 1, ..., n_splits in the 'cv' column."""
         pass
+    
+class RandomKFold(BaseDatasetTransform):
+    
+    def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
+        np.random.seed(random_state)
+        fold_num = np.repeat(np.arange(self.n_splits), 1 + len(dataset.data) // self.n_splits)[:len(dataset.data)]
+        dataset.data["cv"] = np.random.permutation(fold_num)
+        return dataset
+    
+class
     
 class BaseSplitter(BaseDatasetTransform):
     """Base class for all splitters.
