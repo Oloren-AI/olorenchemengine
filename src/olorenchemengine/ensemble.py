@@ -375,6 +375,7 @@ class RFStacker(SKLearnStacker):
         self,
         models: List[BaseModel],
         n_estimators: int = 100,
+        max_features: str = "log2",
         n: int = 1,
         log: bool = True,
         **kwargs
@@ -389,12 +390,12 @@ class RFStacker(SKLearnStacker):
         """
         rf_regressor = RandomForestRegressor(
             n_estimators=n_estimators,
-            max_features="log2",
+            max_features=max_features,
             min_samples_split=4,
             min_samples_leaf=4,
         )
         rf_classifier = RandomForestClassifier(
-            max_features="log2",
+            max_features=max_features,
             min_samples_split=4,
             min_samples_leaf=4,
             n_estimators=n_estimators,
