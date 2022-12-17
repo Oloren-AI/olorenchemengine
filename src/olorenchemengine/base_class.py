@@ -730,8 +730,9 @@ class BaseModel(BaseClass):
             self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
             pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
             true = true.reshape(-1)
-            residuals = np.abs(pred - true)
+            residuals = pred - true
             if hasattr(self, "error_model"):
+                self.error_model.build(self, X, y)
                 self.error_model._fit(residuals, scores, **kwargs)
         elif self.setting == "classification":
             self.calibrator = LinearRegression()
@@ -1281,7 +1282,7 @@ class BaseErrorModel(BaseClass):
 
         self._upper_reg, X_upper, y_upper = self._fit_regression(0.5 + self.ci / 2)
         self._lower_reg, X_lower, y_lower = self._fit_regression(0.5 - self.ci / 2)
-        self.reg = lambda X: list(zip(self._lower_reg(X), self._upper_reg(X)))
+        self.reg = lambda X: [(min(l,0), max(u, 0)) for l, u in zip(self._lower_reg(X), self._upper_reg(X))]
         
         import plotly.express as px
         import plotly.graph_objects as go

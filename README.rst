@@ -38,6 +38,8 @@ It's that simple! And it's just as simple to train a graph neural network, gener
 visualizations, and create error models. More information on features and
 capabilities is available in our documentation at `docs.oloren.ai <https://docs.oloren.ai>`_.
 
+If you are wondering what models to build, please visit `benchmarks.chemengine.org <benchmarks.chemengine.org>`_.
+
 -------------------------------
 Getting Started with oce
 -------------------------------
