@@ -183,7 +183,7 @@ class BaseStacking(BaseModel):
                 if issubclass(type(model), BaseModel):
                     model.fit(X, y)
             if valid is None:
-                print("Using valid set for stacking")
+                print("Using train set for stacking")
                 data = self.featurize(X)
                 self.stacker_model.fit(data, y)
             else:
