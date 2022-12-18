@@ -363,7 +363,7 @@ class BaseModel(BaseClass):
         self,
         X: Union[pd.DataFrame, np.ndarray],
         y: Union[pd.Series, list, np.ndarray],
-        n_splits: int = 5,
+        kf: BaseKFold = None,
         error_model: BaseErrorModel = None,
         scoring: str = None,
         **kwargs
@@ -392,6 +392,15 @@ class BaseModel(BaseClass):
         """
 
         self.fit(X, y, error_model=error_model)
+        
+        X = np.array(X).flatten()
+        y = np.array(y).flatten()
+        
+        dataset = BaseDataset(data = pd.DataFrame({"X": SMILESRepresentation().convert(X),
+                                                   "y": y}),
+                              structure_col = "X",
+                              property_col = "y")
+        dataset = dataset + kf
 
         residuals = None
         scores = None
@@ -399,8 +408,6 @@ class BaseModel(BaseClass):
         true = None
 
         cross_val_metrics = []
-        X = np.array(X).flatten()
-        y = np.array(y).flatten()
 
         if scoring is None:
             if self.setting == "regression":
@@ -411,13 +418,11 @@ class BaseModel(BaseClass):
         from sklearn.calibration import calibration_curve
         from sklearn.model_selection import KFold
 
-        kf = KFold(n_splits=n_splits)
-
-        split = 1
-        for train_index, test_index in kf.split(X):
-            print('evaluating split {} of {}'.format(split, n_splits))
-            split += 1
-
+        for i in range(kf.get_n_splits()):
+            train_index = (dataset.data["cv"] == i)
+            test_index = (dataset.data["cv"] != i)
+            print(train_index)
+            print(test_index)
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
             model = self.copy()

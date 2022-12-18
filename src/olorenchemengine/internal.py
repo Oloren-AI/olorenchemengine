@@ -4,12 +4,14 @@ import hashlib
 import inspect
 import json
 import os
+import io
+import joblib
 import pickle
 import subprocess
 import sys
 import tempfile
 from abc import ABC, abstractmethod
-from typing import Callable, Union
+from typing import Callable, Union, Any, List
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -17,6 +19,7 @@ import pandas as pd
 import pyrebase  # Default pyrebase is pyrebase3 which won't work. Need to install pyrebase4 (pip install pyrebase4)
 from google.cloud.firestore import Client
 from google.oauth2.credentials import Credentials
+from tqdm import tqdm
 
 import olorenchemengine
 
@@ -1073,7 +1076,6 @@ class BaseObject(BaseClass):
         self.obj = obj
 
     def _save(self):
-        import joblib
 
         b = io.BytesIO()
         joblib.dump(self.obj, b)
@@ -1314,3 +1316,152 @@ class LogScaler(BasePreprocessor):
         super()._load(d)
         self.mean = d["mean"]
         return self
+
+def get_all_reps():
+    return list(all_subclasses(BaseRepresentation))
+
+class BaseRepresentation(BaseClass):
+
+    """BaseClass for all molecular representations (PyTorch Geometric graphs, descriptors, fingerprints, etc.)
+    Parameters:
+        log (boolean): Whether to log the representation or not
+    Methods:
+        _convert(smiles: str, y: Union[int, float, np.number] = None) -> Any: converts a single structure (represented by a SMILES string) to a representation
+        convert(Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray]=None) -> List[Any]: converts input data to a list of representations
+    """
+
+    @log_arguments
+    def __init__(self, log=True):
+        pass
+
+    @abstractmethod
+    def _convert(self, smiles: str, y: Union[int, float, np.number] = None) -> Any:
+        """Converts a single structure (represented by a SMILES string) to a representation
+        Parameters:
+            smiles (str): SMILES string of the structure
+            y (Union[int, float, np.number]): target value of the structure
+        Returns:
+            Any: representation of the structure
+        """
+        pass
+
+    def _convert_list(
+        self, smiles_list: List[str], ys: List[Union[int, float, np.number]] = None
+    ) -> List[Any]:
+        """Converts a list of structures (represented by a SMILES string) to a list of representations
+        Parameters:
+            smiles_list (List[str]): list of SMILES strings of the structures
+            ys (List[Union[int, float, np.number]]): list of target values of the structures
+        Returns:
+            List[Any]: list of representations of the structures"""
+        if ys is None:
+            return [self._convert(s) for s in smiles_list]
+            # with mp.Pool(mp.cpu_count()) as p:
+            #   X = p.map(self._convert, smiles_list)
+            # return X
+        else:
+            return [self._convert(s, y=y) for s, y in tqdm(zip(smiles_list, ys))]
+
+    def _convert_cache(
+        self, smiles: str, y: Union[int, float, np.number] = None
+    ) -> Any:
+        """Converts a single structure (represented by a SMILES string) to a representation
+        Parameters:
+            smiles (str): SMILES string of the structure
+            y (Union[int, float, np.number]): target value of the structure
+        Returns:
+            Any: representation of the structure
+        """
+        if smiles in self.cache.keys():
+            return self.cache[smiles]
+        else:
+            return self._convert(smiles, y=y)
+
+    def convert(
+        self,
+        Xs: Union[list, pd.DataFrame, dict, str],
+        ys: Union[list, pd.Series, np.ndarray] = None,
+        **kwargs,
+    ) -> List[Any]:
+        """Converts input data to a list of representations
+        Parameters:
+            Xs (Union[list, pd.DataFrame, dict, str]): input data
+            ys (Union[list, pd.Series, np.ndarray]=None): target values of the input data
+        Returns:
+            List[Any]: list of representations of the input data
+        """
+        if isinstance(Xs, list) and (
+            isinstance(Xs[0], list) or isinstance(Xs[0], tuple)
+        ):
+            smiles = [X[0] for X in Xs]
+        elif isinstance(Xs, pd.DataFrame) or isinstance(Xs, dict):
+            if isinstance(Xs, pd.DataFrame):
+                keys = Xs.columns.tolist()
+            elif isinstance(Xs, dict):
+                keys = Xs.keys()
+            if "smiles" in keys:
+                smiles = Xs["smiles"]
+            elif "Smiles" in keys:
+                smiles = Xs["Smiles"]
+            elif "SMILES" in keys:
+                smiles = Xs["SMILES"]
+            else:
+                smiles = Xs.iloc[:, 0].tolist()
+        elif isinstance(Xs, str):
+            smiles = [Xs]
+        else:
+            smiles = Xs
+
+        return self._convert_list(smiles, ys=ys)
+
+    def _save(self):
+        return {}
+
+    def _load(self, d):
+        pass
+
+class SMILESRepresentation(BaseRepresentation):
+    """Extracts the SMILES strings from inputted data
+
+    Methods:
+        convert(Xs: Union[list, pd.DataFrame, dict, str], ys: Union[list, pd.Series, np.ndarray]=None) -> List[Any]: converts input data to a list of SMILES strings
+            Data types:
+                pd.DataFrames will have columns "smiles" or "Smiles" or "SMILES" extracted
+                lists and tuples of multiple elements will have their first element extracted
+                strings will be converted to a list of one element
+                everything else will be returned as inputted
+    """
+
+    def _convert(self, smiles, y=None):
+        pass
+
+    def convert(self, Xs, ys=None, **kwargs):
+        if isinstance(Xs, list) and (
+            isinstance(Xs[0], list) or isinstance(Xs[0], tuple)
+        ):
+            smiles = [X[0] for X in Xs]
+        elif isinstance(Xs, pd.DataFrame) or isinstance(Xs, dict):
+            if isinstance(Xs, pd.DataFrame):
+                keys = Xs.columns.tolist()
+            elif isinstance(Xs, dict):
+                keys = Xs.keys()
+            if "smiles" in keys:
+                smiles = Xs["smiles"]
+            elif "Smiles" in keys:
+                smiles = Xs["Smiles"]
+            elif "SMILES" in keys:
+                smiles = Xs["SMILES"]
+            elif "smi" in keys:
+                smiles = Xs["smi"]
+            else:
+                smiles = Xs.iloc[:, 0]
+        elif isinstance(Xs, str):
+            smiles = [Xs]
+        elif isinstance(Xs, pd.Series):
+            smiles = Xs.tolist()
+        else:
+            smiles = Xs
+
+        if isinstance(smiles, pd.Series):
+            smiles = smiles.tolist()
+        return smiles
