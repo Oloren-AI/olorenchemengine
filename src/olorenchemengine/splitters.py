@@ -35,12 +35,24 @@ class RandomKFold(BaseDatasetTransform):
     
     def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
         np.random.seed(random_state)
-        fold_num = np.repeat(np.arange(self.n_splits), 1 + len(dataset.data) // self.n_splits)[:len(dataset.data)]
+        fold_num = np.repeat(1 + np.arange(self.n_splits), 1 + len(dataset.data) // self.n_splits)[:len(dataset.data)]
         dataset.data["cv"] = np.random.permutation(fold_num)
         return dataset
     
-class
+class ScaffoldKFold(BaseDatasetTransform):
     
+    def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
+        np.random.seed(random_state)
+        scaffolds = [MurckoScaffold.GetScaffoldForMol(Chem.MolFromSmiles(x)) for x in dataset.data[dataset.structure_col]]
+        folds = np.random.permutation(self.n_splits * np.ones(len(scaffolds), dtype=int))
+        for fold, scaffold in enumerate(sorted(set(scaffolds))):
+            folds[np.array(scaffolds) == scaffold] = 1 + fold % self.n_splits
+        dataset.data["cv"] = folds
+        return dataset
+    
+class KMeansScaffoldKFold(BaseDatasetTransform):
+    
+        
 class BaseSplitter(BaseDatasetTransform):
     """Base class for all splitters.
 
