@@ -363,7 +363,7 @@ class BaseModel(BaseClass):
         self,
         X: Union[pd.DataFrame, np.ndarray],
         y: Union[pd.Series, list, np.ndarray],
-        kf: BaseKFold = None,
+        kf: BaseKFold = RandomKFold(n_splits = 5),
         error_model: BaseErrorModel = None,
         scoring: str = None,
         **kwargs
@@ -397,7 +397,7 @@ class BaseModel(BaseClass):
         y = np.array(y).flatten()
         
         dataset = BaseDataset(data = pd.DataFrame({"X": SMILESRepresentation().convert(X),
-                                                   "y": y}),
+                                                   "y": y}).to_csv(),
                               structure_col = "X",
                               property_col = "y")
         dataset = dataset + kf
@@ -419,10 +419,8 @@ class BaseModel(BaseClass):
         from sklearn.model_selection import KFold
 
         for i in range(kf.get_n_splits()):
-            train_index = (dataset.data["cv"] == i)
-            test_index = (dataset.data["cv"] != i)
-            print(train_index)
-            print(test_index)
+            train_index = (dataset.data["cv"] == i+1)
+            test_index = (dataset.data["cv"] != i+1)
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
             model = self.copy()

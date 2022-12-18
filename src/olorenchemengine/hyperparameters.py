@@ -231,12 +231,18 @@ def optimize(
     hyperparameter_index = index_hyperparameters(model)
 
     def objective(hyperparameter_dictionary, model = model, runner = runner):
-        print(hyperparameter_dictionary)
+        
         model = load_hyperparameters(model, hyperparameter_dictionary)
+        
+        print(model)
+        print(f"STARTING ONE RUN {hyperparameter_dictionary}")
+        
         if issubclass(type(runner), BaseModelManager):
             metric = runner.run(model)
         else:
             metric = runner(model)
+        
+        print(f"DONE WITH ONE RUN {metric}")
         return metric
 
     best = fmin(

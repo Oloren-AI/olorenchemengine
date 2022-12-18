@@ -381,9 +381,8 @@ class BaseKFold(BaseDatasetTransform):
     validation with various strategies."""
     
     @log_arguments
-    def __init__(self, n_splits: int = 10, log= True):
+    def __init__(self, n_splits: int = 10, log = True):
         self.n_splits = n_splits
-        super().__init__(log = False)
     
     def get_n_splits(self):
         return self.n_splits
@@ -393,7 +392,7 @@ class BaseKFold(BaseDatasetTransform):
         """Splits document into folds, identified by 1, ..., n_splits in the 'cv' column."""
         pass
 
-class RandomKFold(BaseDatasetTransform):
+class RandomKFold(BaseKFold):
     
     def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
         np.random.seed(random_state)
@@ -403,7 +402,7 @@ class RandomKFold(BaseDatasetTransform):
 
 from rdkit.Chem.Scaffolds import MurckoScaffold
 
-class ScaffoldKFold(BaseDatasetTransform):
+class ScaffoldKFold(BaseKFold):
     
     def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
         np.random.seed(random_state)
