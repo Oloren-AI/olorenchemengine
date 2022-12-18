@@ -8,8 +8,7 @@ from time import sleep
 
 import olorenchemengine as oce
 
-from .base_class import *
-
+from .internal import *
 
 class BaseDataset(BaseClass):
     """BaseDataset for all dataset objects
@@ -376,3 +375,21 @@ class OneHotEncode(BaseDatasetTransform):
         dataset.data = dataset.data.join(one_hot)
         dataset.feature_cols += one_hot.columns.tolist()
         return dataset
+
+class BaseKFold(BaseDatasetTransform):
+    """Base class for all classes which split the data into KFolds for cross-
+    validation with various strategies."""
+    
+    @log_arguments
+    def __init__(self, n_splits: int = 10, log= True):
+        self.n_splits = n_splits
+        super().__init__(log = False)
+    
+    def get_n_splits(self):
+        return self.n_splits
+    
+    @abstractmethod
+    def transform(self, dataset: BaseDataset, random_state: int = 42, *args, **kwargs):
+        """Splits document into folds, identified by 1, ..., n_splits in the 'cv' column."""
+        pass
+    

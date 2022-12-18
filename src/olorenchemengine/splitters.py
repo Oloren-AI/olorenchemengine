@@ -10,7 +10,6 @@ from rdkit.Chem.Scaffolds import MurckoScaffold
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import QuantileTransformer
 
-from .base_class import *
 from .dataset import *
 from .representations import DescriptastorusDescriptor
 
