@@ -462,7 +462,6 @@ class BaseModel(BaseClass):
                 else:
                     pred = np.concatenate((pred, prob_pred))
                     true = np.concatenate((true, prob_true))
-
             cross_val_metrics.append(metric_functions[scoring](y_test, y_pred_test))
 
         if self.setting == "regression":
