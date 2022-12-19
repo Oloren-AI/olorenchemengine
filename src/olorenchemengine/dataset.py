@@ -406,9 +406,37 @@ class ScaffoldKFold(BaseKFold):
     
     def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
         np.random.seed(random_state)
-        scaffolds = [MurckoScaffold.GetScaffoldForMol(Chem.MolFromSmiles(x)) for x in dataset.data[dataset.structure_col]]
-        folds = np.random.permutation(self.n_splits * np.ones(len(scaffolds), dtype=int))
-        for fold, scaffold in enumerate(sorted(set(scaffolds))):
-            folds[np.array(scaffolds) == scaffold] = 1 + fold % self.n_splits
+        scaffolds = [Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(Chem.MolFromSmiles(x))) for x in dataset.data[dataset.structure_col]]
+        
+        import collections
+        counter = collections.Counter(scaffolds)
+        
+        # get list of values sorted by frequency
+        unique_scaffolds = [x[0] for x in sorted(counter.items(), key=lambda x: x[1], reverse=True)]
+        
+        folds = np.zeros(len(dataset.data))
+        for fold, scaffold in enumerate(unique_scaffolds):
+            if fold // self.n_splits % 2 == 1:
+                folds[np.array(scaffolds) == scaffold] = 1 + fold % self.n_splits
+            else:
+                folds[np.array(scaffolds) == scaffold] = self.n_splits - fold % self.n_splits
         dataset.data["cv"] = folds
+        return dataset
+
+class KMeansKFold(BaseKFold):
+    
+    @log_arguments
+    def __init__(self, rep: BaseVecRepresentation, n_splits: int = 10, log = True):
+        self.n_splits = n_splits
+        self.rep = rep
+        
+    def transform(self, dataset: BaseDataset, random_state: int = 42, *args, **kwargs):
+        X = self.rep.convert(dataset.data[dataset.structure_col])
+        
+        # run kmeans clustering
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=self.n_splits, random_state=random_state).fit(X)
+        
+        dataset.data["cv"] = kmeans.labels_ + 1
+        
         return dataset

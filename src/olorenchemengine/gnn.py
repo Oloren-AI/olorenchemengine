@@ -409,3 +409,11 @@ class TLFromCheckpoint(BaseLightningModule):
             )
         )
         self.network = nn.Sequential(OrderedDict([("A", self.A), ("B", self.B)]))
+        
+class GATv2Model1(BaseLightningModule):
+    
+    @log_arguments
+    def __init__(
+        self,
+        log = True
+    )
