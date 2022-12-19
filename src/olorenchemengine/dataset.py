@@ -440,3 +440,33 @@ class KMeansKFold(BaseKFold):
         dataset.data["cv"] = kmeans.labels_ + 1
         
         return dataset
+    
+class ScaffoldKMeansKFold(BaseKFold):
+    
+    @log_arguments
+    def __init__(self, rep: BaseVecRepresentation, n_splits: int = 10, log = True):
+        self.n_splits = n_splits
+        self.rep = rep
+        
+    def transform(self, dataset: BaseDataset,
+            random_state: int = 42, *args, **kwargs):
+        np.random.seed(random_state)
+        scaffolds = [Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(Chem.MolFromSmiles(x))) for x in dataset.data[dataset.structure_col]]
+        dataset.data["scaffold"] = scaffolds
+        
+        import collections
+        counter = collections.Counter(scaffolds)
+        
+        # get list of values sorted by frequency
+        unique_scaffolds = [x[0] for x in sorted(counter.items(), key=lambda x: x[1], reverse=True)]
+        
+        fps = self.rep.convert(unique_scaffolds)
+        
+        # run kmeans clustering
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=self.n_splits, random_state=random_state).fit(fps)
+        scaffold_fold_map = {scaffold: fold+1 for scaffold, fold in zip(unique_scaffolds, kmeans.labels_)}
+        
+        dataset.data["cv"] = dataset.data["scaffold"].apply(lambda x: scaffold_fold_map[x])
+        
+        return dataset
