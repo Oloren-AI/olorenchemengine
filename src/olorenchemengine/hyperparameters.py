@@ -21,6 +21,11 @@ from .base_class import *
 from .benchmarks import *
 from .manager import *
 
+def cast_int(f: float) -> int:
+    if f.is_integer():
+        return int(f)
+    else:
+        return f
 
 class Opt(BaseClass):
     @abstractproperty
@@ -210,6 +215,8 @@ def load_hyperparameters_(object: BaseClass, hyperparameter_dictionary: dict) ->
         or issubclass(type(object), float)
         or issubclass(type(object), str)
     ):
+        if issubclass(type(object), float) and object.is_integer():
+            return int(object)
         return object
     elif issubclass(type(object), list):
         return [load_hyperparameters_(x, hyperparameter_dictionary) for x in object]

@@ -390,12 +390,12 @@ class BaseModel(BaseClass):
         Returns:
             list: Cross validation metrics for each split
         """
-
-        self.fit(X, y, error_model=error_model)
         
+        self.fit(X, y, error_model=error_model)
+
         X = np.array(X).flatten()
         y = np.array(y).flatten()
-        
+                
         dataset = BaseDataset(data = pd.DataFrame({"X": SMILESRepresentation().convert(X),
                                                    "y": y}).to_csv(),
                               structure_col = "X",
@@ -465,17 +465,18 @@ class BaseModel(BaseClass):
             cross_val_metrics.append(metric_functions[scoring](y_test, y_pred_test))
 
         if self.setting == "regression":
-            self.calibrator = LinearRegression()
-            self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
-            pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
-            true = true.reshape(-1)
+            # self.calibrator = LinearRegression()
+            # self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            # pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
+            # true = true.reshape(-1)
             residuals = pred - true
             if hasattr(self, "error_model"):
                 self.error_model.build(self, X, y)
                 self.error_model._fit(residuals, scores, **kwargs)
         elif self.setting == "classification":
-            self.calibrator = LinearRegression()
-            self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            # self.calibrator = LinearRegression()
+            # self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            pass
 
         return cross_val_metrics
 

@@ -572,11 +572,13 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
         self,
         representation,
         n_estimators=2000,
-        max_depth=7,
+        max_depth=6,
         subsample=0.5,
         max_leaves=5,
         learning_rate=0.05,
         colsample_bytree=0.8,
+        min_child_weight=1,
+        log=True,
         **kwargs
     ):
         import torch
@@ -589,6 +591,7 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
             learning_rate=learning_rate,
             subsample=subsample,
             colsample_bytree=colsample_bytree,
+            min_child_weight=min_child_weight,
         )
 
         classifier = XGBClassifier(
@@ -599,6 +602,7 @@ class XGBoostModel(BaseSKLearnModel, BaseObject):
             learning_rate=learning_rate,
             subsample=subsample,
             colsample_bytree=colsample_bytree,
+            min_child_weight=min_child_weight,
         )
 
         super().__init__(representation, regressor, classifier, log=False, **kwargs)
