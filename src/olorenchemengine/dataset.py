@@ -381,9 +381,8 @@ class BaseKFold(BaseDatasetTransform):
     validation with various strategies."""
     
     @log_arguments
-    def __init__(self, n_splits: int = 10, log= True):
+    def __init__(self, n_splits: int = 10, log = True):
         self.n_splits = n_splits
-        super().__init__(log = False)
     
     def get_n_splits(self):
         return self.n_splits
@@ -392,4 +391,82 @@ class BaseKFold(BaseDatasetTransform):
     def transform(self, dataset: BaseDataset, random_state: int = 42, *args, **kwargs):
         """Splits document into folds, identified by 1, ..., n_splits in the 'cv' column."""
         pass
+
+class RandomKFold(BaseKFold):
     
+    def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
+        np.random.seed(random_state)
+        fold_num = np.repeat(1 + np.arange(self.n_splits), 1 + len(dataset.data) // self.n_splits)[:len(dataset.data)]
+        dataset.data["cv"] = np.random.permutation(fold_num)
+        return dataset
+
+from rdkit.Chem.Scaffolds import MurckoScaffold
+
+class ScaffoldKFold(BaseKFold):
+    
+    def transform(self, dataset: BaseDataset, *args, random_state: int = 42, **kwargs):
+        np.random.seed(random_state)
+        scaffolds = [Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(Chem.MolFromSmiles(x))) for x in dataset.data[dataset.structure_col]]
+        
+        import collections
+        counter = collections.Counter(scaffolds)
+        
+        # get list of values sorted by frequency
+        unique_scaffolds = [x[0] for x in sorted(counter.items(), key=lambda x: x[1], reverse=True)]
+        
+        folds = np.zeros(len(dataset.data))
+        for fold, scaffold in enumerate(unique_scaffolds):
+            if fold // self.n_splits % 2 == 1:
+                folds[np.array(scaffolds) == scaffold] = 1 + fold % self.n_splits
+            else:
+                folds[np.array(scaffolds) == scaffold] = self.n_splits - fold % self.n_splits
+        dataset.data["cv"] = folds
+        return dataset
+
+class KMeansKFold(BaseKFold):
+    
+    @log_arguments
+    def __init__(self, rep: BaseVecRepresentation, n_splits: int = 10, log = True):
+        self.n_splits = n_splits
+        self.rep = rep
+        
+    def transform(self, dataset: BaseDataset, random_state: int = 42, *args, **kwargs):
+        X = self.rep.convert(dataset.data[dataset.structure_col])
+        
+        # run kmeans clustering
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=self.n_splits, random_state=random_state).fit(X)
+        
+        dataset.data["cv"] = kmeans.labels_ + 1
+        
+        return dataset
+    
+class ScaffoldKMeansKFold(BaseKFold):
+    
+    @log_arguments
+    def __init__(self, rep: BaseVecRepresentation, n_splits: int = 10, log = True):
+        self.n_splits = n_splits
+        self.rep = rep
+        
+    def transform(self, dataset: BaseDataset,
+            random_state: int = 42, *args, **kwargs):
+        np.random.seed(random_state)
+        scaffolds = [Chem.MolToSmiles(MurckoScaffold.GetScaffoldForMol(Chem.MolFromSmiles(x))) for x in dataset.data[dataset.structure_col]]
+        dataset.data["scaffold"] = scaffolds
+        
+        import collections
+        counter = collections.Counter(scaffolds)
+        
+        # get list of values sorted by frequency
+        unique_scaffolds = [x[0] for x in sorted(counter.items(), key=lambda x: x[1], reverse=True)]
+        
+        fps = self.rep.convert(unique_scaffolds)
+        
+        # run kmeans clustering
+        from sklearn.cluster import KMeans
+        kmeans = KMeans(n_clusters=self.n_splits, random_state=random_state).fit(fps)
+        scaffold_fold_map = {scaffold: fold+1 for scaffold, fold in zip(unique_scaffolds, kmeans.labels_)}
+        
+        dataset.data["cv"] = dataset.data["scaffold"].apply(lambda x: scaffold_fold_map[x])
+        
+        return dataset
