@@ -1224,7 +1224,7 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
     @log_arguments
     def __init__(
         self,
-        descriptor_set: Union[str, list] = "all",
+        descriptor_set: Union[str, list] = "2d",
         log: bool = True,
         normalize: bool = False,
         **kwargs,
@@ -1235,6 +1235,8 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
 
         if descriptor_set == "all":
             self.calc = Calculator(descriptors, ignore_3D=False)
+        elif descriptor_set == "2d":
+            self.calc = Calculator(descriptors, ignore_3D=True)
 
         self.normalize = normalize
 
