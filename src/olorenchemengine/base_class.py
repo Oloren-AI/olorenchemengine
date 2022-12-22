@@ -12,6 +12,7 @@ from typing import Any, Callable, Tuple, Union
 
 import numpy as np
 import pandas as pd
+
 from sklearn.metrics import (
     average_precision_score,
     explained_variance_score,
@@ -24,6 +25,7 @@ from sklearn.metrics import (
 
 import olorenchemengine as oce
 from olorenchemengine.internal import *
+from olorenchemengine.dataset import *
 
 # List of metrics that can be used for evaluating classification models
 classification_metrics = {
@@ -59,271 +61,6 @@ metric_direction = {
     "Root Mean Squared Error": "lower",
     "Spearman": "higher",
 }
-
-
-class BaseObject(BaseClass):
-    """BaseObject is the parent class for all classes which directly wrap some object to be saved via joblib.
-
-    Attributes:
-        obj (object): the object which is wrapped by the BaseObject
-    """
-
-    @log_arguments
-    def __init__(self, obj=None):
-        self.obj = obj
-
-    def _save(self):
-        import joblib
-
-        b = io.BytesIO()
-        joblib.dump(self.obj, b)
-        return {"obj": b.getvalue()}
-
-    def _load(self, d):
-        import joblib
-
-        super()._load(d)
-        self.obj = joblib.load(io.BytesIO(d["obj"]))
-
-
-class BaseEstimator(BaseObject):
-
-    """Utility class used to wrap any object with a fit and predict method"""
-
-    def fit(self, X, y):
-        """Fit the estimator to the data
-
-        Parameters:
-            X (np.array): The data to fit the estimator to
-            y (np.array): The target data to fit the estimator to
-        Returns:
-            self (object): The estimator object fit to the data
-        """
-
-        return self.obj.fit(X, y)
-
-    def predict(self, X):
-        """Predict the output of the estimator
-
-        Parameters:
-            X (np.array): The data to predict the output of the estimator on
-        Returns:
-            y (np.array): The predicted output of the estimator
-        """
-        pred = self.obj.predict(X)
-        pred = np.array(pred)
-        if pred.ndim == 1:
-            pred = pred
-        else:
-            pred = np.array([pred])
-        return pred
-
-
-class LinearRegression(BaseEstimator):
-
-    """Wrapper for sklearn LinearRegression"""
-
-    @log_arguments
-    def __init__(self, *args, **kwargs):
-        from sklearn.linear_model import LinearRegression as LinearRegression_
-
-        self.obj = LinearRegression_(*args, **kwargs)
-
-
-class BasePreprocessor(BaseObject):
-    """BasePreprocessor is the parent class for all preprocessors which transform the features or properties of a dataset.
-
-    Methods:
-        fit: fit the preprocessor to the dataset
-        fit_transform: fit the preprocessor to the dataset return the transformed values
-        transform: return the transformed values
-        inverse_transform: return the original values from the transformed values
-    """
-
-    def fit(self, X):
-        """Fits the preprocessor to the dataset.
-
-        Parameters:
-            X (np.ndarray): the dataset
-
-        Returns:
-            The fit preprocessor instance
-        """
-        X = np.array(X)
-        if len(X.shape) == 1:
-            X = X.reshape(-1, 1)
-        return self.obj.fit(X)
-
-    def fit_transform(self, X):
-        """Fits the preprocessor to the dataset and returns the transformed values.
-
-        Parameters:
-            X (np.ndarray): the dataset
-
-        Returns:
-            The transformed values of the dataset as a numpy array
-        """
-        X = np.array(X)
-        if len(X.shape) == 1:
-            X = X.reshape(-1, 1)
-        X = self.obj.fit_transform(X)
-        return X
-
-    def transform(self, X):
-        """Returns the transformed values of the dataset as a numpy array.
-
-        Parameters:
-            X (np.ndarray): the dataset
-
-        Returns:
-            The transformed values of the dataset as a numpy array
-        """
-        X = np.array(X)
-        if len(X.shape) == 1:
-            X = X.reshape(-1, 1)
-        X = self.obj.transform(X)
-        return X
-
-    def inverse_transform(self, X):
-        """Returns the original values from the transformed values.
-
-        Parameters:
-            X (np.ndarray): the transformed values
-
-        Returns:
-            The original values from the transformed values
-        """
-        if len(X.shape) == 1:
-            X = X.reshape(-1, 1)
-        X = np.array(X)
-        return self.obj.inverse_transform(X)
-
-
-class QuantileTransformer(BasePreprocessor):
-    """QuantileTransformer is a BasePreprocessor which transforms a dataset by quantile transformation to specified distribution.
-
-    Attributes:
-        obj (sklearn.preprocessing.QuantileTransformer): the object which is wrapped by the BasePreprocessor
-    """
-
-    @log_arguments
-    def __init__(
-        self,
-        n_quantiles=1000,
-        output_distribution="normal",
-        subsample=1e5,
-        random_state=None,
-    ):
-
-        from sklearn.preprocessing import QuantileTransformer
-
-        self.obj = QuantileTransformer(
-            n_quantiles=n_quantiles,
-            output_distribution=output_distribution,
-            subsample=subsample,
-            random_state=random_state,
-        )
-
-
-class StandardScaler(BasePreprocessor):
-    """StandardScaler is a BasePreprocessor which standardizes the data by removing the mean and scaling to unit variance.
-
-    Attributes:
-        obj (sklearn.preprocessing.StandardScaler): the object which is wrapped by the BasePreprocessor
-    """
-
-    @log_arguments
-    def __init__(self, with_mean=True, with_std=True):
-
-        from sklearn.preprocessing import StandardScaler
-
-        self.obj = StandardScaler(with_mean=with_mean, with_std=with_std)
-
-
-class LogScaler(BasePreprocessor):
-    """LogScaler is a BasePreprocessor which standardizes the data by taking the log and then removing the mean and scaling to unit variance."""
-
-    @log_arguments
-    def __init__(self, with_mean=True, with_std=True):
-
-        from sklearn.preprocessing import StandardScaler
-
-        self.obj = StandardScaler(with_mean=with_mean, with_std=with_std)
-
-    def fit(self, X):
-        """Fits the preprocessor to the dataset.
-
-        Parameters:
-            X (np.ndarray): the dataset
-
-        Returns:
-            The fit preprocessor instance
-        """
-        X = np.array(X)
-        self.mean = np.mean(X)
-        X = np.log10(X + self.mean + 1e-3)
-        return self.obj.fit(X.reshape(-1, 1))
-
-    def fit_transform(self, X):
-        """Fits the preprocessor to the dataset and returns the transformed values.
-
-        Parameters:
-            X (np.ndarray): the dataset
-
-        Returns:
-            The transformed values of the dataset as a numpy array
-        """
-        X = np.array(X)
-        self.mean = np.mean(X)
-        X = np.log10(X + self.mean + 1e-3)
-        return self.obj.fit_transform(X.reshape(-1, 1)).reshape(-1)
-
-    def transform(self, X):
-        """Returns the transformed values of the dataset as a numpy array.
-
-        Parameters:
-            X (np.ndarray): the dataset
-
-        Returns:
-            The transformed values of the dataset as a numpy array
-        """
-        X = np.log10(np.array(X) + self.mean + 1e-3)
-        return self.obj.transform(X.reshape(-1, 1)).reshape(-1)
-
-    def inverse_transform(self, X):
-        """Returns the original values from the transformed values.
-
-        Parameters:
-            X (np.ndarray): the transformed values
-
-        Returns:
-            The original values from the transformed values
-        """
-        X = np.array(X)
-        return (
-            10 ** (self.obj.inverse_transform(X.reshape(-1, 1)).reshape(-1))
-            - self.mean
-            - 1e-3
-        )
-
-    def _save(self):
-        d = super()._save()
-        d["mean"] = self.mean
-        return d
-
-    def _load(self, d):
-        super()._load(d)
-        self.mean = d["mean"]
-        return self
-
-
-def detect_setting(data):
-    values, _ = np.unique(data, return_counts=True)
-    if len(values) <= 2:
-        return "classification"
-    else:
-        return "regression"
-
 
 class BaseModel(BaseClass):
     """
@@ -626,7 +363,7 @@ class BaseModel(BaseClass):
         self,
         X: Union[pd.DataFrame, np.ndarray],
         y: Union[pd.Series, list, np.ndarray],
-        n_splits: int = 5,
+        kf: BaseKFold = RandomKFold(n_splits = 5),
         error_model: BaseErrorModel = None,
         scoring: str = None,
         **kwargs
@@ -653,8 +390,17 @@ class BaseModel(BaseClass):
         Returns:
             list: Cross validation metrics for each split
         """
-
+        
         self.fit(X, y, error_model=error_model)
+
+        X = np.array(X).flatten()
+        y = np.array(y).flatten()
+                
+        dataset = BaseDataset(data = pd.DataFrame({"X": SMILESRepresentation().convert(X),
+                                                   "y": y}).to_csv(),
+                              structure_col = "X",
+                              property_col = "y")
+        dataset = dataset + kf
 
         residuals = None
         scores = None
@@ -662,8 +408,6 @@ class BaseModel(BaseClass):
         true = None
 
         cross_val_metrics = []
-        X = np.array(X).flatten()
-        y = np.array(y).flatten()
 
         if scoring is None:
             if self.setting == "regression":
@@ -674,13 +418,9 @@ class BaseModel(BaseClass):
         from sklearn.calibration import calibration_curve
         from sklearn.model_selection import KFold
 
-        kf = KFold(n_splits=n_splits)
-
-        split = 1
-        for train_index, test_index in kf.split(X):
-            print('evaluating split {} of {}'.format(split, n_splits))
-            split += 1
-
+        for i in range(kf.get_n_splits()):
+            train_index = (dataset.data["cv"] == i+1)
+            test_index = (dataset.data["cv"] != i+1)
             X_train, X_test = X[train_index], X[test_index]
             y_train, y_test = y[train_index], y[test_index]
             model = self.copy()
@@ -722,21 +462,21 @@ class BaseModel(BaseClass):
                 else:
                     pred = np.concatenate((pred, prob_pred))
                     true = np.concatenate((true, prob_true))
-
             cross_val_metrics.append(metric_functions[scoring](y_test, y_pred_test))
 
         if self.setting == "regression":
-            self.calibrator = LinearRegression()
-            self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
-            pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
-            true = true.reshape(-1)
+            # self.calibrator = LinearRegression()
+            # self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            # pred = self.calibrator.predict(pred.reshape(-1, 1)).reshape(-1)
+            # true = true.reshape(-1)
             residuals = pred - true
             if hasattr(self, "error_model"):
                 self.error_model.build(self, X, y)
                 self.error_model._fit(residuals, scores, **kwargs)
         elif self.setting == "classification":
-            self.calibrator = LinearRegression()
-            self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            # self.calibrator = LinearRegression()
+            # self.calibrator.fit(pred.reshape(-1, 1), true.reshape(-1, 1))
+            pass
 
         return cross_val_metrics
 

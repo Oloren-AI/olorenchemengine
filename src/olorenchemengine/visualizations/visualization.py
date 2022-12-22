@@ -923,8 +923,7 @@ class VisualizeMoleculePerturbations(ChemicalSpacePlot):
             colorscale="YlOrRd",
         )
 
-
-class VisualizeDatasetSplit(ChemicalSpacePlot):
+class VisualizeDatasetDivision(ChemicalSpacePlot):
     """Visualize a dataset by seeing where train/test compounds are in a dimensionality
     reduced space by coloring the compounds by whether or not they are in
     train/test.
@@ -937,6 +936,9 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         colorscale (str): Color scale to use for coloring the compounds.
         res_lim (int): Capping the visualized residual size to the specified value.
         opacity (float): Opacity of the markers.
+        colors (List[str]): List of colors to use for coloring the compounds.
+        division (str): Whether to use the `split` or `cv` column in the dataset
+            to visualize the dataset division.
     """
 
     @log_arguments
@@ -948,7 +950,8 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         res_lim: float = None,
         opacity: float = 0.4,
         title=None,
-        colors=["red", "green", "blue"],
+        colors=["#4B27E8", "#E88233", "#E8CE05", "#10CDE8", "#BC4DD6", "#D6B258", "#91D62D", "#3862D6"],
+        division: str = "split",
         *args,
         **kwargs,
     ):
@@ -958,6 +961,7 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         self.res_lim = res_lim
         self.opacity = opacity
         self.colors = colors
+        self.division = division
         if not type(dataset) is BaseDataset:
             raise TypeError(
                 "dataset must be a BaseDataset. Consider using df.to_csv() in the"
@@ -992,16 +996,18 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
 
     def get_data(self) -> dict:
         d = super().get_data(SMILES=self.dataset.structure_col)
+        
+        idx_lookup = {x: i for i, x in enumerate(self.dataset.data[self.division].unique())}
 
         if self.model is None:
             d["color"] = [
-                self.colors[0] if x == "train" else self.colors[2] if x == "test" else self.colors[1]
-                for x in self.dataset.entire_dataset_split
+                self.colors[idx_lookup[x]]
+                for x in self.dataset.data[self.division]
             ]
         else:
             d["outline"] = [
-                self.colors[0] if x == "train" else self.colors[2] if x == "test" else self.colors[1]
-                for x in self.dataset.entire_dataset_split
+                self.colors[idx_lookup[x]]
+                for x in self.dataset.data[self.division]
             ]
 
             residuals = (
@@ -1047,6 +1053,24 @@ class VisualizeDatasetSplit(ChemicalSpacePlot):
         attributes["rep"] = oas_reps[attributes["rep"]]
 
         return super(ChemicalSpacePlot, cls).from_attributes(attributes)
+    
+class VisualizeDatasetSplit(VisualizeDatasetDivision):
+    """Visualize the dataset colored by the train/test/val split.
+    
+    Wraps VisualizeDatasetDivision"""
+    
+    @log_arguments
+    def __init__(self, *args, division: str = "split", **kwargs):
+        super().__init__(*args, division=division, **kwargs)
+        
+class VisualizeDatasetCV(VisualizeDatasetDivision):
+    """Visualize the dataset colored by the cross validation split.
+    
+    Wraps VisualizeDatasetDivision"""
+    
+    @log_arguments
+    def __init__(self, *args, division: str = "cv", **kwargs):
+        super().__init__(*args, division=division, **kwargs)
 
 
 from rdkit.Chem import Draw
