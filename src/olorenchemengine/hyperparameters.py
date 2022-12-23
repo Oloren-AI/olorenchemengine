@@ -173,10 +173,14 @@ def index_hyperparameters(object: BaseClass) -> dict:
 
 def load_hyperparameters_(object: BaseClass, hyperparameter_dictionary: dict) -> dict:
     if issubclass(type(object), Opt):
-        return load_hyperparameters_(
+        result = load_hyperparameters_(
             hyperparameter_dictionary[object.label], hyperparameter_dictionary
         )
-
+        if issubclass(type(result), float) and result.is_integer():
+            return int(result)
+        else:
+            return result
+        
     if issubclass(type(object), BaseClass):
         return {
             **{"BC_class_name": type(object).__name__},

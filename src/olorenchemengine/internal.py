@@ -1246,10 +1246,10 @@ class LogScaler(BasePreprocessor):
     """LogScaler is a BasePreprocessor which standardizes the data by taking the log and then removing the mean and scaling to unit variance."""
 
     @log_arguments
-    def __init__(self, with_mean=True, with_std=True):
+    def __init__(self, min_value=0, with_mean=True, with_std=True):
 
         from sklearn.preprocessing import StandardScaler
-
+        self.min=min_value
         self.obj = StandardScaler(with_mean=with_mean, with_std=with_std)
 
     def fit(self, X):
@@ -1262,8 +1262,8 @@ class LogScaler(BasePreprocessor):
             The fit preprocessor instance
         """
         X = np.array(X)
-        self.mean = np.mean(X)
-        X = np.log10(X + self.mean + 1e-3)
+        self.min = np.min(X)
+        X = np.log10(X - self.min + 1e-3)
         return self.obj.fit(X.reshape(-1, 1))
 
     def fit_transform(self, X):
@@ -1276,9 +1276,10 @@ class LogScaler(BasePreprocessor):
             The transformed values of the dataset as a numpy array
         """
         X = np.array(X)
-        self.mean = np.mean(X)
-        X = np.log10(X + self.mean + 1e-3)
-        return self.obj.fit_transform(X.reshape(-1, 1)).reshape(-1)
+        self.min = np.min(X)
+        X = np.log10(np.maximum(X - self.min + 1e-3,0))
+        result = self.obj.fit_transform(X.reshape(-1, 1)).reshape(-1)
+        return result
 
     def transform(self, X):
         """Returns the transformed values of the dataset as a numpy array.
@@ -1289,7 +1290,7 @@ class LogScaler(BasePreprocessor):
         Returns:
             The transformed values of the dataset as a numpy array
         """
-        X = np.log10(np.array(X) + self.mean + 1e-3)
+        X = np.log10(np.maximum(np.array(X) - self.min + 1e-3,0))
         return self.obj.transform(X.reshape(-1, 1)).reshape(-1)
 
     def inverse_transform(self, X):
@@ -1304,18 +1305,18 @@ class LogScaler(BasePreprocessor):
         X = np.array(X)
         return (
             10 ** (self.obj.inverse_transform(X.reshape(-1, 1)).reshape(-1))
-            - self.mean
+            + self.min
             - 1e-3
         )
 
     def _save(self):
         d = super()._save()
-        d["mean"] = self.mean
+        d["min"] = self.min
         return d
 
     def _load(self, d):
         super()._load(d)
-        self.mean = d["mean"]
+        self.min = d["min"]
         return self
 
 def get_all_reps():
@@ -1470,6 +1471,7 @@ class BaseVecRepresentation(BaseRepresentation):
         self,
         Xs: Union[list, pd.DataFrame, dict, str],
         ys: Union[list, pd.Series, np.ndarray] = None,
+        lambda_convert: Callable = None,
         fit=False,
         **kwargs,
     ) -> List[np.ndarray]:
@@ -1506,8 +1508,10 @@ class BaseVecRepresentation(BaseRepresentation):
                 ),
                 allow_pickle=True,
             )
-
-        feats = super().convert(Xs, ys)
+        if not lambda_convert is None:
+            feats = lambda_convert(Xs, ys)
+        else:
+            feats = super().convert(Xs, ys)
         import pandas as pd
 
         feats = pd.DataFrame.from_records(

@@ -339,11 +339,12 @@ class BaseCompoundVecRepresentation(BaseVecRepresentation):
         self,
         Xs: Union[list, pd.Series, pd.DataFrame, dict, str],
         ys: Union[list, pd.Series, np.ndarray] = None,
+        lambda_convert: Callable = None,
         fit=False,
         **kwargs,
     ) -> np.ndarray:
         """Computes a vector representation from each structure in Xs."""
-        feats = np.array(super().convert(Xs, ys, fit=fit))
+        feats = np.array(super().convert(Xs, ys, fit=fit, lambda_convert = lambda_convert))
         out = np.nan_to_num(feats.astype(np.float32))
         return out
 
@@ -833,7 +834,7 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
     def _convert(self, smiles, y=None):
         pass
 
-    def convert(self, Xs, ys=None, **kwargs):
+    def convert_full(self, Xs, ys=None, **kwargs):
         """Convert list of SMILES to descriptors in the form of a numpy array.
 
         Parameters:
@@ -852,6 +853,9 @@ class MordredDescriptor(BaseCompoundVecRepresentation):
             feats[col] = pd.to_numeric(feats[col], errors="coerce").fillna(0)
         feats = np.nan_to_num(feats.to_numpy())
         return feats
+    
+    def convert(self, Xs, ys=None, **kwargs):
+        return super().convert(Xs, ys=ys, lambda_convert = self.convert_full,**kwargs)
 
 
 from rdkit import Chem, DataStructs, RDConfig
