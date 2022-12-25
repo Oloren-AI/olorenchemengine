@@ -1,5 +1,17 @@
 import contextlib
 import sys
+import os
+import json
+import logging
+import pandas as pd
+
+from typing import Union
+from os import path
+
+from rdkit import RDLogger
+
+RDLogger.DisableLog("rdApp.*")
+logging.getLogger().setLevel(logging.ERROR)
 
 if sys.version_info[:2] >= (3, 8):
     # TODO: Import directly (no need for conditional) when `python_requires = >= 3.8`
@@ -75,21 +87,6 @@ for imp in _OPTIONAL_IMPORTS_FOR_OCE_ONLINE:
         sys.modules[imp] = MagicMock()
         _mocked_imports.append(imp)
 
-from rdkit import RDLogger
-
-RDLogger.DisableLog("rdApp.*")
-
-import logging
-
-logging.getLogger().setLevel(logging.ERROR)
-
-import os
-from os import path
-
-import json
-
-import pandas as pd
-
 if not path.exists(path.join(path.expanduser("~"), f".oce/")):
     os.mkdir(path.join(path.expanduser("~"), f".oce/"))
     
@@ -110,12 +107,15 @@ defaults = {
     "CACHE": True
 }
 
+CONFIG_modified = False
 for k, v in defaults.items():
     if k not in CONFIG_:
         CONFIG_[k] = v
-        
-with open(CONFIG_PATH, "w+") as f:
-    json.dump(CONFIG_, f)
+        CONFIG_modified = True
+
+if CONFIG_modified:
+    with open(CONFIG_PATH, "w+") as f:
+        json.dump(CONFIG_, f)
 
 CONFIG = CONFIG_.copy()
 
@@ -140,11 +140,7 @@ def update_config():
         CONFIG["DEVICE"] = torch.device(CONFIG["MAP_LOCATION"])
         CONFIG["USE_CUDA"] = "cuda" in CONFIG["MAP_LOCATION"]
 
-    with open(CONFIG_PATH, "w+") as f:
-        json.dump(CONFIG_, f)
-
-
-def set_config_param(param, value):
+def set_config_param(param: str, value: Union[str, int, float, bool]):
     """Set a configuration parameter.
 
     Parameters:
@@ -153,9 +149,12 @@ def set_config_param(param, value):
     """
     CONFIG_[param] = value
     update_config()
+    
+    with open(CONFIG_PATH, "w+") as f:
+        json.dump(CONFIG_, f)
 
 
-def remove_config_param(param):
+def remove_config_param(param: str):
     """Remove a configuration parameter.
 
     Parameters:
@@ -163,6 +162,9 @@ def remove_config_param(param):
     """
     CONFIG_.pop(param)
     update_config()
+    
+    with open(CONFIG_PATH, "w+") as f:
+        json.dump(CONFIG_, f)
 
 
 update_config()
@@ -172,7 +174,6 @@ def ExampleDataFrame():
     return pd.read_csv(
         "https://storage.googleapis.com/oloren-public-data/sample-csvs/sample_data3.csv"
     )
-
 
 from .base_class import *
 from .basics import *

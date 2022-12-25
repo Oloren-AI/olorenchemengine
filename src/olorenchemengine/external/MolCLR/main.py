@@ -81,11 +81,15 @@ class MolCLR(BaseModel):
         epochs=100,
         batch_size=32,
         init_lr=0.0005,
-        init_base_lr=0.0001,
+        init_base_lr=None,
+        base_coef = 1,
         weight_decay=1e-6,
         **kwargs,
     ):
         self.model_type = model_type
+        
+        if init_base_lr is None:
+            init_base_lr = init_lr/base_coef
 
         self.config = {
             "epochs": epochs,
