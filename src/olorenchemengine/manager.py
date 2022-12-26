@@ -76,6 +76,10 @@ class BaseModelManager(BaseClass):
 
     def primary_metric(self):
         return self.primary_metric
+    
+    @property
+    def direction(self):
+        return metric_direction[self.primary_metric] # "higher" or "lower"
 
     def run(
         self, models: Union[BaseModel, List[BaseModel]], return_models: bool = False

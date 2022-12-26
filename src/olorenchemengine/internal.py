@@ -647,7 +647,8 @@ class BaseClass(BaseRemoteSymbol):
         _load: loads an instance of a BaseClass from a dictionary (abstract method to be implmented by subclasses)
     """
 
-    def __init__(self):
+    @log_arguments
+    def __init__(self, log = True):
         pass
 
     @classmethod

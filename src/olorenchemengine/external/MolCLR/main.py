@@ -288,6 +288,8 @@ class MolCLRVecRep(BaseVecRepresentation):
             torch.load(save_path, map_location=oce.CONFIG["MAP_LOCATION"])
         )
         self.model.to(oce.CONFIG["DEVICE"])
+        
+        super().__init__(log=False,**kwargs)
 
     def _convert(self, X, **kwargs):
         return self.convert(X)
