@@ -250,6 +250,7 @@ class MolCLRVecRep(BaseVecRepresentation):
         init_lr=0.0005,
         init_base_lr=0.0001,
         weight_decay=1e-6,
+        log=True,
         **kwargs,
     ):
         self.model_type = model_type
