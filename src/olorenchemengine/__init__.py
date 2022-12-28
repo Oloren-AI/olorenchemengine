@@ -166,6 +166,21 @@ def remove_config_param(param: str):
     with open(CONFIG_PATH, "w+") as f:
         json.dump(CONFIG_, f)
 
+def create_config_default_param(param: str, value: Union[str, int, float, bool]):
+    """Create a default configuration parameter.
+
+    Parameters:
+        param: the parameter to create.
+        value: the value to set the parameter to.
+    """
+    
+    if param not in CONFIG_:
+        CONFIG_[param] = value
+        
+    update_config()
+    
+    with open(CONFIG_PATH, "w+") as f:
+        json.dump(CONFIG_, f)
 
 update_config()
 
