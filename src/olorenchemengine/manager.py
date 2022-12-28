@@ -188,9 +188,14 @@ class BaseModelManager(BaseClass):
                 return primary_metric_outputs
 
     def get_model_database(self):
-
-        return self.model_database
-
+        if self.direction == "higher":
+            return self.model_database.sort_values(
+                self.primary_metric, ascending=False
+            ).reset_index(drop=True)
+        else:
+            return self.model_database.sort_values(
+                self.primary_metric, ascending=True
+            ).reset_index(drop=True)
 
 class ModelManager(BaseModelManager):
     """ModelManager is the class that tracks model development against a specified
