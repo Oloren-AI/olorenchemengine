@@ -1196,11 +1196,9 @@ class BaseErrorModel(BaseClass):
             self.y_train = d["y_train"]
             self.y_pred_train = d["y_pred_train"]
             if hasattr(self, "model"):
-                print("Rebuilding error model...")
                 self._build()
         if "residuals" in d.keys():
             self.residuals = d["residuals"]
             self.scores = d["scores"]
             if hasattr(self, "model"):
-                print("Refitting error model...")
                 self._fit(self.residuals, self.scores)
