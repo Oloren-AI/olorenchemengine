@@ -1076,8 +1076,8 @@ class BaseErrorModel(BaseClass):
             elif self.method == "roll":
                 window = min(len(self.scores), self.window)
                 idxs = np.argsort(self.scores)
-                X = list(pd.Series(self.scores[idxs]).rolling(window).mean())[window-1:]
-                y = list(pd.Series(self.residuals[idxs]).rolling(window).quantile(quantile))[window-1:]
+                X = pd.Series(self.scores[idxs]).rolling(window).mean()[window-1:]
+                y = pd.Series(self.residuals[idxs]).rolling(window).quantile(quantile)[window-1:]
             else:
                 raise NameError("Method {} is not recognized. Valid inputs are \"bin\", \"qbin\", and \"roll\".".format(self.method))
         
@@ -1116,13 +1116,13 @@ class BaseErrorModel(BaseClass):
         
             reg = lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
             
-            self._fit_regression_params[mode] = {"func": opt_func, "params": opt_params, "X": X, "y": y}
+            self._fit_regression_params[mode] = {"func": opt_func, "params": opt_params, "X": X.tolist(), "y": y.tolist()}
             
             return reg, X, y
         else:
             params = self._fit_regression_params[mode]
             
-            return lambda x: np.maximum(np.minimum(params["func"](x, *params["params"]), np.max(self.residuals)), np.min(self.residuals)), params["X"], params["y"]
+            return lambda x: np.maximum(np.minimum(params["func"](x, *params["params"]), np.max(self.residuals)), np.min(self.residuals)), np.array(params["X"]), np.array(params["y"])
 
     @abstractmethod
     def calculate(
@@ -1184,6 +1184,8 @@ class BaseErrorModel(BaseClass):
         if hasattr(self, "residuals"):
             d.update({"residuals": self.residuals})
             d.update({"scores": self.scores})
+            
+        d.update({"fit_regression_params": self._fit_regression_params})
         return d
 
     def _load(self, d) -> None:
