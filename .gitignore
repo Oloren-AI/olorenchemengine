@@ -93,3 +93,5 @@ tests/*.png
 
 data
 data/*
+
+/examples/**/tmp_*.*

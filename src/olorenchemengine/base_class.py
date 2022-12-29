@@ -1114,7 +1114,7 @@ class BaseErrorModel(BaseClass):
                 except (RuntimeError, TypeError, ValueError):
                     raise RuntimeError("Curve fit failed to fit regression model.")
         
-            reg = lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
+            reg = lambda x: np.clip(opt_func(x, *opt_params), np.min(self.residuals), np.max(self.residuals))
             
             self._fit_regression_params[mode] = {"used_curvetype": used_curvetype, "params": opt_params, "X": X.tolist(), "y": y.tolist()}
             
@@ -1122,7 +1122,7 @@ class BaseErrorModel(BaseClass):
         else:
             params = self._fit_regression_params[mode]
             
-            return lambda x: np.maximum(np.minimum(regression_functions[params["used_curvetype"]](x, *params["params"]), np.max(self.residuals)), np.min(self.residuals)), np.array(params["X"]), np.array(params["y"])
+            return lambda x: np.clip(regression_functions[params["used_curvetype"]](x, *params["params"]), np.max(self.residuals), np.min(self.residuals)), np.array(params["X"]), np.array(params["y"])
 
     @abstractmethod
     def calculate(
