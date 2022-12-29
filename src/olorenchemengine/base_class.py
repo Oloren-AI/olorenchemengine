@@ -616,9 +616,7 @@ class BaseModel(BaseClass):
         if "error_model" in d.keys():
             error_model = loads(d["error_model"])
             error_model.model = self
-            print("Rebuilding error model...")
             error_model._build()
-            print("Refitting error model...")
             error_model._fit(error_model.residuals, error_model.scores)
             self.error_model = error_model
         if "normalization" in d.keys():
