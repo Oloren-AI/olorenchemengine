@@ -278,7 +278,6 @@ if len(_mocked_imports) > 0:
                 parallelized, remote execution on Oloren's cloud solution. Oloren ChemEngine online SHOULD NOT BE USED FOR
                 CONFIDENTAIL DATA, and is only intended for demonstration purposes. The securely privately hosted Server version is
                 called Oloren ChemEngine Enterprise.
-
         \n"""
 
     # print(textwrap.fill(textwrap.dedent(message).replace("\n", " ").replace("    (", "\n     ("), 80))
@@ -286,5 +285,5 @@ if len(_mocked_imports) > 0:
 
 def online(session_url="https://aws.chemengine.org"):
     global online_session
-    online_session = Remote(session_url)
+    online_session = Workflow(session_url)
     online_session.__enter__()
