@@ -375,33 +375,3 @@ def test_supergat(example_data):
 #     model = oce.RandomForestModel(rep, n_estimators=10)
 #     train_predict_slf(model, example_data)
 
-
-def test_molnet_single_task():
-    mn_datasets = [
-        "bace_classification",
-        "bbbp",
-        "clintox",
-        "hiv",
-        "muv",
-        "pcba",
-        "sider",
-        "tox21",
-        "toxcast",
-        "delaney" or "ESOL",
-        "freesolv",
-        "lipo",
-        "bace_regression",
-    ]
-
-    MTC = oce.RandomForestModel(
-        oce.DescriptastorusDescriptor("morgan3counts"),
-        max_features="log2",
-        n_estimators=1,
-    )
-    RDK = oce.RandomForestModel(
-        oce.FragmentIndicator(), max_features="log2", n_estimators=1
-    )
-    models = [MTC, RDK]
-
-    mn_bench = BenchmarkMolNet(datasets=[mn_datasets[0]])
-    mn_bench.run(models)
