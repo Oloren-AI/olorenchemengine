@@ -1105,9 +1105,11 @@ class BaseErrorModel(BaseClass):
                         opt_func = func
                         opt_params = params
                         min_mse = mse
+                        used_curvetype = reg
                 assert min_mse is not None, "Curve fit failed to find a suitable regression model."
             else:
                 opt_func = regression_functions[self.curvetype]
+                used_curvetype = self.curvetype
                 init = regression_init[self.curvetype](X, y)
                 try:
                     opt_params = curve_fit(opt_func, X, y, p0=init, maxfev = 500 * len(init))[0]
@@ -1116,13 +1118,13 @@ class BaseErrorModel(BaseClass):
         
             reg = lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
             
-            self._fit_regression_params[mode] = {"func": opt_func, "params": opt_params, "X": X.tolist(), "y": y.tolist()}
+            self._fit_regression_params[mode] = {"used_curvetype": used_curvetype, "params": opt_params, "X": X.tolist(), "y": y.tolist()}
             
             return reg, X, y
         else:
             params = self._fit_regression_params[mode]
             
-            return lambda x: np.maximum(np.minimum(params["func"](x, *params["params"]), np.max(self.residuals)), np.min(self.residuals)), np.array(params["X"]), np.array(params["y"])
+            return lambda x: np.maximum(np.minimum(regression_functions[params["used_curvetype"]](x, *params["params"]), np.max(self.residuals)), np.min(self.residuals)), np.array(params["X"]), np.array(params["y"])
 
     @abstractmethod
     def calculate(
