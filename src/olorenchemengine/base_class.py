@@ -907,6 +907,8 @@ class BaseErrorModel(BaseClass):
         self.bins = bins
         self.curvetype = curvetype
         
+        self._fit_regression_params = {}
+        
     def build(
         self,
         model: BaseModel,
@@ -1045,70 +1047,82 @@ class BaseErrorModel(BaseClass):
 
         return fig
 
-    def _fit_regression(self, quantile):
+    def _fit_regression(self, quantile, mode: str = None):
         """Fits a regression curve to a quantile of the fitting data.
 
         Args:
             quantile (float): fraction of data below the regression function
+            mode (str): the name of the fit either "upper" or "lower". This 
+                selection is used to determine if the regression fit has been
+                precomputed and if so, to return the precomputed fit.
 
         Returns:
             X and y coordinates for regression and regression function
         """
-        if self.method == "bin":
-            bins = min(len(np.unique(self.scores)), self.bins)
-            bin_labels = pd.cut(self.scores, bins, labels=False)
-            labels = np.unique(bin_labels)
-            X = [np.mean(self.scores[bin_labels == i]) for i in labels]
-            y = [np.quantile(self.residuals[bin_labels == i], quantile) for i in labels]
-        elif self.method == "qbin":
-            bins = min(len(np.unique(self.scores)), self.bins)
-            bin_labels = pd.qcut(self.scores, bins, labels=False, duplicates="drop")
-            labels = np.unique(bin_labels)
-            X = [np.mean(self.scores[bin_labels == i]) for i in labels]
-            y = [np.quantile(self.residuals[bin_labels == i], quantile) for i in labels]
-        elif self.method == "roll":
-            window = min(len(self.scores), self.window)
-            idxs = np.argsort(self.scores)
-            X = pd.Series(self.scores[idxs]).rolling(window).mean()[window-1:]
-            y = pd.Series(self.residuals[idxs]).rolling(window).quantile(quantile)[window-1:]
-        else:
-            raise NameError("Method {} is not recognized. Valid inputs are \"bin\", \"qbin\", and \"roll\".".format(self.method))
         
-        X = np.array(X)
-        y = np.array(y)
-
-        if len(X) == 1:
-            print("WARNING: Only one unique score computed. Please decrease bin/window size or use a larger dataset.")
-            return np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan), X, y
-
-        from scipy.optimize import curve_fit
+        if not mode in self._fit_regression_params:
+            if self.method == "bin":
+                bins = min(len(np.unique(self.scores)), self.bins)
+                bin_labels = pd.cut(self.scores, bins, labels=False)
+                labels = np.unique(bin_labels)
+                X = [np.mean(self.scores[bin_labels == i]) for i in labels]
+                y = [np.quantile(self.residuals[bin_labels == i], quantile) for i in labels]
+            elif self.method == "qbin":
+                bins = min(len(np.unique(self.scores)), self.bins)
+                bin_labels = pd.qcut(self.scores, bins, labels=False, duplicates="drop")
+                labels = np.unique(bin_labels)
+                X = [np.mean(self.scores[bin_labels == i]) for i in labels]
+                y = [np.quantile(self.residuals[bin_labels == i], quantile) for i in labels]
+            elif self.method == "roll":
+                window = min(len(self.scores), self.window)
+                idxs = np.argsort(self.scores)
+                X = list(pd.Series(self.scores[idxs]).rolling(window).mean())[window-1:]
+                y = list(pd.Series(self.residuals[idxs]).rolling(window).quantile(quantile))[window-1:]
+            else:
+                raise NameError("Method {} is not recognized. Valid inputs are \"bin\", \"qbin\", and \"roll\".".format(self.method))
         
-        if self.curvetype == "auto":
-            min_mse = None
-            for reg in regression_functions:
-                func = regression_functions[reg]
-                init = regression_init[reg](X, y)
+            X = np.array(X)
+            y = np.array(y)
+
+            if len(X) == 1:
+                print("WARNING: Only one unique score computed. Please decrease bin/window size or use a larger dataset.")
+                return np.vectorize(lambda x: y[0] if (x == X[0]) else np.nan), X, y
+
+            from scipy.optimize import curve_fit
+        
+            if self.curvetype == "auto":
+                min_mse = None
+                for reg in regression_functions:
+                    func = regression_functions[reg]
+                    init = regression_init[reg](X, y)
+                    try:
+                        params = curve_fit(func, X, y, p0=init, maxfev = 500 * len(init))[0]
+                        y_pred = func(X, *params)
+                        mse = mean_squared_error(y, y_pred)
+                    except (RuntimeError, TypeError, ValueError):
+                        continue
+                    if min_mse is None or mse < min_mse:
+                        opt_func = func
+                        opt_params = params
+                        min_mse = mse
+                assert min_mse is not None, "Curve fit failed to find a suitable regression model."
+            else:
+                opt_func = regression_functions[self.curvetype]
+                init = regression_init[self.curvetype](X, y)
                 try:
-                    params = curve_fit(func, X, y, p0=init, maxfev = 500 * len(init))[0]
-                    y_pred = func(X, *params)
-                    mse = mean_squared_error(y, y_pred)
+                    opt_params = curve_fit(opt_func, X, y, p0=init, maxfev = 500 * len(init))[0]
                 except (RuntimeError, TypeError, ValueError):
-                    continue
-                if min_mse is None or mse < min_mse:
-                    opt_func = func
-                    opt_params = params
-                    min_mse = mse
-            assert min_mse is not None, "Curve fit failed to find a suitable regression model."
-        else:
-            opt_func = regression_functions[self.curvetype]
-            init = regression_init[self.curvetype](X, y)
-            try:
-                opt_params = curve_fit(opt_func, X, y, p0=init, maxfev = 500 * len(init))[0]
-            except (RuntimeError, TypeError, ValueError):
-                raise RuntimeError("Curve fit failed to fit regression model.")
+                    raise RuntimeError("Curve fit failed to fit regression model.")
         
-        reg = lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
-        return reg, X, y
+            reg = lambda x: np.maximum(np.minimum(opt_func(x, *opt_params), np.max(self.residuals)), np.min(self.residuals))
+            
+            self._fit_regression_params[mode] = {"func": opt_func, "params": opt_params, "X": X, "y": y}
+            
+            return reg, X, y
+        else:
+            params = self._fit_regression_params[mode]
+            
+            return lambda x: np.maximum(np.minimum(params["func"](x, *params["params"]), np.max(self.residuals)), np.min(self.residuals)), params["X"], params["y"]
 
     @abstractmethod
     def calculate(
