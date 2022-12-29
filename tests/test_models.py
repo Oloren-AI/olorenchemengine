@@ -6,7 +6,6 @@ from sklearn.model_selection import train_test_split
 import olorenchemengine as oce
 from olorenchemengine.base_class import *
 from olorenchemengine.basics import *
-from olorenchemengine.benchmarks import *
 from olorenchemengine.ensemble import *
 from olorenchemengine.internal import download_public_file
 from olorenchemengine.representations import *

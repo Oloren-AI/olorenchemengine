@@ -18,7 +18,6 @@ from hyperopt import fmin, hp, tpe
 from hyperopt.pyll import scope
 
 from .base_class import *
-from .benchmarks import *
 from .manager import *
 
 def cast_int(f: float) -> int:
