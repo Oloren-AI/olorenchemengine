@@ -43,13 +43,6 @@ def test_reg_2():
     )
 
 
-def test_reg_3():
-    model = get_model_for_testing("reg model 3")
-    print(model.predict(test_molecules))
-    assert np.allclose(
-        model.predict(test_molecules), [0.5101875, 0.27005324], atol=1e-3
-    )
-
 def test_class_0():
     model = get_model_for_testing("class model 0")
     assert np.allclose(model.predict(test_molecules), [0.9907742, 0.9907742])
@@ -63,8 +56,3 @@ def test_class_1():
 def test_class_2():
     model = get_model_for_testing("class model 2")
     assert np.allclose(model.predict(test_molecules), [1.0, 1.0])
-
-
-def test_class_3():
-    model = get_model_for_testing("class model 3")
-    assert np.allclose(model.predict(test_molecules), [0.580161, 0.56691015])

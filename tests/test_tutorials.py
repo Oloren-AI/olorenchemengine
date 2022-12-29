@@ -33,11 +33,19 @@ def test_0():
         + oce.CleanStructures()
         + oce.RandomSplit()
     )
-    model = oce.RandomForestModel(
-        oce.DescriptastorusDescriptor("morgan3counts"), n_estimators=1000
-    )
-    _ = model.fit_cv(*dataset.train_dataset, error_model=oce.TrainDistKNN())
-    oce.save(model, "vis-model.oce")
+    model = oce.BaseBoosting([
+        oce.RandomForestModel(oce.DescriptastorusDescriptor("morgan3counts"), n_estimators=1000),
+        oce.RandomForestModel(oce.OlorenCheckpoint("default"), n_estimators=1000),
+        oce.ChemPropModel(epochs=20, batch_size=64)
+    ])
+
+    model.fit(*dataset.train_dataset)
+    model.test(*dataset.test_dataset)
+    model.fit_cv(*dataset.train_dataset, error_model = oce.KernelRegressionError(kernel = "sdc", ci=0.8))
+    oce.save(model, "tmp.oce")
+    results = model.predict(dataset.test_dataset[0], return_ci = True, return_vis = True)
+    results["vis"].iloc[32].render_ipynb()
+
 
 @pytest.mark.timeout(300)
 def test_1d():

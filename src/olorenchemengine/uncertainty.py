@@ -257,13 +257,13 @@ class BaseEnsembleModel(BaseErrorModel):
     @log_arguments
     def __init__(self, ensemble_model = None, n_ensembles = 16, log=True, **kwargs):      
         self.ensemble_model = ensemble_model
+        self.ensembles = []
         self.n_ensembles = n_ensembles
         super().__init__(log=False, **kwargs)
 
     def _build(self, **kwargs):
         if self.ensemble_model is None:
             self.ensemble_model = self.model.copy()
-        self.ensembles = []
     
     def calculate(self, X, y_pred):
         predictions = np.stack([model.predict(X) for model in tqdm(self.ensembles)])
@@ -308,16 +308,19 @@ class BootstrapEnsemble(BaseEnsembleModel):
 
     def _build(self, **kwargs):
         super()._build()
-
-        from sklearn.model_selection import train_test_split
         
-        for _ in tqdm(range(self.n_ensembles)):
-            X_train, X_test, y_train, y_test = train_test_split(
-                self.X_train, self.y_train, train_size=self.bootstrap_size
-            )
-            ensemble_model = self.ensemble_model.copy()
-            ensemble_model.fit(X_train, y_train)
-            self.ensembles.append(ensemble_model)
+        if len(self.ensembles) > 0:
+            return
+        else:
+            from sklearn.model_selection import train_test_split
+        
+            for _ in tqdm(range(self.n_ensembles)):
+                X_train, X_test, y_train, y_test = train_test_split(
+                    self.X_train, self.y_train, train_size=self.bootstrap_size
+                )
+                ensemble_model = self.ensemble_model.copy()
+                ensemble_model.fit(X_train, y_train)
+                self.ensembles.append(ensemble_model)
 
 class RandomForestEnsemble(BaseEnsembleModel):
     """Ensemble of random forests
