@@ -97,24 +97,7 @@ def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
                     kwargs[k] = v
             self.args = args
             self.kwargs = {k: v for k, v in kwargs.items() if k not in ignored_kwargs}
-        if _runtime.is_local:
-            return func(self, *args, **kwargs)
-        import uuid
-
-        REMOTE_ID = str(uuid.uuid4())
-
-        if "BaseRemoteSymbol" in str(type(self)):
-            self.REMOTE_ID = REMOTE_ID
-            return func(self, *args, **kwargs)
-
-        _runtime.add_instruction(
-            {
-                "type": "CREATE",
-                "REMOTE_ID": REMOTE_ID,
-                "parameters": parameterize(self),
-            }
-        )
-        self.REMOTE_ID = REMOTE_ID
+        return func(self, *args, **kwargs)
 
     wrapper.__wrapped__ = func
 
@@ -132,365 +115,7 @@ def deparametrize_args_kwargs(params):
         key: create_BC(kwarg) for key, kwarg in kwargs.items()
     }
 
-
-def recursive_get_attr(parent, attr):
-    if len(attr) == 0:
-        return parent
-    return recursive_get_attr(getattr(parent, attr[0]), attr[1:])
-
-
-def generate_uuid():
-    import uuid
-
-    return str(uuid.uuid4())
-
-
-class _RemoteRuntime:
-    def __init__(self) -> None:
-        self.reset_remote()
-
-    def get_remote_obj(self, remote_id):
-        if self.runner is None:
-            raise NotImplementedError(
-                "Not yet implemented remote object retrieval locally"
-            )
-        else:
-            return self.runner.get_remote_obj(remote_id)
-
-    def add_instruction(self, instruction):
-
-        self.instruction_buffer.append(instruction)
-
-        if instruction["type"] == "CALL":
-            x = self.send_instructions_blocking()
-            if x is not None and isinstance(x, str):
-                return json.loads(x)
-
-    def get_iterable(self, remote_id):
-        self.instruction_buffer.append({"type": "ITER", "REMOTE_ID": remote_id})
-        return [
-            BaseRemoteSymbol.from_rid(rid) for rid in self.send_instructions_blocking()
-        ]
-
-    def get_obj_repr(self, remote_id):
-        self.instruction_buffer.append({"type": "REPR", "REMOTE_ID": remote_id})
-        return self.send_instructions_blocking()
-
-    def send_instructions_blocking(self):
-        import requests
-
-        response = None
-
-        oas_connector.authenticate()
-        _, execution = oas_connector.logging_db.collection("executions").add(
-            {
-                "uid": oas_connector.uid,
-                "sid": self.session_id,
-                "instructions": json.dumps(self.instruction_buffer),
-                "status": "Queued",
-            }
-        )
-
-        eid = execution.id
-
-        response = requests.post(
-            f"{self.remote_url}/firestore/run_remote/",
-            params={
-                "eid": eid,
-                "uid": oas_connector.authenticate(),
-            },
-            headers={
-                "accept": "application/json",
-                "content-type": "application/x-www-form-urlencoded",
-            },
-        )
-
-        if response.status_code != 200:
-            self.instruction_buffer = []
-            raise ValueError(f"Error code on post to {self.remote_url} {response.status_code} - {response.text}. Length of instruction buffer: {len(json.dumps(self.instruction_buffer))}")
-
-        response = response.json()
-
-        execution = None
-
-        def on_snapshot(doc_snapshot, changes, read_time):
-            nonlocal execution
-            for doc in doc_snapshot:
-                execution = doc.to_dict()
-
-        listener = (
-            oas_connector.logging_db.collection("executions")
-            .document(eid)
-            .on_snapshot(on_snapshot)
-        )
-
-        while execution is None:
-            pass
-
-        while execution["status"] not in ("Finished", "Error"):
-            pass
-
-        listener.close()
-
-        if execution["status"] == "Error":
-            print(f"Remote Call: {self.instruction_buffer}\nResulted in Traceback:")
-            print(execution["traceback"])
-            oas_connector.logging_db.collection("executions").document(eid).delete()
-            self.instruction_buffer = []
-            raise ValueError("Remote call resulted in error")
-
-        elif execution["status"] == "Finished":
-            if len(execution["stdout"].strip()) > 0:
-                print(
-                    "\n".join([f"REMOTE: {x}" for x in execution["stdout"].split("\n")])
-                )
-            oas_connector.logging_db.collection("executions").document(eid).delete()
-            self.instruction_buffer = []
-            return execution["return"]
-        else:
-            raise NotImplementedError(f"Unknown status {execution['status']}")
-
-    @property
-    def is_local(self):
-        return self.runtime == "local"
-
-    def start_remote(self, session_id, debug, remote_url):
-        self.runtime = "remote"
-        self.instruction_buffer = []
-        self.session_id = session_id
-        self.runner = None
-        self.debug = debug
-        self.remote_url = remote_url
-
-    def reset_remote(self):
-        self.runtime = "local"
-        self.instruction_buffer = []
-        self.session_id = None
-        self.runner = None
-        self.debug = False
-        self.remote_url = None
-
-
-_runtime = _RemoteRuntime()  # internal runtime object
-
-
-def set_runner(runner):
-    _runtime.runner = runner
-
-
-def get_runtime():
-    return _runtime
-
-
-class Remote(object):
-    def __init__(self, remote_url, session_id=None, keep_alive=False, debug=False):
-        self.keep_alive = keep_alive
-        self.session_id = session_id
-        self.debug = debug
-        self.remote_url = remote_url
-
-    def __enter__(self):
-        self.session_id = generate_uuid()
-        _runtime.start_remote(self.session_id, self.debug, self.remote_url)
-        return self.session_id
-
-    def __exit__(self, type, value, traceback):
-        _runtime.reset_remote()
-        if not self.keep_alive:
-            import google
-
-            oas_connector.authenticate()
-
-            with contextlib.suppress(google.api_core.exceptions.PermissionDenied):
-                doc = (
-                    oas_connector.logging_db.collection("sessions")
-                    .document(self.session_id)
-                    .get()
-                    .to_dict()
-                )
-                if doc is not None:
-                    for rid in doc["objects"]:
-                        try:
-                            oas_connector.storage.delete(
-                                f"{oas_connector.uid}/sessions/{self.session_id}/{rid}.oce",
-                                oas_connector.uid_token,
-                            )
-                        except:
-                            import logging
-
-                            logging.warning(
-                                f"Unable to delete remote object {rid} from session {self.session_id}"
-                            )
-                    oas_connector.logging_db.collection("sessions").document(
-                        self.session_id
-                    ).delete()
-
-
-def pretty_args_kwargs(args, kwargs):
-    parameterized_args = [parameterize(arg) for arg in args]
-    parameterized_kwargs = {k: parameterize(v) for k, v in kwargs.items()}
-    return f"(args={parameterized_args}, kwargs={parameterized_kwargs})"
-
-
-def _paremetrize_if_necessary(obj):
-    if isinstance(obj, BaseRemoteSymbol):
-        return parameterize(obj)
-    elif isinstance(obj, pd.Series):
-        return list(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    with contextlib.suppress(Exception):
-        json.dumps(obj)
-        return obj
-
-
-def parametrize_args_kwargs(args, kwargs):
-    parameterized_args = [_paremetrize_if_necessary(arg) for arg in args]
-    parameterized_kwargs = {k: _paremetrize_if_necessary(v) for k, v in kwargs.items()}
-    return {"args": parameterized_args, "kwargs": parameterized_kwargs}
-
-
-def _truncate_json(json_obj, max_length=40):
-    if isinstance(json_obj, str):
-        if len(json_obj) > max_length:
-            return f"{json_obj[:max_length]}..."
-        else:
-            return json_obj
-    elif isinstance(json_obj, list):
-        return [_truncate_json(x, max_length) for x in json_obj]
-    elif isinstance(json_obj, dict):
-        return {
-            _truncate_json(k): _truncate_json(v, max_length)
-            for k, v in json_obj.items()
-        }
-    else:
-        return json_obj
-
-
-class BaseRemoteSymbol:
-    @log_arguments
-    def __init__(
-        self, REMOTE_SYMBOL_NAME, REMOTE_PARENT, args=None, kwargs=None
-    ) -> None:
-        if _runtime.is_local:
-            raise RuntimeError("Cannot instantiate RemoteObject in local _runtime")
-
-        if args is not None:
-            self.args = args
-        if kwargs is not None:
-            self.kwargs = kwargs
-
-        self.REMOTE_SYMBOL_NAME = REMOTE_SYMBOL_NAME
-        self.REMOTE_PARENT = REMOTE_PARENT
-        self.REMOTE_CHILDREN = {}
-
-        if REMOTE_SYMBOL_NAME == "CALL":
-            out = _runtime.add_instruction(
-                {
-                    "type": "CALL",
-                    "PARENT_REMOTE_ID": self.REMOTE_PARENT.REMOTE_ID,
-                    "REMOTE_ID": self.REMOTE_ID,
-                    "ARGUMENTS": parametrize_args_kwargs(args, kwargs),
-                }
-            )
-
-            if self.REMOTE_PARENT.REMOTE_SYMBOL_NAME == "render_ipynb":
-                from IPython.display import IFrame, display
-
-                display(IFrame(out, width=800, height=600))
-
-        else:
-            if not hasattr(self.REMOTE_PARENT, "REMOTE_ID"):
-                self.REMOTE_PARENT._upload_remote()
-
-            _runtime.add_instruction(
-                {
-                    "type": "SYMBOL",
-                    "PARENT_REMOTE_ID": self.REMOTE_PARENT.REMOTE_ID,
-                    "SYMBOL_NAME": self.REMOTE_SYMBOL_NAME,
-                    "REMOTE_ID": self.REMOTE_ID,
-                }
-            )
-
-    @classmethod
-    def from_rid(cls, rid):
-        x = object.__new__(cls)
-        x.REMOTE_ID = rid
-        return x
-
-    def __iter__(self):
-        return iter(_runtime.get_iterable(self.REMOTE_ID))
-
-    def __repr__(self):
-        if hasattr(self, "REMOTE_ID"):
-            return _runtime.get_obj_repr(self.REMOTE_ID)
-        else:
-            return  object.__repr__(self)
-
-    def _upload_remote(self):
-        try:
-            oas_connector.authenticate()
-            REMOTE_ID = generate_uuid()
-
-            r = _runtime.runtime
-            _runtime.runtime = "local"
-
-            with tempfile.NamedTemporaryFile() as tmp:
-                pickle.dump(saves(self), tmp)
-                tmp.flush()
-                response = oas_connector.storage.child(
-                    f"{oas_connector.uid}/sessions/{_runtime.session_id}"
-                    + f"/{REMOTE_ID}.oce"
-                ).put(tmp.name, oas_connector.uid_token)
-        except:
-            import sys
-            import traceback
-
-        r = _runtime.runtime
-
-        _runtime.runtime = r
-        object.__setattr__(self, "REMOTE_ID", REMOTE_ID)
-
-        return REMOTE_ID
-
-    def __getattribute__(self, key):
-        if _runtime.is_local or key == "_upload_remote":
-            return object.__getattribute__(self, key)
-        if "ipython_canary_method_should_not_exist" in key:
-            return {}
-        if (
-            key.startswith("REMOTE")
-            or key.startswith("__")
-            or key in ["args", "kwargs"]
-        ):
-            return object.__getattribute__(self, key)
-
-        if not hasattr(self, "REMOTE_CHILDREN") or key not in self.REMOTE_CHILDREN:
-            if not hasattr(self, "REMOTE_CHILDREN"):
-                self.REMOTE_CHILDREN = {}
-            self.REMOTE_CHILDREN[key] = BaseRemoteSymbol(key, self)
-        return self.REMOTE_CHILDREN[key]
-
-    def __call__(self, *args, **kwargs):
-        remote_id = generate_uuid()
-        out = _runtime.add_instruction(
-            {
-                "type": "CALL",
-                "PARENT_REMOTE_ID": self.REMOTE_ID,
-                "REMOTE_ID": remote_id,
-                "ARGUMENTS": parametrize_args_kwargs(args, kwargs),
-            }
-        )
-
-        if self.REMOTE_SYMBOL_NAME == "render_ipynb":
-            from IPython.display import IFrame, display
-
-            display(IFrame(out, width=800, height=600))
-
-        return out if out is not None else RemoteObj(remote_id)
-
-
-class BaseClass(BaseRemoteSymbol):
+class BaseClass:
     """BaseClass is the base class for all models.
 
     All classes in Oloren ChemEngine should inherit from BaseClass to enable for universal saving and loading of both
@@ -569,12 +194,6 @@ class BaseDepreceated(BaseClass):
     def __init__(self, *args, **kwargs):
         raise Exception("This class has been depreceated and will not run, please reach out via email (contact@oloren.ai) or raise an issue on GitHub for more details if you have any questions")
 
-class RemoteObj(BaseRemoteSymbol):
-    """Dummy object to represent remote objects."""
-
-    def __init__(self, remote_id):
-        self.REMOTE_ID = remote_id
-
 
 def parameterize(object: Union[BaseClass, list, dict, int, float, str, None]) -> dict:
     """parameterize is a recursive method which creates a dictionary of all arguments necessary to instantiate a BaseClass object.
@@ -590,11 +209,7 @@ def parameterize(object: Union[BaseClass, list, dict, int, float, str, None]) ->
     Returns:
         dict: dictionary of parameters necessary to instantiate the object.
     """
-    if issubclass(type(object), BaseClass) or (
-        issubclass(type(object), BaseRemoteSymbol) and hasattr(object, "REMOTE_ID")
-    ):
-        if hasattr(object, "REMOTE_ID"):
-            return {"REMOTE_ID": object.REMOTE_ID}
+    if issubclass(type(object), BaseClass):
         return {
             **{"BC_class_name": type(object).__name__},
             **{"args": [parameterize(arg) for arg in object.args]},
@@ -697,14 +312,11 @@ def create_BC(d: dict) -> BaseClass:
         )
         d = json.loads(d)
 
-    if "REMOTE_ID" in d.keys():
-        return _runtime.get_remote_obj(d["REMOTE_ID"])
-
     args = []
     if "args" in d.keys():
         for arg in d["args"]:
             if isinstance(arg, dict) and (
-                "BC_class_name" in arg.keys() or "REMOTE_ID" in arg.keys()
+                "BC_class_name" in arg.keys()
             ):
                 args.append(create_BC(arg))
             else:
@@ -712,7 +324,7 @@ def create_BC(d: dict) -> BaseClass:
                     arg = [
                         create_BC(x)
                         if isinstance(x, dict)
-                        and ("BC_class_name" in x.keys() or "REMOTE_ID" in x.keys())
+                        and ("BC_class_name" in x.keys())
                         else x
                         for x in arg
                     ]
@@ -720,7 +332,7 @@ def create_BC(d: dict) -> BaseClass:
                     arg = {
                         k: create_BC(v)
                         if isinstance(v, dict)
-                        and ("BC_class_name" in v.keys() or "REMOTE_ID" in v.keys())
+                        and ("BC_class_name" in v.keys())
                         else v
                         for k, v in arg.items()
                     }
@@ -730,7 +342,7 @@ def create_BC(d: dict) -> BaseClass:
     if "kwargs" in d.keys():
         for k, v in d["kwargs"].items():
             if isinstance(v, dict) and (
-                "BC_class_name" in v.keys() or "REMOTE_ID" in v.keys()
+                "BC_class_name" in v.keys()
             ):
                 kwargs[k] = create_BC(v)
             else:
@@ -781,17 +393,9 @@ def save(model: BaseClass, fname: str):
         model (BaseClass): the object to be saved
         fname (str): the file name to save the model to
     """
-
-    if hasattr(model, "REMOTE_ID"):
-
-        REMOTE_ID = model.REMOTE_ID
-        oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}/{REMOTE_ID}.oce.delete"
-        ).download("", fname, token=oas_connector.authenticate())
-    else:
-        save_dict = saves(model)
-        with open(fname, "wb+") as f:
-            pickle.dump(save_dict, f)
+    save_dict = saves(model)
+    with open(fname, "wb+") as f:
+        pickle.dump(save_dict, f)
 
 
 def load(fname: str) -> BaseClass:
@@ -803,17 +407,9 @@ def load(fname: str) -> BaseClass:
     Returns:
         BaseClass: the BaseClass object which as been recreated from the file
     """
-    if _runtime.is_local:
-        with open(fname, "rb") as f:
-            d = pickle.load(f)
-        return loads(d)
-    else:
-        oas_connector.authenticate()
-        REMOTE_ID = generate_uuid()
-        response = oas_connector.storage.child(
-            f"{oas_connector.uid}/sessions/{_runtime.session_id}" + f"/{REMOTE_ID}.oce.delete"
-        ).put(fname, oas_connector.uid_token)
-        return RemoteObj(REMOTE_ID)
+    with open(fname, "rb") as f:
+        d = pickle.load(f)
+    return loads(d)
 
 
 def pretty_params(base: Union[BaseClass, dict]) -> dict:
