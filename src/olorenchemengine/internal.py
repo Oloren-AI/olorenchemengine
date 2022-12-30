@@ -280,6 +280,8 @@ def saves(object: Union[BaseClass, dict, list, int, float, str, None]) -> dict:
         issubclass(type(object), int)
         or issubclass(type(object), float)
         or issubclass(type(object), str)
+        or issubclass(type(object), bool)
+        or issubclass(type(object), bytes)
         or object is None
     ):
         return object
