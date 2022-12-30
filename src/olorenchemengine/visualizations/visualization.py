@@ -55,13 +55,15 @@ class BaseVisualization(BaseClass):
     """
 
     # A list of packages that can be specified in self.packages to be loaded
-    package_urls = {
-        "d3": "https://d3js.org/d3.v4.js",
-        "plotly": "https://cdn.plot.ly/plotly-2.14.0.min.js",
-        "olorenrenderer": "https://unpkg.com/olorenrenderer@1.0.0-c/dist/oloren-renderer.min.js",
-        "smilesdrawer": "https://unpkg.com/smiles-drawer@1.0.10/dist/smiles-drawer.min.js",
-        "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
-    }
+    @property
+    def package_urls(self):
+        return {
+            "d3": "https://d3js.org/d3.v4.js",
+            "plotly": "https://cdn.plot.ly/plotly-2.14.0.min.js",
+            "olorenrenderer": "https://unpkg.com/olorenrenderer@1.0.0-c/dist/oloren-renderer.min.js",
+            "smilesdrawer": "https://unpkg.com/smiles-drawer@1.0.10/dist/smiles-drawer.min.js",
+            "rdkit": "https://unpkg.com/@rdkit/rdkit/dist/RDKit_minimal.js",
+        }
 
     @log_arguments
     def __init__(self, log=True, **kwargs):
