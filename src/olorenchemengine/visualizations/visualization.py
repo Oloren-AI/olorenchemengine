@@ -69,7 +69,7 @@ class BaseVisualization(BaseClass):
     def __init__(self, log=True, **kwargs):
         self.packages = []
 
-    def get_data() -> dict:
+    def get_data(self, *args, **kwargs) -> dict:
         """Get data for visualization in JSON-like dictionary."""
 
         return {}
