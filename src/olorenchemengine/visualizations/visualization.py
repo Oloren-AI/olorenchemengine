@@ -340,7 +340,7 @@ class VisualizeError(BaseVisualization):
         super().__init__(**kwargs)
         self.packages = ["plotly"]
 
-    def get_data(self):
+    def get_data(self, *args, **kwargs) -> dict:
         d = {
             "reference": self.reference,
             "value": self.value,
