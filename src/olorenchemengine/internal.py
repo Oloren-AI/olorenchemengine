@@ -16,9 +16,6 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
-import pyrebase  # Default pyrebase is pyrebase3 which won't work. Need to install pyrebase4 (pip install pyrebase4)
-from google.cloud.firestore import Client
-from google.oauth2.credentials import Credentials
 from tqdm import tqdm
 
 import olorenchemengine
