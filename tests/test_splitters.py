@@ -13,14 +13,6 @@ __copyright__ = "Oloren AI"
 """
 
 
-def remote(func):
-    def wrapper(*args, **kwargs):
-        with oce.Remote("http://api.oloren.ai:5000") as remote:
-            func(*args, **kwargs)
-
-    return wrapper
-
-
 @pytest.fixture
 def example_data1():
     file_path = download_public_file("sample-csvs/sample_data1.csv")
@@ -45,12 +37,12 @@ def example_data3():
 def example_data4():
     file_path = download_public_file("sample-csvs/sample_data4.csv")
     df = pd.read_csv(file_path)
-    
+
     from rdkit import Chem
     df["mol"] = df["smiles"].apply(lambda x: Chem.MolFromSmiles(x))
     df = df.dropna(subset=["mol"])
     df = df.drop(columns=["mol"])
-    
+
     return df
 
 def test_run_random(example_data3):
@@ -58,13 +50,13 @@ def test_run_random(example_data3):
     for i in splitter.split(example_data3):
         assert isinstance(i, pd.DataFrame)
         assert len(i) > 0
-        
+
 def test_run_stratified(example_data4):
     splitter = oce.StratifiedSplitter(split_proportions=[0.8, 0.1, 0.1], value_col='p_np')
     for i in splitter.split(example_data4):
         assert(isinstance(i, pd.DataFrame))
         assert(len(i) > 0)
-        
+
 def test_run_scaffold(example_data3):
     splitter = oce.ScaffoldSplit(
         scaffold_filter_threshold=1,
@@ -163,7 +155,7 @@ def test_split_props_stratified(example_data4):
 
 def test_split_props_scaffold_murcko(example_data3):
     split_proportions = [0.8, 0.1, 0.1]
-    
+
     splitter = oce.ScaffoldSplit(scaffold_filter_threshold=1, split_type='murcko', split_proportions=split_proportions)
 
     split = splitter.split(example_data3)
