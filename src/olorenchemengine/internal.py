@@ -21,9 +21,7 @@ from tqdm import tqdm
 import olorenchemengine
 import olorenchemengine as oce
 
-sys.modules[
-    "olorenautoml"
-] = olorenchemengine  # important for backwards compatibility of some models
+sys.modules["olorenautoml"] = olorenchemengine  # important for backwards compatibility of some models
 
 
 def mock_imports(g, *args):
@@ -33,9 +31,8 @@ def mock_imports(g, *args):
 
 def all_subclasses(cls):
     """Helper function to return all subclasses of class"""
-    return set(cls.__subclasses__()).union(
-        [s for c in cls.__subclasses__() for s in all_subclasses(c)]
-    )
+    return set(cls.__subclasses__()).union([s for c in cls.__subclasses__() for s in all_subclasses(c)])
+
 
 ignored_kwargs = ["map_location", "num_workers"]
 
@@ -60,18 +57,14 @@ def download_public_file(path, redownload=False):
     import urllib.request
 
     urllib.request.urlretrieve(
-        urllib.parse.quote(f"https://storage.googleapis.com/oloren-public-data/{path}",safe='/:?=&'), local_path
+        urllib.parse.quote(f"https://storage.googleapis.com/oloren-public-data/{path}", safe="/:?=&"), local_path
     )
     return local_path
 
 
 def get_default_args(func):
     signature = inspect.signature(func)
-    return {
-        k: v.default
-        for k, v in signature.parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
+    return {k: v.default for k, v in signature.parameters.items() if v.default is not inspect.Parameter.empty}
 
 
 def log_arguments(func: Callable[..., None]) -> Callable[..., None]:
@@ -108,9 +101,8 @@ def _create_BC_if_necessary(obj):
 def deparametrize_args_kwargs(params):
     args = params["args"]
     kwargs = params["kwargs"]
-    return [_create_BC_if_necessary(arg) for arg in args], {
-        key: create_BC(kwarg) for key, kwarg in kwargs.items()
-    }
+    return [_create_BC_if_necessary(arg) for arg in args], {key: create_BC(kwarg) for key, kwarg in kwargs.items()}
+
 
 class BaseClass:
     """BaseClass is the base class for all models.
@@ -125,7 +117,7 @@ class BaseClass:
     """
 
     @log_arguments
-    def __init__(self, log = True):
+    def __init__(self, log=True):
         pass
 
     @classmethod
@@ -148,9 +140,7 @@ class BaseClass:
         if hasattr(cls, "__abstractmethods__") and len(cls.__abstractmethods__) != 0:
             return [o for sc in cls.__subclasses__() for o in sc.AllInstances()]
         try:
-            return [cls()] + [
-                o for sc in cls.__subclasses__() for o in sc.AllInstances()
-            ]
+            return [cls()] + [o for sc in cls.__subclasses__() for o in sc.AllInstances()]
         except Exception:
             return [o for sc in cls.__subclasses__() for o in sc.AllInstances()]
 
@@ -180,16 +170,19 @@ class BaseClass:
         obj_copy = create_BC(parameterize(self))
         obj_copy._load(self._save())
         return obj_copy
-    
+
+
 class BaseDepreceated(BaseClass):
     """BaseDepreceated is a class which is used to deprecate a class.
-    
+
     Depreceated classes will raise Exception and will not run.
     """
-    
+
     @log_arguments
     def __init__(self, *args, **kwargs):
-        raise Exception("This class has been depreceated and will not run, please reach out via email (contact@oloren.ai) or raise an issue on GitHub for more details if you have any questions")
+        raise Exception(
+            "This class has been depreceated and will not run, please reach out via email (contact@oloren.ai) or raise an issue on GitHub for more details if you have any questions"
+        )
 
 
 def parameterize(object: Union[BaseClass, list, dict, int, float, str, None]) -> dict:
@@ -239,9 +232,7 @@ def model_name_from_params(param_dict: dict) -> str:
     return (
         param_dict["BC_class_name"]
         + " "
-        + base64.urlsafe_b64encode(
-            hashlib.md5(str(param_dict).encode("utf-8")).digest()
-        )[:8].decode("utf-8")
+        + base64.urlsafe_b64encode(hashlib.md5(str(param_dict).encode("utf-8")).digest())[:8].decode("utf-8")
     )
 
 
@@ -303,36 +294,20 @@ def create_BC(d: dict) -> BaseClass:
         BaseClass: the object created from the parameters
     """
     if isinstance(d, str):
-        d = (
-            d.replace("'", '"')
-            .replace("True", "true")
-            .replace("False", "false")
-            .replace("None", "null")
-        )
+        d = d.replace("'", '"').replace("True", "true").replace("False", "false").replace("None", "null")
         d = json.loads(d)
 
     args = []
     if "args" in d.keys():
         for arg in d["args"]:
-            if isinstance(arg, dict) and (
-                "BC_class_name" in arg.keys()
-            ):
+            if isinstance(arg, dict) and ("BC_class_name" in arg.keys()):
                 args.append(create_BC(arg))
             else:
                 if isinstance(arg, list):
-                    arg = [
-                        create_BC(x)
-                        if isinstance(x, dict)
-                        and ("BC_class_name" in x.keys())
-                        else x
-                        for x in arg
-                    ]
+                    arg = [create_BC(x) if isinstance(x, dict) and ("BC_class_name" in x.keys()) else x for x in arg]
                 elif isinstance(arg, dict):
                     arg = {
-                        k: create_BC(v)
-                        if isinstance(v, dict)
-                        and ("BC_class_name" in v.keys())
-                        else v
+                        k: create_BC(v) if isinstance(v, dict) and ("BC_class_name" in v.keys()) else v
                         for k, v in arg.items()
                     }
                 args.append(arg)
@@ -340,9 +315,7 @@ def create_BC(d: dict) -> BaseClass:
     kwargs = {}
     if "kwargs" in d.keys():
         for k, v in d["kwargs"].items():
-            if isinstance(v, dict) and (
-                "BC_class_name" in v.keys()
-            ):
+            if isinstance(v, dict) and ("BC_class_name" in v.keys()):
                 kwargs[k] = create_BC(v)
             else:
                 kwargs[k] = v
@@ -368,18 +341,10 @@ def loads(d: dict) -> BaseClass:
             args.append(loads(arg))
         else:
             if isinstance(arg, list):
-                arg = [
-                    loads(x)
-                    if isinstance(x, dict) and "BC_class_name" in x.keys()
-                    else x
-                    for x in arg
-                ]
+                arg = [loads(x) if isinstance(x, dict) and "BC_class_name" in x.keys() else x for x in arg]
             args.append(arg)
 
-    kwargs = {
-        k: loads(v) if isinstance(v, dict) and "BC_class_name" in v.keys() else v
-        for k, v in d["kwargs"].items()
-    }
+    kwargs = {k: loads(v) if isinstance(v, dict) and "BC_class_name" in v.keys() else v for k, v in d["kwargs"].items()}
     bc = BaseClass.Registry()[d["BC_class_name"]](*args, **kwargs)
     bc._load(d["instance_save"])
     return bc
@@ -420,9 +385,7 @@ def pretty_params(base: Union[BaseClass, dict]) -> dict:
     if issubclass(type(base), BaseClass):
         args = list(base.args)
         kwargs = dict(base.kwargs.items())
-        base_object_parameters = list(
-            inspect.signature(base.__init__).parameters.keys()
-        )
+        base_object_parameters = list(inspect.signature(base.__init__).parameters.keys())
 
         for kwarg in kwargs:
             if kwarg in base_object_parameters:
@@ -437,12 +400,7 @@ def pretty_params(base: Union[BaseClass, dict]) -> dict:
             **fully_labeled_args,
             **fully_labeled_kwargs,
         }
-    elif (
-        issubclass(type(base), int)
-        or issubclass(type(base), float)
-        or issubclass(type(base), str)
-        or base is None
-    ):
+    elif issubclass(type(base), int) or issubclass(type(base), float) or issubclass(type(base), str) or base is None:
         return base
     elif issubclass(type(base), list):
         return [pretty_params(x) for x in base]
@@ -470,6 +428,7 @@ def json_params_str(base: Union[BaseClass, dict]) -> str:
         .replace("None", "null")
     )
 
+
 def package_available(package_name: str) -> bool:
     """Checks if a package is available.
 
@@ -485,17 +444,15 @@ def package_available(package_name: str) -> bool:
     except ImportError:
         return False
 
+
 def install_with_permission(package_name: str):
-    inp = input(
-        f"The required package {package_name} is not installed. Do you want to install it? [y/N]? "
-    )
+    inp = input(f"The required package {package_name} is not installed. Do you want to install it? [y/N]? ")
     if inp.lower() == "y":
         subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
     else:
-        print(
-            f"Stopping program. You can install the package manually with: \n >> pip install {package_name}"
-        )
+        print(f"Stopping program. You can install the package manually with: \n >> pip install {package_name}")
         os._exit(1)
+
 
 def import_or_install(package_name: str, statement: str = None, scope: dict = None):
     if scope is None:
@@ -509,12 +466,14 @@ def import_or_install(package_name: str, statement: str = None, scope: dict = No
     finally:
         exec(statement, scope)
 
+
 def detect_setting(data):
     values, _ = np.unique(data, return_counts=True)
     if len(values) <= 2:
         return "classification"
     else:
         return "regression"
+
 
 class BaseObject(BaseClass):
     """BaseObject is the parent class for all classes which directly wrap some object to be saved via joblib.
@@ -528,7 +487,6 @@ class BaseObject(BaseClass):
         self.obj = obj
 
     def _save(self):
-
         b = io.BytesIO()
         joblib.dump(self.obj, b)
         return {"obj": b.getvalue()}
@@ -668,7 +626,6 @@ class QuantileTransformer(BasePreprocessor):
         subsample=1e5,
         random_state=None,
     ):
-
         from sklearn.preprocessing import QuantileTransformer
 
         self.obj = QuantileTransformer(
@@ -677,6 +634,7 @@ class QuantileTransformer(BasePreprocessor):
             subsample=subsample,
             random_state=random_state,
         )
+
 
 class StandardScaler(BasePreprocessor):
     """StandardScaler is a BasePreprocessor which standardizes the data by removing the mean and scaling to unit variance.
@@ -687,7 +645,6 @@ class StandardScaler(BasePreprocessor):
 
     @log_arguments
     def __init__(self, with_mean=True, with_std=True):
-
         from sklearn.preprocessing import StandardScaler
 
         self.obj = StandardScaler(with_mean=with_mean, with_std=with_std)
@@ -698,9 +655,9 @@ class LogScaler(BasePreprocessor):
 
     @log_arguments
     def __init__(self, min_value=0, with_mean=True, with_std=True):
-
         from sklearn.preprocessing import StandardScaler
-        self.min=min_value
+
+        self.min = min_value
         self.obj = StandardScaler(with_mean=with_mean, with_std=with_std)
 
     def fit(self, X):
@@ -728,7 +685,7 @@ class LogScaler(BasePreprocessor):
         """
         X = np.array(X)
         self.min = np.min(X)
-        X = np.log10(np.maximum(X - self.min + 1e-3,0))
+        X = np.log10(np.maximum(X - self.min + 1e-3, 0))
         result = self.obj.fit_transform(X.reshape(-1, 1)).reshape(-1)
         return result
 
@@ -741,7 +698,7 @@ class LogScaler(BasePreprocessor):
         Returns:
             The transformed values of the dataset as a numpy array
         """
-        X = np.log10(np.maximum(np.array(X) - self.min + 1e-3,0))
+        X = np.log10(np.maximum(np.array(X) - self.min + 1e-3, 0))
         return self.obj.transform(X.reshape(-1, 1)).reshape(-1)
 
     def inverse_transform(self, X):
@@ -754,11 +711,7 @@ class LogScaler(BasePreprocessor):
             The original values from the transformed values
         """
         X = np.array(X)
-        return (
-            10 ** (self.obj.inverse_transform(X.reshape(-1, 1)).reshape(-1))
-            + self.min
-            - 1e-3
-        )
+        return 10 ** (self.obj.inverse_transform(X.reshape(-1, 1)).reshape(-1)) + self.min - 1e-3
 
     def _save(self):
         d = super()._save()
@@ -770,8 +723,10 @@ class LogScaler(BasePreprocessor):
         self.min = d["min"]
         return self
 
+
 def get_all_reps():
     return list(all_subclasses(BaseRepresentation))
+
 
 class BaseRepresentation(BaseClass):
 
@@ -798,9 +753,7 @@ class BaseRepresentation(BaseClass):
         """
         pass
 
-    def _convert_list(
-        self, smiles_list: List[str], ys: List[Union[int, float, np.number]] = None
-    ) -> List[Any]:
+    def _convert_list(self, smiles_list: List[str], ys: List[Union[int, float, np.number]] = None) -> List[Any]:
         """Converts a list of structures (represented by a SMILES string) to a list of representations
         Parameters:
             smiles_list (List[str]): list of SMILES strings of the structures
@@ -815,9 +768,7 @@ class BaseRepresentation(BaseClass):
         else:
             return [self._convert(s, y=y) for s, y in tqdm(zip(smiles_list, ys))]
 
-    def _convert_cache(
-        self, smiles: str, y: Union[int, float, np.number] = None
-    ) -> Any:
+    def _convert_cache(self, smiles: str, y: Union[int, float, np.number] = None) -> Any:
         """Converts a single structure (represented by a SMILES string) to a representation
         Parameters:
             smiles (str): SMILES string of the structure
@@ -843,9 +794,7 @@ class BaseRepresentation(BaseClass):
         Returns:
             List[Any]: list of representations of the input data
         """
-        if isinstance(Xs, list) and (
-            isinstance(Xs[0], list) or isinstance(Xs[0], tuple)
-        ):
+        if isinstance(Xs, list) and (isinstance(Xs[0], list) or isinstance(Xs[0], tuple)):
             smiles = [X[0] for X in Xs]
         elif isinstance(Xs, pd.DataFrame) or isinstance(Xs, dict):
             if isinstance(Xs, pd.DataFrame):
@@ -873,6 +822,7 @@ class BaseRepresentation(BaseClass):
     def _load(self, d):
         pass
 
+
 class BaseVecRepresentation(BaseRepresentation):
     """Representation where given input data, returns a vector representation for each compound."""
 
@@ -896,16 +846,8 @@ class BaseVecRepresentation(BaseRepresentation):
 
         from os import path
 
-        if not path.exists(
-            path.join(
-                oce.CONFIG["CACHE_PATH"], f"vecrep/{self.__class__.__name__}/"
-            )
-        ):
-            os.mkdir(
-                path.join(
-                oce.CONFIG["CACHE_PATH"], f"vecrep/{self.__class__.__name__}/"
-                )
-            )
+        if not path.exists(path.join(oce.CONFIG["CACHE_PATH"], f"vecrep/{self.__class__.__name__}/")):
+            os.mkdir(path.join(oce.CONFIG["CACHE_PATH"], f"vecrep/{self.__class__.__name__}/"))
 
         super().__init__(*args, log=False, **kwargs)
 
@@ -914,9 +856,7 @@ class BaseVecRepresentation(BaseRepresentation):
         if not self._names is None:
             return self._names
         else:
-            raise ValueError(
-                f"Names not set for representation {self.__class__.__name__}"
-            )
+            raise ValueError(f"Names not set for representation {self.__class__.__name__}")
 
     def convert(
         self,
@@ -937,12 +877,7 @@ class BaseVecRepresentation(BaseRepresentation):
         """
         import joblib
 
-        input_hash = (
-            joblib.hash(Xs)
-            + joblib.hash(ys)
-            + joblib.hash(self._save())
-            + joblib.hash(oce.parameterize(self))
-        )
+        input_hash = joblib.hash(Xs) + joblib.hash(ys) + joblib.hash(self._save()) + joblib.hash(oce.parameterize(self))
 
         from os import path
 
@@ -965,20 +900,12 @@ class BaseVecRepresentation(BaseRepresentation):
             feats = super().convert(Xs, ys)
         import pandas as pd
 
-        feats = pd.DataFrame.from_records(
-            feats, columns=[f"col{i}" for i in range(len(feats[0]))]
-        )
+        feats = pd.DataFrame.from_records(feats, columns=[f"col{i}" for i in range(len(feats[0]))])
         if fit and len(Xs) > 2:
             # collinear
             corr_matrix = feats.corr().abs()
-            upper = corr_matrix.where(
-                np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool)
-            )
-            self.to_drop = [
-                column
-                for column in upper.columns
-                if any(upper[column] > self.collinear_thresh)
-            ]
+            upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+            self.to_drop = [column for column in upper.columns if any(upper[column] > self.collinear_thresh)]
             feats = feats.drop(columns=self.to_drop)
             # scale
             if not self.scale is None:
@@ -1124,6 +1051,7 @@ class ConcatenatedVecRepresentation(BaseVecRepresentation):
         converted_2 = self.rep2.convert(smiles_list, ys=ys, fit=fit)
         return np.concatenate((converted_1, converted_2), axis=1)
 
+
 class SMILESRepresentation(BaseRepresentation):
     """Extracts the SMILES strings from inputted data
 
@@ -1140,9 +1068,7 @@ class SMILESRepresentation(BaseRepresentation):
         pass
 
     def convert(self, Xs, ys=None, **kwargs):
-        if isinstance(Xs, list) and (
-            isinstance(Xs[0], list) or isinstance(Xs[0], tuple)
-        ):
+        if isinstance(Xs, list) and (isinstance(Xs[0], list) or isinstance(Xs[0], tuple)):
             smiles = [X[0] for X in Xs]
         elif isinstance(Xs, pd.DataFrame) or isinstance(Xs, dict):
             if isinstance(Xs, pd.DataFrame):

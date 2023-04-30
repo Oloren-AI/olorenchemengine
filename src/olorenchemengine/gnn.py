@@ -36,9 +36,7 @@ class BaseLightningModule(*lm_imports):
 
         """
         if task_type == "classification":
-            self.loss_fun = nn.BCEWithLogitsLoss(
-                reduction="none", pos_weight=pos_weight
-            )
+            self.loss_fun = nn.BCEWithLogitsLoss(reduction="none", pos_weight=pos_weight)
         else:
             self.loss_fun = nn.MSELoss()
 
@@ -278,7 +276,7 @@ class BaseTorchGeometricModel(BaseModel):
             auto_select_gpus=False,
             max_epochs=self.epochs,
             auto_lr_find=auto_lr_find,
-            num_sanity_val_steps=0
+            num_sanity_val_steps=0,
         )
 
         super().__init__(log=False, **kwargs)
@@ -299,9 +297,7 @@ class BaseTorchGeometricModel(BaseModel):
             if self.pos_weight == "balanced":
                 self.network.set_task_type(
                     "classification",
-                    pos_weight=torch.tensor(
-                        [(len(y_train) - sum(y_train)) / sum(y_train)]
-                    ),
+                    pos_weight=torch.tensor([(len(y_train) - sum(y_train)) / sum(y_train)]),
                 )
             else:
                 self.network.set_task_type("classification")
@@ -310,7 +306,9 @@ class BaseTorchGeometricModel(BaseModel):
 
         from torch_geometric.data import DataLoader as PyGDataLoader
 
-        dataloader = PyGDataLoader(X_train, batch_size=self.batch_size, shuffle=True, num_workers=oce.CONFIG["NUM_WORKERS"])
+        dataloader = PyGDataLoader(
+            X_train, batch_size=self.batch_size, shuffle=True, num_workers=oce.CONFIG["NUM_WORKERS"]
+        )
 
         self.trainer.fit(self.network, dataloader)
 
@@ -346,7 +344,7 @@ from collections import OrderedDict
 
 class TLFromCheckpoint(BaseLightningModule):
 
-    """ TLFromCheckpoint is a class for transfer-learning from an OlorenVec PyTorch-lightning checkpoint.
+    """TLFromCheckpoint is a class for transfer-learning from an OlorenVec PyTorch-lightning checkpoint.
 
     Parameters:
         model_path (str, option): The path to the PyTorch-lightning checkpoint. Ise
@@ -380,9 +378,7 @@ class TLFromCheckpoint(BaseLightningModule):
         state_dict = OrderedDict(
             [
                 (k.replace("model.", ""), v)
-                for k, v in torch.load(path, map_location=oce.CONFIG["MAP_LOCATION"])[
-                    "state_dict"
-                ].items()
+                for k, v in torch.load(path, map_location=oce.CONFIG["MAP_LOCATION"])["state_dict"].items()
             ]
         )
 
@@ -397,7 +393,7 @@ class TLFromCheckpoint(BaseLightningModule):
             virtual_node=False,
         )
         if not reset:
-            self.A.load_state_dict(state_dict)
+            self.A.load_state_dict(state_dict, strict=False)
         self.B = nn.Sequential(
             OrderedDict(
                 [
