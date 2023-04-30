@@ -391,7 +391,7 @@ class TLFromCheckpoint(BaseLightningModule):
         self.A = GNN(
             gnn_type="gcn",
             num_tasks=num_tasks,
-            num_layer=5,
+            num_layer=4,
             emb_dim=300,
             drop_ratio=0.5,
             virtual_node=False,
