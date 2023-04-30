@@ -5,4 +5,4 @@ RUN conda install python=3.8
 COPY install.sh install.sh
 RUN bash install.sh --docker
 COPY . .
-RUN pip install .
+RUN pip install ".[full]"
