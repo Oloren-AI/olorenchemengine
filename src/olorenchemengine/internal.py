@@ -904,7 +904,7 @@ class BaseVecRepresentation(BaseRepresentation):
         if fit and len(Xs) > 2:
             # collinear
             corr_matrix = feats.corr().abs()
-            upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+            upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(np.bool_))
             self.to_drop = [column for column in upper.columns if any(upper[column] > self.collinear_thresh)]
             feats = feats.drop(columns=self.to_drop)
             # scale
