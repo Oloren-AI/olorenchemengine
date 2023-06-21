@@ -328,7 +328,7 @@ class ScaffoldSplit(BaseSplitter):
                     split_reached[cluster_id] = True
             if split_reached == [True] * cluster_count or i >= scaff_size:
                 break
-        data = data.drop("murcko", 1)
+        data = data.drop("murcko", axis=1)
         return out
 
     def _murcko_split(self, data):
@@ -378,7 +378,7 @@ class ScaffoldSplit(BaseSplitter):
                 split_reached[i] = True
             if split_reached == [True] * 3 or scaff_index >= scaff_size:
                 break
-        data = data.drop("murcko", 1)
+        data = data.drop("murcko", axis=1)
         return out
 
     def split(self, data: pd.DataFrame, *args, structure_col: str = "Smiles", **kwargs):
@@ -673,7 +673,7 @@ class PropertySplit(BaseSplitter):
                 ] = int(1)
                 df.loc[df[self.property_col] > thresh2, self.property_col] = int(2)
 
-        data = data.drop("prop_norm", 1)
+        data = data.drop("prop_norm", axis=1)
         return out
 
     def _quantile_uniform_thresh(self, data, threshold, noise):
@@ -709,7 +709,7 @@ class PropertySplit(BaseSplitter):
                     df[self.property_col] <= self.threshold, int(0), int(1)
                 )
 
-        data = data.drop("prop_norm", 1)
+        data = data.drop("prop_norm", axis=1)
         return out
 
     def split(self, data: pd.DataFrame, *args, **kwargs):
